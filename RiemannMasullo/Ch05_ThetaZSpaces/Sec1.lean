@@ -130,7 +130,7 @@ def globalIdelicMellin : ℬ𝔽 →ₗ[ℂ] ↥globalMeromorphic :=
 /-- Paper: Definition 5.1.1.1(1), p. 223.
 At a regular character the global transform evaluates to the continued global zeta integral. -/
 theorem globalIdelicMellin_apply (f : ℬ𝔽) (c : {c : X𝔽 // 0 ≤ globalIdelicOrderBound c}) :
-    (globalIdelicMellin (F := F) f).val c = globalIdelicZFunction f c.val := by sorry
+    (globalIdelicMellin (F := F) f).val c = globalIdelicZFunction f c.val := rfl
 
 /-- Paper: Definition 5.1.1.1(2), p. 223.
 The allowed S-local pole multiplicity is that of the correcting factor.
@@ -182,7 +182,7 @@ def sLocalIdelicMellin : ℬₛ →ₗ[ℂ] ↥sLocalMeromorphic :=
 /-- Paper: Definition 5.1.1.1(2), p. 223.
 At a regular character the S-local transform evaluates to the continued S-local zeta integral. -/
 theorem sLocalIdelicMellin_apply (f : ℬₛ) (c : {c : Xₛ // 0 ≤ sLocalIdelicOrderBound c}) :
-    (sLocalIdelicMellin (F := F) (S := S) f).val c = sLocalIdelicZFunction f c.val := by sorry
+    (sLocalIdelicMellin (F := F) (S := S) f).val c = sLocalIdelicZFunction f c.val := rfl
 
 variable (F) in
 /-- Paper: Definition 5.1.1.1(3), p. 223.
@@ -193,7 +193,7 @@ def adelicThetaLinearMap : ℬ𝔽 →ₗ[ℂ] C(C𝔽, ℂ) :=
 /-- Paper: Definition 5.1.1.1(3), p. 223.
 Evaluating the linear theta map returns the adelic theta function. -/
 theorem adelicThetaLinearMap_apply (f : ℬ𝔽) :
-    adelicThetaLinearMap F f = adelicTheta f := by sorry
+    adelicThetaLinearMap F f = adelicTheta f := rfl
 
 local notation "theta𝔽" => adelicThetaLinearMap F
 local notation "thetaₛ" => sLocalAdelicTheta F S
@@ -208,7 +208,9 @@ abbrev GlobalAdelicThetaSpace := ℬ𝔽 ⧸ LinearMap.ker theta𝔽
 Two test functions give the same global quotient class exactly when their theta functions agree. -/
 theorem globalAdelicThetaSpace_mk_eq_iff (f g : ℬ𝔽) :
     (Submodule.Quotient.mk f : GlobalAdelicThetaSpace F) = Submodule.Quotient.mk g ↔
-      adelicTheta f = adelicTheta g := by sorry
+      adelicTheta f = adelicTheta g := by
+  rw [Submodule.Quotient.eq, LinearMap.mem_ker, map_sub, sub_eq_zero]
+  rfl
 
 variable (F S) in
 /-- Paper: Definition 5.1.1.1(3), p. 223.
@@ -223,7 +225,17 @@ Two test functions give the same S-local quotient class exactly when their class
 functions agree. -/
 theorem sLocalAdelicThetaSpace_mk_eq_iff (f g : ℬₛ) :
     (Submodule.Quotient.mk f : SLocalAdelicThetaSpace F S) = Submodule.Quotient.mk g ↔
-      sLocalAdelicThetaOnClasses F S f = sLocalAdelicThetaOnClasses F S g := by sorry
+      sLocalAdelicThetaOnClasses F S f = sLocalAdelicThetaOnClasses F S g := by
+  rw [Submodule.Quotient.eq, LinearMap.mem_ker, map_sub, sub_eq_zero]
+  constructor
+  · intro h
+    refine ContinuousMap.ext fun x ↦ QuotientGroup.induction_on x fun g' ↦ ?_
+    exact (sLocalAdelicThetaOnClasses_mk F S f g').trans
+      ((DFunLike.congr_fun h g').trans (sLocalAdelicThetaOnClasses_mk F S g g').symm)
+  · intro h
+    refine ContinuousMap.ext fun x ↦ ?_
+    exact (sLocalAdelicThetaOnClasses_mk F S f x).symm.trans
+      ((DFunLike.congr_fun h _).trans (sLocalAdelicThetaOnClasses_mk F S g x))
 
 /-- Paper: Definition 5.1.1.1(3), p. 223.
 The global zeta continuation vanishes for every test function with zero theta function.
@@ -247,7 +259,7 @@ def globalThetaMellin : GlobalAdelicThetaSpace F →ₗ[ℂ] ↥globalMeromorphi
 The global quotient transform recovers the test-function transform on every representative. -/
 theorem globalThetaMellin_mk (f : ℬ𝔽) :
     globalThetaMellin (F := F) (Submodule.Quotient.mk f) =
-      globalIdelicMellin (F := F) f := by sorry
+      globalIdelicMellin (F := F) f := rfl
 
 /-- Paper: Definition 5.1.1.1(3), p. 223.
 The Mellin transform of S-local theta functions is the map induced on the theta quotient. -/
@@ -259,7 +271,7 @@ def sLocalThetaMellin : SLocalAdelicThetaSpace F S →ₗ[ℂ] ↥sLocalMeromorp
 The S-local quotient transform recovers the test-function transform on every representative. -/
 theorem sLocalThetaMellin_mk (f : ℬₛ) :
     sLocalThetaMellin (F := F) (S := S) (Submodule.Quotient.mk f) =
-      sLocalIdelicMellin (F := F) (S := S) f := by sorry
+      sLocalIdelicMellin (F := F) (S := S) f := rfl
 
 variable (F) in
 /-- Paper: Definition 5.1.1.1(4), p. 223.
@@ -291,7 +303,8 @@ def globalThetaToZ : GlobalAdelicThetaSpace F →ₗ[ℂ] GlobalIdelicZSpace F :
 
 /-- Paper: Definition 5.1.1.1(4), p. 223.
 The map from the global theta space onto its Z-space is a quotient map. -/
-theorem globalThetaToZ_isQuotientMap : IsQuotientMap (globalThetaToZ (F := F)) := by sorry
+theorem globalThetaToZ_isQuotientMap : IsQuotientMap (globalThetaToZ (F := F)) :=
+  { eq_coinduced := rfl, surjective := LinearMap.surjective_rangeRestrict _ }
 
 variable (F S) in
 /-- Paper: Definition 5.1.1.1(4), p. 223.

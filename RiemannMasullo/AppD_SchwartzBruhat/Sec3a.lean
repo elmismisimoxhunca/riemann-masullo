@@ -12,6 +12,7 @@ public import Mathlib.Analysis.MellinTransform
 import Mathlib.Analysis.SpecialFunctions.Gaussian.GaussianIntegral
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
 import Mathlib.MeasureTheory.Function.LpSeminorm.LpNorm
+import Mathlib.MeasureTheory.Measure.SeparableMeasure
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Montel
 import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 import Mathlib.Analysis.SpecialFunctions.ExpDeriv
@@ -583,7 +584,34 @@ theorem schwartzBergman_schwartzLine_topology (I : Set ℝ) (hI : IsOpen I)
 
 /-- Paper: Lemma D.3.1.2, p. 799. The Schwartz–Bergman space is separable. -/
 theorem schwartzBergman_separable (I : Set ℝ) (hI : IsOpen I) (hInt : OrdConnected I)
-    (hne : I.Nonempty) : SeparableSpace (SchwartzBergman I) := by sorry
+    (hne : I.Nonempty) : SeparableSpace (SchwartzBergman I) := by
+  let : Nonempty I := hne.to_subtype
+  obtain ⟨a,ha⟩ := TopologicalSpace.exists_dense_seq I
+  have hbr (x : I) : (∃ n, (a n : ℝ) < x) ∧ ∃ n, (x : ℝ) < a n := by
+    obtain ⟨l,r,hl,hr⟩ := exists_bracketing_lines hI x
+    exact ⟨ha.exists_mem_open isOpen_Iio ⟨l,hl⟩, ha.exists_mem_open isOpen_Ioi ⟨r,hr⟩⟩
+  obtain ⟨_, P, hP, hval⟩ := schwartzBergman_lp_generates I hI hInt hne a hbr 2 (by norm_num) (by norm_num)
+  let L (i : ℕ × ℕ) := (weightedSchwartzLp (a i.1) i.2 2).toLinearMap.comp (bergmanLine hI hInt (a i.1))
+  let T := LinearMap.pi L
+  have heq (i : ℕ × ℕ) : P i = (normSeminorm ℂ _).comp (L i) := by
+    ext f
+    change P i f = bergmanLpSeminorm hI hInt 2 (a i.1) i.2 f
+    rw [bergmanLpSeminorm_apply, ← toReal_eLpNorm]
+    exact (ENNReal.toReal_ofReal (apply_nonneg (P i) f)).symm.trans (congrArg ENNReal.toReal (hval i f))
+  have hprod := withSeminorms_pi fun _ : ℕ × ℕ ↦ norm_withSeminorms ℂ (Lp ℂ 2 (volume : Measure ℝ))
+  have hi : IsInducing T := by
+    constructor
+    refine hP.topologicalSpace_eq_iInf.trans ?_
+    refine Eq.trans ?_ (WithSeminorms.topologicalSpace_eq_iInf (t := TopologicalSpace.induced T inferInstance)
+      (T.withSeminorms_induced hprod)).symm
+    rw [iInf_sigma]
+    congr 1
+    funext i
+    rw [heq, iInf_unique]
+    rfl
+  have : Fact ((2 : ℝ≥0∞) ≠ ⊤) := ⟨by norm_num⟩
+  have := hi.secondCountableTopology
+  infer_instance
 
 end Bergman
 
@@ -1308,7 +1336,8 @@ leaving the pure exponential weight. -/
 theorem exponentialDecayL2Integrand_zero_log (a : ℝ) (m : ℕ)
     (f : PositiveRealExponentialDecay univ) (x : ℝ) :
     exponentialDecayL2Integrand a 0 m f x =
-      (Real.exp (a * |x|) : ℂ) * iteratedDeriv m f.val x := by sorry
+      (Real.exp (a * |x|) : ℂ) * iteratedDeriv m f.val x := by
+  simp [exponentialDecayL2Integrand]
 
 private def decayTwistCLM (c : ℝ) : PositiveRealExponentialDecay univ →L[ℂ] 𝓢(ℝ, ℂ) :=
   ⟨logExponentialDecayTwist univ ⟨c, mem_univ c⟩,
@@ -1496,12 +1525,21 @@ def modulatedExponentialDecaySubmodule : Submodule ℂ (G → ℂ) :=
 /-- Paper: Definition D.3.3.1, p. 804. The exponent set containing only zero
 recovers the ordinary Schwartz–Bruhat functions. -/
 theorem modulatedExponentialDecaySubmodule_singleton_zero :
-    modulatedExponentialDecaySubmodule m {0} = schwartzBruhatSubmodule G := by sorry
+    modulatedExponentialDecaySubmodule m {0} = schwartzBruhatSubmodule G := by
+  ext f
+  simp only [modulatedExponentialDecaySubmodule, Submodule.mem_iInf, Submodule.mem_comap]
+  constructor
+  · intro h
+    simpa [modulationWeight_zero] using h ⟨0, rfl⟩
+  · rintro hf ⟨a, ha⟩
+    obtain rfl : a = 0 := ha
+    simpa [modulationWeight_zero] using hf
 
 /-- Paper: (D.3.3.2), p. 805. The given exponent supplies the corresponding
 Schwartz–Bruhat membership. -/
 theorem modulationWeight_mem_schwartzBruhat (a : I) (f : modulatedExponentialDecaySubmodule m I) :
-    modulationWeight m a f.val ∈ schwartzBruhatSubmodule G := by sorry
+    modulationWeight m a f.val ∈ schwartzBruhatSubmodule G :=
+  Submodule.mem_comap.1 (Submodule.mem_iInf _ |>.1 f.2 a)
 
 /-- Paper: (D.3.3.2), p. 805. The linear map Tₐ sends a function in the decay
 submodule to its weighted Schwartz–Bruhat function. -/
@@ -1557,7 +1595,7 @@ theorem compactSubgroup_le_modulation_ker (k : Subgroup G) (hk : IsCompact (k : 
 modulation on a compact-subgroup quotient is continuous. -/
 theorem continuous_quotientModulation (k : Subgroup G) (hk : IsCompact (k : Set G)) :
     Continuous (QuotientGroup.lift k m.toMonoidHom (compactSubgroup_le_modulation_ker m k hk)) :=
-  by sorry
+  continuous_coinduced_dom.2 m.continuous
 
 /-- Paper: Definition D.3.3.3, p. 805. Use the descended modulation to form
 the projective system on the quotient by a compact subgroup. -/
@@ -1568,7 +1606,7 @@ def quotientModulation (k : Subgroup G) (hk : IsCompact (k : Set G)) : (G ⧸ k)
 /-- Paper: Definition D.3.3.3, p. 805. The descended modulation agrees with
 the original one on each coset representative. -/
 theorem quotientModulation_apply (k : Subgroup G) (hk : IsCompact (k : Set G)) (g : G) :
-    quotientModulation m k hk (g : G ⧸ k) = m g := by sorry
+    quotientModulation m k hk (g : G ⧸ k) = m g := rfl
 
 /-- Paper: Definition D.3.3.3, p. 805. The stage S_I(k,G) carries the topology
 induced by the Schwartz–Bruhat twists on G/k.
