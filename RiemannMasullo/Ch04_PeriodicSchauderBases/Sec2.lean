@@ -612,7 +612,83 @@ theorem cyclicFourierCoeff_interval (γ : ℝ) (hγ : 1 < γ) (f : S) (m : ℤ) 
     cyclicFourierCoeff m f =
       (Real.log γ : ℂ)⁻¹ * ∫ t in (1 : ℝ)..γ,
         f (point ((Real.log t / Real.log γ : ℝ) : T)) *
-          Complex.exp (-phase[γ, m] * (Real.log t : ℂ)) / (t : ℂ) := by sorry
+          Complex.exp (-phase[γ, m] * (Real.log t : ℂ)) / (t : ℂ) := by
+  let L := Real.log γ
+  have hL : 0 < L := Real.log_pos hγ
+  have hLne : L ≠ 0 := hL.ne'
+  have hL0 : (L : ℂ) ≠ 0 := by exact_mod_cast hLne
+  change fourierCoeff (fun z : T ↦ f (point z)) m = _
+  rw [fourierCoeff_eq_intervalIntegral _ m 0]
+  simp only [div_self one_ne_zero, one_smul, zero_add, smul_eq_mul]
+  let φ : ℝ → ℝ := fun x ↦ Real.exp (x * L)
+  have hφder : ∀ x ∈ uIcc (0 : ℝ) 1, HasDerivAt φ (L * φ x) x := by
+    intro x _
+    have h := (Real.hasDerivAt_exp (x * L)).comp x ((hasDerivAt_id x).mul_const L)
+    simp only [Function.comp_def, id_eq] at h
+    have : Real.exp (x * L) * (1 * L) = L * φ x := by simp [φ, one_mul, mul_comm]
+    rw [this] at h
+    simpa [φ] using h
+  have hφcont : ContinuousOn (fun x ↦ L * φ x) (uIcc (0 : ℝ) 1) :=
+    (continuous_const.mul
+      (Real.continuous_exp.comp (continuous_id.mul continuous_const))).continuousOn
+  have hφ0 : φ 0 = 1 := by simp [φ]
+  have hφ1 : φ 1 = γ := by simpa [φ] using Real.exp_log (lt_trans zero_lt_one hγ)
+  let g : ℝ → ℂ := fun t ↦
+    cyclicLift f (Real.log t / L) *
+      Complex.exp (-phase[γ, m] * (Real.log t : ℂ)) / (t : ℂ)
+  have hg : ContinuousOn g (Ioi 0) := by
+    have hlog : ContinuousOn Real.log (Ioi 0) :=
+      Real.continuousOn_log.mono fun x (hx : x ∈ Ioi 0) ↦ hx.ne'
+    have harg : ContinuousOn (fun t : ℝ ↦ Real.log t / L) (Ioi 0) := hlog.div_const _
+    have hlift : ContinuousOn (fun t ↦ cyclicLift f (Real.log t / L)) (Ioi 0) :=
+      (cyclicLift_contDiff f).continuous.comp_continuousOn harg
+    have hclog : ContinuousOn (fun t : ℝ ↦ (Real.log t : ℂ)) (Ioi 0) :=
+      Complex.continuous_ofReal.comp_continuousOn hlog
+    have hexp : ContinuousOn
+        (fun t ↦ Complex.exp (-phase[γ, m] * (Real.log t : ℂ))) (Ioi 0) :=
+      Complex.continuous_exp.comp_continuousOn (continuousOn_const.mul hclog)
+    have hcoe : ContinuousOn (fun t : ℝ ↦ (t : ℂ)) (Ioi 0) :=
+      Complex.continuous_ofReal.continuousOn
+    exact (hlift.mul hexp).div hcoe fun t ht ↦ by exact_mod_cast (ht.ne' : t ≠ 0)
+  have himg : φ '' uIcc (0 : ℝ) 1 ⊆ Ioi 0 := by
+    rintro t ⟨x, -, rfl⟩
+    simpa [φ] using Real.exp_pos (x * L)
+  have hsub := intervalIntegral.integral_deriv_smul_comp'
+    (f := φ) (f' := fun x ↦ L * φ x) (g := g) (a := (0 : ℝ)) (b := 1)
+    hφder hφcont (hg.mono himg)
+  have hsub' :
+      ∫ x in (0 : ℝ)..1, (L * φ x) • g (φ x) = ∫ t in (1 : ℝ)..γ, g t := by
+    simpa [hφ0, hφ1] using hsub
+  have hexp (x : ℝ) :
+      Complex.exp (-phase[γ, m] * ((x : ℂ) * (L : ℂ))) = fourier (-m) (x : T) := by
+    rw [fourier_coe_apply]
+    congr 1
+    push_cast
+    dsimp [L] at *
+    field_simp [hL0]
+  have hpoint (x : ℝ) :
+      (L * φ x) • g (φ x) =
+        (L : ℂ) * (fourier (-m) (x : T) * cyclicLift f x) := by
+    have hlog : Real.log (φ x) = x * L := Real.log_exp _
+    have ha : (φ x : ℂ) ≠ 0 := by exact_mod_cast (Real.exp_ne_zero (x * L) : φ x ≠ 0)
+    unfold g
+    rw [hlog, mul_div_cancel_right₀ _ hLne]
+    push_cast
+    rw [hexp, RCLike.real_smul_eq_coe_mul]
+    field_simp [ha] <;> push_cast
+    calc
+      (L : ℂ) * (φ x : ℂ) * cyclicLift f x =
+          cyclicLift f x * ((φ x : ℂ) * (L : ℂ)) := by rw [mul_comm (L : ℂ) (φ x : ℂ), mul_comm]
+      _ = cyclicLift f x * (φ x : ℂ) * (L : ℂ) := (mul_assoc _ _ _).symm
+  have hint :
+      ∫ x in (0 : ℝ)..1, (L * φ x) • g (φ x) =
+        (L : ℂ) * ∫ x in (0 : ℝ)..1, fourier (-m) (x : T) * cyclicLift f x := by
+    rw [← intervalIntegral.integral_const_mul]
+    exact intervalIntegral.integral_congr fun x _ ↦ hpoint x
+  suffices ∫ x in (0 : ℝ)..1, fourier (-m) (x : T) * cyclicLift f x =
+      (L : ℂ)⁻¹ * ∫ t in (1 : ℝ)..γ, g t by
+    simpa [g, cyclicLift] using this
+  rw [← hsub', hint, ← mul_assoc, inv_mul_cancel₀ hL0, one_mul]
 
 -- TODO(paper-gap): The estimate (4.2.1.7) uses m^k for negative frequencies.
 -- For f = e₋₁ and k = 1 the printed right-hand side is negative.
