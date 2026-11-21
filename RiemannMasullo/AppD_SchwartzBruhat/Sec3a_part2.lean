@@ -7,6 +7,7 @@ import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import Mathlib.Topology.ContinuousMap.SecondCountableSpace
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
 # Structure and Fourier–Mellin transform of Schwartz–Bruhat decay spaces
@@ -647,8 +648,51 @@ theorem modulatedExponentialDecay_strip_coordinates
     (c : relativeVerticalStrip m.toMonoidHom hm.1 hm.2 I) :
     ∃! p : PontryaginDual K × ℂ, p.2.re ∈ I ∧
       ∀ (u : K) (t : ℝ≥0ˣ),
-        (c : QuasiCharacter G) ((u : G) * τ t) = (p.1 u : ℂ) * ((t.val : ℝ) : ℂ) ^ p.2 :=
-  by sorry
+        (c : QuasiCharacter G) ((u : G) * τ t) = (p.1 u : ℂ) * ((t.val : ℝ) : ℂ) ^ p.2 := by
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  obtain ⟨e, he⟩ :=
+    quasiCharacterParametrization_of_split (m := m.toMonoidHom) m.continuous (σ := τ) hτ
+  let qc : QuasiCharacter G := c
+  let s : ℂ := (e qc).1
+  let χ : PontryaginDual K := (e qc).2
+  have hrad : ∀ t : ℝ≥0ˣ, qc (τ t) = (((t : ℝ≥0) : ℝ) : ℂ) ^ s := (he qc).1
+  have hker : ∀ u : K, (χ u : ℂ) = qc u := (he qc).2
+  have hformula (u : K) (t : ℝ≥0ˣ) :
+      qc ((u : G) * τ t) = (χ u : ℂ) * ((t.val : ℝ) : ℂ) ^ s := by
+    rw [map_mul, ← hker u, hrad t]
+  -- On the splitting, the modulus is the real power of the module, so the abscissa is s.re.
+  have hsre : s.re = quasiCharacterAbscissa m.toMonoidHom hm.1 hm.2 qc := by
+    set g : G := hm.2.choose
+    have hg : m g ≠ 1 := hm.2.choose_spec
+    let u : K := ⟨g / τ (m g), by
+      rw [MonoidHom.mem_ker, map_div]
+      rw [show m.toMonoidHom (τ (m g)) = m (τ (m g)) from rfl, hτ (m g)]
+      rw [show m.toMonoidHom g = m g from rfl]
+      exact div_self' _⟩
+    have hdecomp : (u : G) * τ (m g) = g := div_mul_cancel _ _
+    have hnorm : ‖qc g‖ = ((m g : ℝ≥0) : ℝ) ^ s.re := by
+      have haux : ‖qc ((u : G) * τ (m g))‖ = ((m g : ℝ≥0) : ℝ) ^ s.re := by
+        rw [map_mul, ← hker u, hrad (m g), norm_mul, Circle.norm_coe, one_mul]
+        exact Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (m g))) s
+      simpa [hdecomp] using haux
+    have hpos : 0 < ((m g : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (m g))
+    have hne1 : ((m g : ℝ≥0) : ℝ) ≠ 1 := fun h ↦ hg (Units.ext (NNReal.coe_inj.mp h))
+    have hlog : Real.log ((m g : ℝ≥0) : ℝ) ≠ 0 := Real.log_ne_zero_of_pos_of_ne_one hpos hne1
+    have hdiv : Real.log ‖qc g‖ / Real.log ((m g : ℝ≥0) : ℝ) = s.re := by
+      rw [hnorm, Real.log_rpow hpos, mul_div_cancel_right₀ _ hlog]
+    exact hdiv.symm
+  refine ExistsUnique.intro (χ, s) ⟨hsre ▸ c.property, hformula⟩ ?_
+  rintro ⟨η, w⟩ ⟨_, hw⟩
+  have hwker (u : K) : qc u = (η u : ℂ) := by
+    simpa [map_one, Complex.one_cpow] using hw u 1
+  have hwrad : ∀ t : ℝ≥0ˣ, qc.comp τ t = (((t : ℝ≥0) : ℝ) : ℂ) ^ w := by
+    intro t
+    simpa [Subgroup.coe_one, map_one, Circle.coe_one] using hw (1 : K) t
+  apply Prod.ext
+  · apply PontryaginDual.ext
+    intro u
+    exact (Circle.ext ((hker u).trans (hwker u))).symm
+  · exact (existsUnique_complexPower (qc.comp τ)).unique hwrad hrad
 
 local notation "T" => InductiveTensor (SchwartzBruhat K) P
 
