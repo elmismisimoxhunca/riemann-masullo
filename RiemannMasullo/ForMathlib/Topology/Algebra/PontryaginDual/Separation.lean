@@ -260,6 +260,93 @@ private theorem averageOrbit_dense (v : H) :
 
 end Averaging
 
+/-- Finitely many powers suffice to detect, in a fixed ball test, every circle element
+outside a prescribed neighborhood of one. -/
+private theorem circle_finite_power_test {ε : ℝ} (hε : 0 < ε) :
+    ∃ t : Finset ℕ, ∀ z : Circle, (∀ n ∈ t, dist (z ^ n) 1 < 1 / 4) → dist z 1 < ε := by
+  let O (n : ℕ) := {z : Circle | 1 / 4 < dist (z ^ n) 1}
+  have hopen (n : ℕ) : IsOpen (O n) := isOpen_lt continuous_const
+    ((continuous_id.pow n).dist continuous_const)
+  have hcover : (Metric.ball (1 : Circle) ε)ᶜ ⊆ ⋃ n, O n := by
+    intro z hz
+    by_contra h
+    have hall : ∀ n, dist (z ^ n) 1 ≤ 1 / 4 := by simpa [O] using h
+    have heq : z = 1 := Circle.eq_one_of_forall_pow_mem_centeredArc_pi_div_two fun n _ ↦ by
+      rw [Circle.mem_centeredArc (by linarith [Real.pi_pos]), Complex.abs_arg_lt_pi_div_two_iff]
+      left
+      have hd := hall n
+      change dist ((z ^ n : Circle) : ℂ) 1 ≤ 1 / 4 at hd
+      have hr := Complex.abs_re_le_norm (((z ^ n : Circle) : ℂ) - 1)
+      rw [dist_eq_norm] at hd
+      rw [Complex.sub_re, Complex.one_re] at hr
+      linarith [neg_le_abs (((z ^ n : Circle) : ℂ).re - 1)]
+    exact hz (heq ▸ Metric.mem_ball_self hε)
+  obtain ⟨t, ht⟩ := Metric.isOpen_ball.isClosed_compl.isCompact.elim_finite_subcover O hopen hcover
+  refine ⟨t, fun z hz ↦ ?_⟩
+  by_contra! h
+  obtain ⟨n, hn, hzn⟩ := mem_iUnion₂.mp (ht (show z ∈ (Metric.ball 1 ε)ᶜ from not_lt.mpr h))
+  exact (hz n hn).not_gt hzn
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- On a spectral level set on which an averaged operator is bounded away from zero,
+the unitary multipliers restrict to a compact family of continuous group characters.
+A fixed ball test on their powers bounds the displacement of the operator. -/
+private theorem compact_character_test_of_multiplier {A : Type*} [CommCStarAlgebra A]
+    (V : G →* A) (hV : ∀ (ω : characterSpace ℂ A) g, ‖ω (V g)‖ = 1)
+    (a : A) (hc : Continuous fun g ↦ V g * a) :
+    ∃ K : Set (PontryaginDual G), IsCompact K ∧
+      ∀ g, (∀ χ ∈ K, dist (χ g) 1 < 1 / 4) → ‖V g * a - a‖ ≤ 1 / 4 := by
+  let S := {ω : characterSpace ℂ A | 1 / 8 ≤ ‖ω a‖}
+  have hS : IsClosed S := isClosed_le continuous_const (gelfandTransform ℂ A a).continuous.norm
+  let : CompactSpace S := isCompact_iff_compactSpace.mp hS.isCompact
+  have hcont : Continuous fun p : S × G ↦ p.1.val (V p.2) := by
+    have hnum : Continuous fun p : S × G ↦ p.1.val (V p.2 * a) :=
+      continuous_eval.comp ((((gelfandTransform_isometry A).continuous.comp hc).comp
+        continuous_snd).prodMk (continuous_subtype_val.comp continuous_fst))
+    have hden : Continuous fun p : S × G ↦ p.1.val a :=
+      (gelfandTransform ℂ A a).continuous.comp (continuous_subtype_val.comp continuous_fst)
+    have hn (p : S × G) : p.1.val a ≠ 0 :=
+      norm_pos_iff.mp ((by norm_num : (0 : ℝ) < 1 / 8).trans_le p.1.property)
+    exact (hnum.div hden hn).congr fun p ↦ by
+      change p.1.val (V p.2 * a) / p.1.val a = _
+      rw [map_mul, mul_div_cancel_right₀ _ (hn p)]
+  let χ (s : S) : PontryaginDual G :=
+    { toFun g := ⟨s.val (V g), mem_sphere_zero_iff_norm.mpr (hV _ _)⟩
+      map_one' := Subtype.ext (by simp)
+      map_mul' g k := Circle.ext (by
+        change s.val (V (g * k)) = s.val (V g) * s.val (V k)
+        rw [map_mul, map_mul])
+      continuous_toFun := (hcont.comp (continuous_const.prodMk continuous_id)).subtype_mk _ }
+  have hχ : Continuous χ := ContinuousMonoidHom.continuous_of_continuous_uncurry χ
+    (hcont.subtype_mk _)
+  let ε := (1 / 4) / (‖a‖ + 1)
+  obtain ⟨t, ht⟩ := circle_finite_power_test (show 0 < ε by dsimp [ε]; positivity)
+  let K := ⋃ n ∈ t, range (fun s ↦ χ s ^ n)
+  refine ⟨K, t.finite_toSet.isCompact_biUnion (fun n _ ↦ isCompact_range (hχ.pow n)),
+    fun g hg ↦ ?_⟩
+  have hiso := (gelfandTransform_isometry A).norm_map_of_map_zero (map_zero _) (V g * a - a)
+  rw [← hiso, ContinuousMap.norm_le _ (by norm_num)]
+  intro ω
+  change ‖ω (V g * a - a)‖ ≤ 1 / 4
+  rw [map_sub, map_mul, ← sub_one_mul, norm_mul]
+  by_cases hs : ω ∈ S
+  · have hdist : dist (χ ⟨ω, hs⟩ g) 1 < ε := ht _ fun n hn ↦ by
+      have hh := hg (χ ⟨ω, hs⟩ ^ n) (mem_iUnion₂.mpr ⟨n, hn, mem_range_self _⟩)
+      exact (ContinuousMonoidHom.pow_apply (χ ⟨ω, hs⟩) n g) ▸ hh
+    change dist (ω (V g)) 1 < ε at hdist
+    rw [dist_eq_norm] at hdist
+    have hω : ‖ω a‖ ≤ ‖a‖ := by
+      change ‖(gelfandTransform ℂ A a) ω‖ ≤ ‖a‖
+      exact (ContinuousMap.norm_coe_le_norm _ _).trans_eq
+        ((gelfandTransform_isometry A).norm_map_of_map_zero (map_zero _) a)
+    refine (mul_le_mul hdist.le (hω.trans (by linarith : ‖a‖ ≤ ‖a‖ + 1))
+      (norm_nonneg _) (by dsimp [ε]; positivity)).trans ?_
+    exact (div_mul_cancel₀ _ (by positivity : ‖a‖ + 1 ≠ 0)).le
+  · have hlow : ‖ω a‖ < 1 / 8 := lt_of_not_ge hs
+    have hdiff := norm_sub_le (ω (V g)) 1
+    rw [hV, norm_one] at hdiff
+    exact (mul_le_mul hdiff hlow.le (norm_nonneg _) (by norm_num)).trans (by norm_num)
+
 section Spectrum
 
 variable [MeasurableSpace G] [BorelSpace G] (μ : Measure G) [μ.IsHaarMeasure]
@@ -359,6 +446,78 @@ private theorem exists_character_of_rep_ne_one {x : G} (hx : U x ≠ 1) :
   have hh : ω (V x) = 1 := congrArg (fun z : Circle ↦ (z : ℂ)) h
   rw [map_mul, hh, one_mul]
 
+include μ hU hc in
+open scoped IsMulCommutative Pointwise in
+/-- Compact tests control displacement of a nonzero vector in a strongly continuous
+unitary representation. First smooth the vector with a Haar average, so that its
+translates can be controlled in operator norm in the double commutant. -/
+private theorem compact_character_test_of_rep (v : H) (hv : 0 < ‖v‖) :
+    ∃ K : Set (PontryaginDual G), IsCompact K ∧
+      ∀ g, (∀ χ ∈ K, dist (χ g) 1 < 1 / 4) → ‖U g v - v‖ < ‖v‖ := by
+  let B := H →L[ℂ] H
+  have hstar (g : G) : star (U g) = U g⁻¹ := by
+    have hh := (U g).norm_map_iff_adjoint_comp_self.mp (hU g)
+    change star (U g) * U g = 1 at hh
+    calc
+      star (U g) = (star (U g) * U g) * U g⁻¹ := by
+        rw [mul_assoc, ← map_mul, mul_inv_cancel, map_one, mul_one]
+      _ = U g⁻¹ := by rw [hh, one_mul]
+  let S : Set B := range U
+  let A := StarSubalgebra.centralizer ℂ (StarSubalgebra.centralizer ℂ S : Set B)
+  have hS : S ∪ star S = S := by
+    apply union_eq_self_of_subset_right
+    intro T hT
+    obtain ⟨g, hg⟩ : star T ∈ range U := hT
+    exact ⟨g⁻¹, by rw [← hstar, hg, star_star]⟩
+  have hA : (A : Set B) = S.centralizer.centralizer := by
+    rw [StarSubalgebra.coe_centralizer_centralizer, hS]
+  let : IsClosed (A : Set B) := hA ▸ Set.isClosed_centralizer _
+  have hcomm : S.Pairwise Commute := .of_forall₂ fun _ ha _ hb ↦ by
+    obtain ⟨g, rfl⟩ := ha
+    obtain ⟨k, rfl⟩ := hb
+    change U g * U k = U k * U g
+    rw [← map_mul, ← map_mul, mul_comm g k]
+  let : IsMulCommutative A := .of_setLike_mul_comm fun a ha b hb ↦ by
+    change a ∈ (A : Set B) at ha
+    change b ∈ (A : Set B) at hb
+    rw [hA] at ha hb
+    exact Set.centralizer_centralizer_comm_of_comm hcomm _ ha _ hb
+  let : CommCStarAlgebra A := { }
+  let V : G →* A := U.codRestrict A.toSubmonoid fun g ↦ by
+    change U g ∈ (A : Set B)
+    rw [hA]
+    exact Set.subset_centralizer_centralizer (mem_range_self _)
+  have hVstar (g : G) : star (V g) = V g⁻¹ := Subtype.ext (hstar g)
+  obtain ⟨_, ⟨f, rfl⟩, hfv⟩ := Metric.mem_closure_iff.mp (averageOrbit_dense μ U hU hc v)
+    (‖v‖ / 8) (by positivity)
+  let a : A := ⟨averageOrbit μ U hU hc f, by
+    change averageOrbit μ U hU hc f ∈ (A : Set B)
+    rw [hA]
+    intro T hT
+    exact averageOrbit_commutes μ U hU hc f T (fun g ↦ hT (U g) (mem_range_self g))⟩
+  have hunit (ω : characterSpace ℂ A) (g : G) : ‖ω (V g)‖ = 1 := by
+    have heq : star (ω (V g)) * ω (V g) = 1 := by
+      rw [← map_star, ← map_mul, hVstar, ← map_mul, inv_mul_cancel, map_one, map_one]
+    have habs := congrArg norm heq
+    rw [norm_mul, norm_star, norm_one, ← sq] at habs
+    nlinarith [norm_nonneg (ω (V g))]
+  have hcont : Continuous fun g ↦ V g * a := by
+    have ht : Continuous fun g ↦ U g * averageOrbit μ U hU hc f := by
+      simp_rw [averageOrbit_translate]
+      exact (averageOrbit μ U hU hc).continuous.comp
+        (haarTranslation_continuous μ 1 ENNReal.one_ne_top f)
+    exact ht.subtype_mk _
+  obtain ⟨K, hK, htest⟩ := compact_character_test_of_multiplier V hunit a hcont
+  refine ⟨K, hK, fun g hg ↦ ?_⟩
+  let T : H →L[ℂ] H := a
+  have hnorm : ‖U g * T - T‖ ≤ 1 / 4 := htest g hg
+  have hm : ‖U g (T v) - T v‖ ≤ (1 / 4) * ‖v‖ :=
+    ((U g * T - T).le_opNorm v).trans (mul_le_mul_of_nonneg_right hnorm (norm_nonneg v))
+  have he : ‖v - T v‖ < ‖v‖ / 8 := by simpa only [dist_eq_norm] using hfv
+  have hd := dist_triangle4 (U g v) (U g (T v)) (T v) v
+  simp only [dist_eq_norm, ← map_sub, hU] at hd
+  linarith [norm_sub_rev (T v) v]
+
 end Spectrum
 
 /-- Each nonidentity element of a locally compact Hausdorff abelian group is detected by a
@@ -370,5 +529,45 @@ public theorem exists_pontryaginDual_apply_ne_one {x : G} (hx : x ≠ 1) :
   let μ : Measure G := Measure.haar
   exact exists_character_of_rep_ne_one μ (haarTranslation μ 2) (haarTranslation_norm μ 2)
     (haarTranslation_continuous μ 2 (by simp)) (haarTranslation_ne_one μ hx)
+
+open scoped Pointwise in
+/-- The fixed-radius tests on compact sets of characters refine every neighborhood of one.
+Use the indicator of a small compact neighborhood in the regular representation: outside
+the given neighborhood its translate has disjoint support. -/
+public theorem exists_compact_character_test_of_nhds_one {W : Set G} (hW : W ∈ 𝓝 1) :
+    ∃ K : Set (PontryaginDual G), IsCompact K ∧
+      ∀ g, (∀ χ ∈ K, dist (χ g) 1 < 1 / 4) → g ∈ W := by
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  let μ : Measure G := Measure.haar
+  obtain ⟨D, hD, -, hDi, hDD⟩ := exists_closed_nhds_one_inv_eq_mul_subset hW
+  obtain ⟨L, ⟨hLn, hL⟩, hLD⟩ := (compact_basis_nhds (1 : G)).mem_iff.mp hD
+  have hLpos : 0 < μ.real L := ENNReal.toReal_pos (μ.measure_pos_of_mem_nhds hLn).ne'
+    hL.measure_lt_top.ne
+  let v := indicatorConstLp 2 hL.measurableSet (hL.measure_lt_top (μ := μ)).ne (1 : ℂ)
+  have hv : 0 < ‖v‖ := by
+    rw [norm_indicatorConstLp (by norm_num) (by simp), norm_one, one_mul]
+    exact Real.rpow_pos_of_pos hLpos _
+  obtain ⟨K, hK, htest⟩ := compact_character_test_of_rep μ (haarTranslation μ 2)
+    (haarTranslation_norm μ 2) (haarTranslation_continuous μ 2 (by simp)) v hv
+  refine ⟨K, hK, fun g hg ↦ ?_⟩
+  by_contra hnot
+  apply (htest g hg).not_ge
+  have he : (haarTranslation μ 2 g v : G → ℂ) =ᵐ[μ] fun y ↦ (v : G → ℂ) (g⁻¹ * y) :=
+    Lp.coeFn_compMeasurePreserving _ _
+  have hval : (v : G → ℂ) =ᵐ[μ] L.indicator (fun _ ↦ (1 : ℂ)) := indicatorConstLp_coeFn
+  refine Lp.norm_le_norm_of_ae_le ?_
+  filter_upwards [Lp.coeFn_sub (haarTranslation μ 2 g v) v, he, hval,
+    (measurePreserving_mul_left μ g⁻¹).quasiMeasurePreserving.ae_eq_comp hval] with y hy ht hvy hgy
+  change v (g⁻¹ * y) = L.indicator (fun _ ↦ (1 : ℂ)) (g⁻¹ * y) at hgy
+  rw [hy, Pi.sub_apply, ht, hgy, hvy]
+  by_cases hyL : y ∈ L
+  · have hn : g⁻¹ * y ∉ L := by
+      intro h
+      apply hnot
+      apply hDD
+      exact ⟨y, hLD hyL, _, hDi ▸ Set.inv_mem_inv.mpr (hLD h), by simp⟩
+    simp [hyL, hn]
+  · simp [hyL]
 
 end RiemannMasullo

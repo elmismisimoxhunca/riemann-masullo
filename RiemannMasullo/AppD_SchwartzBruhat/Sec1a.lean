@@ -87,7 +87,7 @@ carrying most of its Bochner measure. -/
 theorem exists_pontryaginDual_compact_test {U : Set G} (hU : U ∈ 𝓝 (1 : G)) :
     ∃ K : Set (PontryaginDual G), IsCompact K ∧
       ∀ x : G, (∀ χ ∈ K, dist (χ x) 1 < 1 / 4) → x ∈ U := by
-  sorry
+  exact exists_compact_character_test_of_nhds_one hU
 
 /-- Paper: Theorem D.1.1.1(2), p. 746. Evaluation embeds the group as a closed subgroup
 of its bidual. -/
@@ -329,9 +329,14 @@ theorem pontryaginDual_bidual :
     fun _ _ ↦ rfl⟩
 
 /-- Paper: Theorem D.1.1.1(3), p. 746. A locally compact abelian group is compact
-exactly when its dual is discrete. -/
+exactly when its dual is discrete. Mathlib derives the forward implication
+(`CompactSpace A → DiscreteTopology (PontryaginDual A)`); the converse identifies `G`
+with the closed subgroup `pontryaginDual_eval G` of the bidual, which is compact
+because the dual is discrete. -/
 theorem compactSpace_iff_discretePontryaginDual :
-    CompactSpace G ↔ DiscreteTopology (PontryaginDual G) := by sorry
+    CompactSpace G ↔ DiscreteTopology (PontryaginDual G) := by
+  refine ⟨fun _ ↦ inferInstance, fun _ ↦ ?_⟩
+  exact IsClosedEmbedding.compactSpace (isClosedEmbedding_pontryaginDual_eval (G := G))
 
 end Pontryagin
 
