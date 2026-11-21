@@ -10,6 +10,7 @@ import Mathlib.Topology.Covering.AddCircle
 import Mathlib.Topology.Homotopy.Lifting
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.ContDiff
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 
@@ -1283,12 +1284,59 @@ gives a differential operator of degree one. -/
 theorem bruhatDiffDegree_generator (a : LCATopologicalLie G) (ha : a ≠ 1) :
     bruhatDiffDegree (bruhatDiffGenerator a) = 1 := by sorry
 
+omit [CommGroup G] [TopologicalSpace G] hTop hT2 hLC in
+/-- On a fixed discrete fiber the covering parametrization is a translate of a
+vector group homomorphism. -/
+private theorem contDiff_elementary_character {A : Type*} [CommGroup A] [TopologicalSpace A]
+    (χ : PontryaginDual A) (e : ElementaryLCAPresentation A)
+    (z : Fin e.latticeRank → ℤ) (b : e.finiteFactor) (p : WithTop ℕ∞) :
+    ContDiff ℝ p (fun xt ↦
+      (χ (e.equiv.symm (Multiplicative.ofAdd (elementaryCover xt z b))) : ℂ)) := by
+  let E := EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim)
+  let S := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let cover : E →+ S :=
+    { toFun := fun xt ↦ elementaryCover xt 0 0
+      map_zero' := Prod.ext rfl (Prod.ext (funext fun _ ↦ AddCircle.coe_zero (1 : ℝ)) rfl)
+      map_add' := fun u v ↦ Prod.ext rfl
+        (Prod.ext (funext fun i ↦ AddCircle.coe_add (1 : ℝ) (u.2 i) (v.2 i)) (zero_add _).symm) }
+  have hCover : Continuous cover :=
+    continuous_fst.prodMk ((continuous_pi fun i ↦ (AddCircle.continuous_mk' (1 : ℝ)).comp
+      ((PiLp.continuous_apply 2 _ i).comp continuous_snd)).prodMk continuous_const)
+  let φ : PontryaginDual (Multiplicative S) := χ.comp e.equiv.symm
+  let ψ : PontryaginDual (Multiplicative E) := φ.comp ⟨cover.toMultiplicative, hCover⟩
+  have hShift (xt : E) : elementaryCover xt z b = cover xt + (0, 0, z, b) := by
+    exact Prod.ext (add_zero _).symm (Prod.ext (add_zero _).symm (zero_add _).symm)
+  simp_rw [hShift]
+  change ContDiff ℝ p (fun xt : E ↦
+    (φ (Multiplicative.ofAdd (cover xt) * Multiplicative.ofAdd (0, 0, z, b)) : ℂ))
+  simp only [map_mul, Circle.coe_mul]
+  exact (contDiff_vector_character ψ p).mul contDiff_const
+
 /-- Paper: Remark D.1.6.11, p. 768. A character gives a Bruhat smooth
 function via its circle-valued character map.
 Deviation: The global differentiability definition in §D.1.5 allows any
 good subgroup in the kernel, so the symbol can use the character itself. -/
 theorem pontryaginDual_mem_bruhatSmooth (χ : PontryaginDual G) :
-    (fun x : G ↦ (χ x : ℂ)) ∈ bruhatSmoothSubmodule := by sorry
+    (fun x : G ↦ (χ x : ℂ)) ∈ bruhatSmoothSubmodule := by
+  obtain ⟨H, hχ⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 χ
+  let k := lcaDualAnnihilator H.val
+  have hker : k ≤ χ.toMonoidHom.ker := fun x hx ↦
+    (mem_lcaDualAnnihilator_iff H.val x).mp hx ⟨χ, hχ⟩
+  apply (mem_bruhatSmoothSubmodule_iff _).mpr
+  intro p
+  refine ⟨k, isBruhatGoodSubgroup_dualAnnihilator H, ?_, ?_⟩
+  · intro h x
+    change (χ (h.val * x) : ℂ) = (χ x : ℂ)
+    rw [map_mul, show χ h.val = 1 from hker h.property, one_mul]
+  · intro a ha
+    let ψ := χ.toMonoidHom.comp a.val.1.subtype
+    let N := (OrderDual.ofDual a.val.2).comap a.val.1.subtype
+    have hN : N ≤ ψ.ker := fun x hx ↦ hker (ha ▸ (show x.val ∈ OrderDual.ofDual a.val.2 from hx))
+    let χ₀ : PontryaginDual a.quotient :=
+      ⟨QuotientGroup.lift N ψ hN, (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr
+        (χ.continuous.comp continuous_subtype_val)⟩
+    exact ⟨fun y ↦ (χ₀ y : ℂ), fun _ ↦ rfl, fun e z b ↦
+      contDiff_elementary_character χ₀ e z b (p : ℕ∞)⟩
 
 /-- Paper: Definition D.1.6.10, p. 768. The symbol evaluates the differential
 operator applied to a character at the group identity. -/
@@ -1318,11 +1366,71 @@ theorem bruhatDiffWord_character (w : List (LCATopologicalLie G))
       (w.map (fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ)).prod * (χ x : ℂ) :=
   by sorry
 
+/-- A continuous character is an eigenfunction of each invariant first-order
+operator, with eigenvalue the symbol at the identity. -/
+private theorem bruhatFirstOrder_character (a : LCATopologicalLie G) (χ : PontryaginDual G) :
+    bruhatFirstOrder a ⟨fun x ↦ (χ x : ℂ), pontryaginDual_mem_bruhatSmooth χ⟩ =
+      bruhatDiffSymbol (bruhatDiffGenerator a) χ •
+        ⟨fun x ↦ (χ x : ℂ), pontryaginDual_mem_bruhatSmooth χ⟩ := by
+  let φ : bruhatSmoothSubmodule (G := G) :=
+    ⟨fun x ↦ (χ x : ℂ), pontryaginDual_mem_bruhatSmooth χ⟩
+  change bruhatFirstOrder a φ = bruhatDiffSymbol (bruhatDiffGenerator a) χ • φ
+  apply Subtype.ext
+  funext x
+  rw [bruhatFirstOrder_apply, Submodule.coe_smul, Pi.smul_apply, smul_eq_mul]
+  have hsym : bruhatDiffSymbol (bruhatDiffGenerator a) χ =
+      bruhatDirectionalDeriv a (φ : G → ℂ) 1 := by
+    simp [bruhatDiffSymbol, bruhatDiffGenerator, bruhatFirstOrder_apply, φ]
+  rw [hsym]
+  simp only [bruhatDirectionalDeriv]
+  have horbit :
+      (fun t : ℝ ↦ (φ : G → ℂ) (x * a (Multiplicative.ofAdd t))) =
+        fun t : ℝ ↦ (χ x : ℂ) * (χ (a (Multiplicative.ofAdd t)) : ℂ) := by
+    funext t
+    change (χ (x * a (Multiplicative.ofAdd t)) : ℂ) = _
+    rw [map_mul, Circle.coe_mul]
+  have hunit :
+      (fun t : ℝ ↦ (φ : G → ℂ) ((1 : G) * a (Multiplicative.ofAdd t))) =
+        fun t : ℝ ↦ (χ (a (Multiplicative.ofAdd t)) : ℂ) := by
+    funext t
+    change (χ ((1 : G) * a (Multiplicative.ofAdd t)) : ℂ) = _
+    simp
+  rw [horbit, hunit, deriv_const_mul_field]
+  exact mul_comm _ _
+
+/-- A word in the first-order operators multiplies a character by the product
+of the corresponding symbols. -/
+private theorem bruhatDiffWord_apply_character (w : List (LCATopologicalLie G))
+    (χ : PontryaginDual G) :
+    (bruhatDiffWord w).val ⟨fun x ↦ (χ x : ℂ), pontryaginDual_mem_bruhatSmooth χ⟩ =
+      (w.map (fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ)).prod •
+        ⟨fun x ↦ (χ x : ℂ), pontryaginDual_mem_bruhatSmooth χ⟩ := by
+  let φ : bruhatSmoothSubmodule (G := G) :=
+    ⟨fun x ↦ (χ x : ℂ), pontryaginDual_mem_bruhatSmooth χ⟩
+  change (bruhatDiffWord w).val φ =
+    (w.map (fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ)).prod • φ
+  induction w with
+  | nil =>
+      simp [bruhatDiffWord, φ]
+  | cons a w ih =>
+      have hword : bruhatDiffWord (a :: w) = bruhatDiffWord w * bruhatDiffGenerator a := by
+        simp [bruhatDiffWord]
+      rw [hword]
+      change (bruhatDiffWord w).val ((bruhatDiffGenerator a).val φ) = _
+      rw [show (bruhatDiffGenerator a).val φ = bruhatFirstOrder a φ from rfl,
+        bruhatFirstOrder_character, map_smul, ih, smul_smul, List.map_cons, List.prod_cons]
+
 /-- Paper: Lemma D.1.6.13, p. 769. The symbol of a word is the product
 of its first-order symbols. -/
 theorem bruhatDiffSymbol_word (w : List (LCATopologicalLie G)) (χ : PontryaginDual G) :
     bruhatDiffSymbol (bruhatDiffWord w) χ =
-      (w.map (fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ)).prod := by sorry
+      (w.map (fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ)).prod := by
+  let φ : bruhatSmoothSubmodule (G := G) :=
+    ⟨fun x : G ↦ (χ x : ℂ), pontryaginDual_mem_bruhatSmooth χ⟩
+  have h := congrArg (fun f : bruhatSmoothSubmodule (G := G) ↦ (f : G → ℂ) 1)
+    (bruhatDiffWord_apply_character w χ)
+  simpa [bruhatDiffSymbol, φ, Submodule.coe_smul, Pi.smul_apply, smul_eq_mul, map_one,
+    Circle.coe_one, mul_one] using h
 
 /-- Paper: Lemma D.1.6.13, p. 769. The symbol is invariant under every
 compact subgroup of the dual. -/

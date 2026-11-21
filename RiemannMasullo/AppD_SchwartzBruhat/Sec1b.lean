@@ -12,6 +12,7 @@ import RiemannMasullo.ForMathlib.Topology.Algebra.ContinuousMonoidHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.LocalSubgroup
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.LocalHom
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Complex.CircleLocalHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
@@ -2045,44 +2046,86 @@ theorem bruhatStructuralPair_filtered :
     have hKq : K ≤ OrderDual.ofDual q.val.2 := inf_le_right
     exact ⟨⟨(H.val, OrderDual.toDual K), H.property.1, H.property.2, hK, hKH⟩, ⟨hp, hKp⟩, ⟨hq, hKq⟩⟩
 
+/-- The target of an open continuous map from a real vector group has an elementary
+presentation if it is compactly generated. -/
+private theorem elementaryPresentation_of_open_vector_map {E B : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
+    [CommGroup B] [TopologicalSpace B] [IsTopologicalGroup B] [T2Space B]
+    (f : E →+ Additive B) (hf : Continuous f) (hopen : IsOpenMap f)
+    (hB : IsCompactlyGeneratedGroup B) : Nonempty (ElementaryLCAPresentation B) := by
+  let : T2Space (Additive B) := ‹T2Space B›
+  obtain ⟨m, n, ⟨e⟩⟩ := exists_real_torus_equiv_of_open_vector_range f hf hopen
+  have hRange : IsOpen (f.range : Set (Additive B)) := by
+    rw [AddMonoidHom.coe_range, ← Set.image_univ]
+    exact hopen _ isOpen_univ
+  let : DivisibleBy f.range ℤ := divisibleByOfSMulRightSurj f.range ℤ (fun {z} hz y ↦ by
+    obtain ⟨x, rfl⟩ := f.rangeRestrict_surjective y
+    have hzR : (z : ℝ) ≠ 0 := Int.cast_ne_zero.mpr hz
+    refine ⟨f.rangeRestrict ((z : ℝ)⁻¹ • x), ?_⟩
+    change z • f.rangeRestrict ((z : ℝ)⁻¹ • x) = f.rangeRestrict x
+    rw [← map_zsmul, ← Int.cast_smul_eq_zsmul ℝ, smul_smul, mul_inv_cancel₀ hzR, one_smul])
+  obtain ⟨split⟩ := exists_continuousAddEquiv_prod_quotient_of_open f.range hRange
+  let D := Additive B ⧸ f.range
+  let : DiscreteTopology D := QuotientAddGroup.discreteTopology hRange
+  let product := split.toAddEquiv.trans (AddEquiv.prodCongr e.toAddEquiv (AddEquiv.refl D))
+  let assoc := Homeomorph.prodAssoc (EuclideanSpace ℝ (Fin m)) (Fin n → AddCircle (1 : ℝ)) D
+  exact elementaryPresentation_of_compactlyGenerated hB {
+    AddEquiv.toMultiplicativeRight (product.trans AddEquiv.prodAssoc) with
+    continuous_toFun := assoc.continuous.comp
+      ((e.continuous_toFun.prodMap continuous_id).comp split.continuous_toFun)
+    continuous_invFun := split.continuous_invFun.comp
+      ((e.continuous_invFun.prodMap continuous_id).comp assoc.symm.continuous) }
+
+/-- The local vector subgroup above a torus homomorphism with discrete kernel extends
+to a continuous open homomorphism from a finite-dimensional vector space. -/
+private theorem exists_open_vector_map_of_discrete_torusKernel {G ι : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [LocallyCompactSpace G] [Fintype ι]
+    (f : G →ₜ* (ι → Circle)) (hf : DiscreteTopology f.toMonoidHom.ker) :
+    ∃ (L : Submodule ℝ (EuclideanSpace ℝ ι)) (g : L →+ Additive G), Continuous g ∧ IsOpenMap g := by
+  obtain ⟨L, ρ, σ, hρ, _, _, hc, hadd, hnhds⟩ := exists_localSection_of_discrete_torusKernel f hf
+  obtain ⟨g, hg⟩ := exists_addMonoidHom_of_addOn_ball (fun v ↦ Additive.ofMul (σ v)) hρ hadd
+  have hEq : (fun v ↦ Additive.ofMul (σ v)) =ᶠ[𝓝 0] g := by
+    filter_upwards [Metric.ball_mem_nhds (0 : L) hρ] with v hv
+    exact (hg v (by simpa using hv)).symm
+  refine ⟨L, g, continuous_of_continuousAt_zero g ?_, IsTopologicalAddGroup.isOpenMap_iff_nhds_zero.mpr ?_⟩
+  · exact (hc.continuousAt (Metric.ball_mem_nhds 0 hρ)).congr hEq
+  · rw [← Filter.map_congr hEq]
+    refine (Metric.nhds_basis_ball.map _).ge_iff.mpr ?_
+    intro ε hε
+    exact hnhds ε hε
+
 /-- Paper: Lemma D.1.5.2(1), p. 761. The quotient attached to a structural pair
 has an elementary presentation. -/
 theorem BruhatStructuralPair.elementary (p : BruhatStructuralPair G) :
     Nonempty (ElementaryLCAPresentation p.quotient) := by
+  classical
   let H := p.val.1
   let k := OrderDual.ofDual p.val.2
   let N := k.comap H.subtype
   obtain ⟨hH, hGen, ⟨hk, hkOpen, hkGen⟩, _⟩ := p.property
   let : LocallyCompactSpace H := hH.isOpenEmbedding_subtypeVal.locallyCompactSpace
-  let hN : IsClosed (N : Set H) := hk.preimage continuous_subtype_val
-  refine lca_elementary_iff.mp ⟨isCompactlyGeneratedGroup_quotient hGen N hN, ?_⟩
-  let A := lcaAnnihilator k
-  let : LocallyCompactSpace A := hkOpen.isOpenEmbedding_subtypeVal.locallyCompactSpace
-  -- Evaluation on the annihilator has kernel exactly the good subgroup.
-  let ι : A →ₜ* PontryaginDual G := ⟨A.subtype, continuous_subtype_val⟩
-  let f : H →ₜ* PontryaginDual A :=
-    (PontryaginDual.map ι).comp (pontryaginDual_eval.comp ⟨H.subtype, continuous_subtype_val⟩)
-  have hker : f.toMonoidHom.ker = N := by
-    ext x
-    rw [MonoidHom.mem_ker, Subgroup.mem_comap, Subgroup.coe_subtype,
-      ← lcaDualAnnihilator_annihilator k hk, mem_lcaDualAnnihilator_iff]
-    exact ⟨fun hx χ ↦ congrArg (fun ψ : PontryaginDual A ↦ ψ χ) hx,
-      fun hx ↦ PontryaginDual.ext hx⟩
-  let e : p.quotient →ₜ* PontryaginDual A :=
-    ⟨QuotientGroup.lift N f.toMonoidHom hker.ge,
-      (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr f.continuous⟩
-  have he : Function.Injective e :=
-    (QuotientGroup.injective_lift_iff N f.toMonoidHom hker.ge).mpr hker.symm
-  -- A neighborhood with no nontrivial cyclic subgroups pulls back along this injection.
-  obtain ⟨W, hW, hPow⟩ := exists_nhds_one_of_isLocallyEuclidean
-    (isCompactlyGeneratedGroup_iff_dual_locallyEuclidean.mp hkGen)
-  have hW' : W ∈ 𝓝 (e 1) := by rwa [map_one]
-  refine isLocallyEuclidean_of_noSmallCyclicSubgroups
-    (e.continuous.continuousAt.preimage_mem_nhds hW') ?_
-  intro x hx
-  apply he
-  rw [map_one]
-  exact hPow (e x) fun n ↦ map_pow e x n ▸ hx n
+  have hN : IsClosed (N : Set H) := hk.preimage continuous_subtype_val
+  let : T1Space p.quotient := QuotientGroup.t1Space_iff.mpr hN
+  -- Compact generation of the annihilator makes G/k locally Euclidean.
+  let : T1Space (G ⧸ k) := QuotientGroup.t1Space_iff.mpr hk
+  obtain ⟨e, _⟩ := lcaQuotientDual_equiv_annihilator k hk
+  have hEu := isLocallyEuclidean_of_isCompactlyGeneratedGroup_dual
+    (isCompactlyGeneratedGroup_of_continuousMulEquiv e.symm hkGen)
+  obtain ⟨W, hW, hCyclic⟩ := exists_nhds_one_of_isLocallyEuclidean hEu
+  -- The injection H/(k ∩ H) → G/k pulls the no-small-subgroups neighborhood back.
+  let j := QuotientGroup.map N k H.subtype le_rfl
+  have hj : Function.Injective j := (QuotientGroup.map_injective_iff N k H.subtype le_rfl).mpr le_rfl
+  have hc : Continuous j := (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr
+    (QuotientGroup.continuous_mk.comp continuous_subtype_val)
+  have hPre : j ⁻¹' W ∈ 𝓝 (1 : p.quotient) := hc.continuousAt.preimage_mem_nhds (by rwa [map_one])
+  have hPow (x : p.quotient) (hx : ∀ n : ℕ, x ^ n ∈ j ⁻¹' W) : x = 1 := by
+    apply hj
+    rw [map_one]
+    exact hCyclic _ fun n ↦ map_pow j x n ▸ hx n
+  obtain ⟨_, φ, _, hφ⟩ := exists_torusHom_of_noSmallCyclicSubgroups hPre hPow
+  obtain ⟨L, g, hg, ho⟩ := exists_open_vector_map_of_discrete_torusKernel φ hφ
+  exact elementaryPresentation_of_open_vector_map g hg ho
+    (isCompactlyGeneratedGroup_quotient hGen N hN)
 
 /-- Paper: Lemma D.1.5.2(2), p. 761. The two annihilators form a structural pair
 in the dual, with the annihilator of the good subgroup as the open subgroup. -/
@@ -2639,14 +2682,12 @@ theorem isBruhatSmooth_real_iff (f : Multiplicative ℝ → ℂ) :
 
 variable [hTop : IsTopologicalGroup G] [hT2 : T2Space G] [hLC : LocallyCompactSpace G]
 
-/-- An LCA group has a good subgroup. The annihilator of an open compactly generated
-subgroup of the dual is compact. Evaluation gives a continuous injection from the quotient
-into a group with no small subgroups, so the quotient is locally Euclidean. -/
-private theorem exists_bruhatGoodSubgroup : ∃ k : Subgroup G, IsBruhatGoodSubgroup k := by
-  obtain ⟨H, _⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 1
+/-- The annihilator of any open compactly generated subgroup of the dual is good. -/
+theorem isBruhatGoodSubgroup_dualAnnihilator (H : OpenCompactlyGeneratedSubgroups (PontryaginDual G)) :
+    IsBruhatGoodSubgroup (lcaDualAnnihilator H.val) := by
   let k := lcaDualAnnihilator H.val
   have hk := isCompact_lcaDualAnnihilator H.val H.property.1
-  refine ⟨k, hk.isClosed, isOpen_lcaAnnihilator k hk, ?_⟩
+  refine ⟨hk.isClosed, isOpen_lcaAnnihilator k hk, ?_⟩
   let : T1Space (G ⧸ k) := QuotientGroup.t1Space_iff.mpr hk.isClosed
   let r := PontryaginDual.map (⟨H.val.subtype, continuous_subtype_val⟩ : H.val →ₜ* PontryaginDual G)
   let γ := r.comp (pontryaginDual_eval (G := G))
@@ -2688,43 +2729,19 @@ private theorem exists_bruhatGoodSubgroup : ∃ k : Subgroup G, IsBruhatGoodSubg
     (isCompactlyGeneratedGroup_dual_of_isLocallyEuclidean
       (isLocallyEuclidean_of_torusHom_discreteKernel φ hφ))
 
+/-- An LCA group has a good subgroup. The annihilator of an open compactly generated
+subgroup of the dual is compact. Evaluation gives a continuous injection from the quotient
+into a group with no small subgroups, so the quotient is locally Euclidean. -/
+private theorem exists_bruhatGoodSubgroup : ∃ k : Subgroup G, IsBruhatGoodSubgroup k := by
+  obtain ⟨H, _⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 1
+  exact ⟨_, isBruhatGoodSubgroup_dualAnnihilator H⟩
+
 /-- Paper: Definition D.1.5.3(1), p. 762. The zero function is of class Cᵖ. -/
 theorem isBruhatContDiff_zero (p : ℕ) : IsBruhatContDiff p (0 : G → ℂ) := by
   obtain ⟨k, hk⟩ := exists_bruhatGoodSubgroup (G := G)
   refine ⟨k, hk, fun _ _ ↦ rfl, fun a _ ↦ ⟨(0 : a.quotient → ℂ), fun _ ↦ rfl, ?_⟩⟩
   intro e z b
   exact contDiff_const
-
-/-- The target of an open continuous map from a real vector group has an elementary
-presentation if it is compactly generated. -/
-private theorem elementaryPresentation_of_open_vector_map {E B : Type*}
-    [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
-    [CommGroup B] [TopologicalSpace B] [IsTopologicalGroup B] [T2Space B]
-    (f : E →+ Additive B) (hf : Continuous f) (hopen : IsOpenMap f)
-    (hB : IsCompactlyGeneratedGroup B) : Nonempty (ElementaryLCAPresentation B) := by
-  let : T2Space (Additive B) := ‹T2Space B›
-  obtain ⟨m, n, ⟨e⟩⟩ := exists_real_torus_equiv_of_open_vector_range f hf hopen
-  have hRange : IsOpen (f.range : Set (Additive B)) := by
-    rw [AddMonoidHom.coe_range, ← Set.image_univ]
-    exact hopen _ isOpen_univ
-  let : DivisibleBy f.range ℤ := divisibleByOfSMulRightSurj f.range ℤ (fun {z} hz y ↦ by
-    obtain ⟨x, rfl⟩ := f.rangeRestrict_surjective y
-    have hzR : (z : ℝ) ≠ 0 := Int.cast_ne_zero.mpr hz
-    refine ⟨f.rangeRestrict ((z : ℝ)⁻¹ • x), ?_⟩
-    change z • f.rangeRestrict ((z : ℝ)⁻¹ • x) = f.rangeRestrict x
-    rw [← map_zsmul, ← Int.cast_smul_eq_zsmul ℝ, smul_smul, mul_inv_cancel₀ hzR, one_smul])
-  obtain ⟨split⟩ := exists_continuousAddEquiv_prod_quotient_of_open f.range hRange
-  let D := Additive B ⧸ f.range
-  let : DiscreteTopology D := QuotientAddGroup.discreteTopology hRange
-  let product := split.toAddEquiv.trans (AddEquiv.prodCongr e.toAddEquiv (AddEquiv.refl D))
-  let assoc := Homeomorph.prodAssoc (EuclideanSpace ℝ (Fin m)) (Fin n → AddCircle (1 : ℝ)) D
-  exact elementaryPresentation_of_compactlyGenerated hB {
-    AddEquiv.toMultiplicativeRight (product.trans AddEquiv.prodAssoc) with
-    continuous_toFun := assoc.continuous.comp
-      ((e.continuous_toFun.prodMap continuous_id).comp split.continuous_toFun)
-    continuous_invFun := split.continuous_invFun.comp
-      ((e.continuous_invFun.prodMap continuous_id).comp assoc.symm.continuous) }
-
 
 /-- The cover of the identity component of an elementary group as a homomorphism. -/
 private def elementaryCoverZeroHom {m n r : ℕ} {F : Type*} [AddCommGroup F] :
