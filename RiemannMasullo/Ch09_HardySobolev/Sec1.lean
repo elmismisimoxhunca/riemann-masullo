@@ -64,7 +64,44 @@ theorem weightedSobolev_norm [MeasurableSpace A] [TopologicalSpace A] [BorelSpac
     (ν : Measure A) {w : A → ℝ≥0} (hw : Continuous w) (s : ℝ)
     (f : WeightedSobolev ν w s) :
     Integrable (fun x ↦ ‖f x‖ ^ 2 * (1 + (w x : ℝ) ^ 2) ^ (s / 2)) ν ∧
-    ‖f‖ = Real.sqrt (∫ x, ‖f x‖ ^ 2 * (1 + (w x : ℝ) ^ 2) ^ (s / 2) ∂ν) := by sorry
+    ‖f‖ = Real.sqrt (∫ x, ‖f x‖ ^ 2 * (1 + (w x : ℝ) ^ 2) ^ (s / 2) ∂ν) := by
+  let μ : Measure A := sobolevMeasure ν w s
+  let ρ : A → ℝ := fun x ↦ (1 + (w x : ℝ) ^ 2) ^ (s / 2)
+  have hρ_cont : Continuous ρ := by
+    refine Continuous.rpow_const (continuous_const.add
+      ((NNReal.continuous_coe.comp hw).pow 2)) ?_
+    intro x
+    refine Or.inl (ne_of_gt ?_)
+    exact lt_of_lt_of_le one_pos (le_add_of_nonneg_right (sq_nonneg _))
+  have hρ_nonneg (x : A) : 0 ≤ ρ x := by
+    dsimp only [ρ]
+    exact Real.rpow_nonneg (add_nonneg zero_le_one (sq_nonneg _)) _
+  have hdens : Measurable (fun x ↦ ENNReal.ofReal (ρ x)) :=
+    (ENNReal.continuous_ofReal.comp hρ_cont).measurable
+  have hμ : μ = ν.withDensity (fun x ↦ ENNReal.ofReal (ρ x)) := rfl
+  have hflt : ∀ᵐ x ∂ν, ENNReal.ofReal (ρ x) < ∞ :=
+    ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have hint_sq : Integrable (fun x ↦ ‖(f : A → ℂ) x‖ ^ 2) μ :=
+    (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable f)).1 (Lp.memLp f)
+  have hint : Integrable (fun x ↦ ‖f x‖ ^ 2 * ρ x) ν := by
+    rw [hμ] at hint_sq
+    refine ((integrable_withDensity_iff hdens hflt).1 hint_sq).congr ?_
+    filter_upwards with x
+    rw [ENNReal.toReal_ofReal (hρ_nonneg x)]
+  refine ⟨hint, ?_⟩
+  rw [norm_eq_sqrt_re_inner (𝕜 := ℂ) (x := f)]
+  refine congrArg Real.sqrt ?_
+  rw [L2.inner_def (f := f) (g := f), ← integral_re (L2.integrable_inner f f)]
+  simp_rw [inner_self_eq_norm_sq]
+  calc
+    ∫ x, ‖(f : A → ℂ) x‖ ^ 2 ∂sobolevMeasure ν w s
+        = ∫ x, ‖(f : A → ℂ) x‖ ^ 2 ∂ν.withDensity (fun x ↦ ENNReal.ofReal (ρ x)) := rfl
+    _ = ∫ x, (ENNReal.ofReal (ρ x)).toReal • ‖(f : A → ℂ) x‖ ^ 2 ∂ν :=
+      integral_withDensity_eq_integral_toReal_smul hdens hflt _
+    _ = ∫ x, ‖f x‖ ^ 2 * (1 + (w x : ℝ) ^ 2) ^ (s / 2) ∂ν := by
+      refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+      dsimp
+      rw [ENNReal.toReal_ofReal (hρ_nonneg x), mul_comm]
 
 end Weighted
 
