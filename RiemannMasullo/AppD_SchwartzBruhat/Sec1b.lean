@@ -536,11 +536,133 @@ closed subgroup under the evaluation pairing. -/
 theorem lcaDualAnnihilator_annihilator (H : Subgroup G) (hH : IsClosed (H : Set G)) :
     lcaDualAnnihilator (lcaAnnihilator H) = H := by sorry
 
+omit [T2Space G] in
+/-- A compact subset of a quotient of a locally compact group lies in the image of a compact set. -/
+private theorem exists_isCompact_quotient_preimage (H : Subgroup G) {K : Set (G ⧸ H)}
+    (hK : IsCompact K) : ∃ C : Set G, IsCompact C ∧ K ⊆ QuotientGroup.mk '' C := by
+  obtain ⟨L, hLcomp, hL⟩ := exists_compact_mem_nhds (1 : G)
+  have hU : QuotientGroup.mk '' L ∈ 𝓝 (1 : G ⧸ H) :=
+    (QuotientGroup.isOpenMap_coe (N := H)).image_mem_nhds hL
+  obtain ⟨t, ht⟩ := compact_covered_by_mul_left_translates hK
+    ⟨(1 : G ⧸ H), mem_interior_iff_mem_nhds.mpr hU⟩
+  refine ⟨⋃ g ∈ t, Homeomorph.mulLeft (g.out)⁻¹ '' L,
+    t.isCompact_biUnion fun g _ =>
+      hLcomp.image (Homeomorph.mulLeft (g.out)⁻¹).continuous, ?_⟩
+  intro k hk
+  obtain ⟨g, hg, hkU⟩ := mem_iUnion₂.mp (ht hk)
+  rw [mem_preimage, mem_image] at hkU
+  obtain ⟨y, hy, hgy⟩ := hkU
+  refine ⟨(g.out)⁻¹ * y, mem_iUnion₂.mpr ⟨g, hg, mem_image_of_mem _ hy⟩, ?_⟩
+  rw [QuotientGroup.mk_mul, QuotientGroup.mk_inv, QuotientGroup.out_eq', hgy,
+    inv_mul_cancel_left]
+
 /-- Paper: Lemma D.1.4.6(2), p. 758. Pullback by the quotient map identifies
 the dual of a quotient with the annihilator. -/
 theorem lcaQuotientDual_equiv_annihilator (H : Subgroup G) (hH : IsClosed (H : Set G)) :
     ∃ e : PontryaginDual (G ⧸ H) ≃ₜ* lcaAnnihilator H,
-      ∀ (χ : PontryaginDual (G ⧸ H)) x, (e χ).val x = χ (QuotientGroup.mk x) := by sorry
+      ∀ (χ : PontryaginDual (G ⧸ H)) x, (e χ).val x = χ (QuotientGroup.mk x) := by
+  -- Closedness of `H` makes the quotient Hausdorff.
+  have hpre : QuotientGroup.mk ⁻¹' ({1} : Set (G ⧸ H)) = (H : Set G) := by
+    simpa [QuotientGroup.mk_one] using QuotientGroup.preimage_mk_one H
+  have : T2Space (G ⧸ H) := IsTopologicalGroup.t2Space_iff_one_closed.mpr <| by
+    rw [← (QuotientGroup.isQuotientMap_mk H).isCoinducing.isClosed_preimage, hpre]
+    exact hH
+  let q : G →ₜ* G ⧸ H :=
+    { toMonoidHom := QuotientGroup.mk' H
+      continuous_toFun := QuotientGroup.continuous_mk }
+  have hq (x : G) : q x = QuotientGroup.mk x := by
+    change QuotientGroup.mk' H x = QuotientGroup.mk x
+    exact QuotientGroup.mk'_apply H x
+  have hker (ψ : lcaAnnihilator H) : H ≤ ψ.val.toMonoidHom.ker := by
+    intro x hx
+    exact (mem_lcaAnnihilator_iff H ψ.val).1 ψ.property ⟨x, hx⟩
+  let toAnn : PontryaginDual (G ⧸ H) →* lcaAnnihilator H :=
+    { toFun := fun χ => ⟨PontryaginDual.map q χ, by
+        rw [mem_lcaAnnihilator_iff]
+        intro x
+        rw [PontryaginDual.map_apply]
+        have : q x.val = 1 := by
+          change QuotientGroup.mk x.val = 1
+          exact (QuotientGroup.eq_one_iff _).2 x.property
+        rw [this, map_one]⟩
+      map_one' := Subtype.ext (map_one (PontryaginDual.map q))
+      map_mul' := fun χ φ => Subtype.ext (map_mul (PontryaginDual.map q) χ φ) }
+  let fromAnnFun (ψ : lcaAnnihilator H) : PontryaginDual (G ⧸ H) :=
+    { toMonoidHom := QuotientGroup.lift H ψ.val.toMonoidHom (hker ψ)
+      continuous_toFun :=
+        (QuotientGroup.isQuotientMap_mk H).continuous_iff.2 ψ.val.continuous_toFun }
+  have happly (ψ : lcaAnnihilator H) (x : G) :
+      fromAnnFun ψ (QuotientGroup.mk x) = ψ.val x := by
+    dsimp [fromAnnFun]
+    exact QuotientGroup.lift_mk' H (hker ψ) x
+  let fromAnn : lcaAnnihilator H →* PontryaginDual (G ⧸ H) :=
+    { toFun := fromAnnFun
+      map_one' := by
+        apply PontryaginDual.ext
+        intro y
+        obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+        rw [happly 1 x]
+        rfl
+      map_mul' := fun ψ φ => by
+        apply PontryaginDual.ext
+        intro y
+        obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+        rw [happly (ψ * φ) x]
+        have hr :
+            (fromAnnFun ψ * fromAnnFun φ) (QuotientGroup.mk x) =
+              fromAnnFun ψ (QuotientGroup.mk x) * fromAnnFun φ (QuotientGroup.mk x) :=
+          ContinuousMonoidHom.mul_apply _ _ _
+        rw [hr, happly ψ x, happly φ x, Subgroup.coe_mul]
+        rfl }
+  have hinv_left (χ : PontryaginDual (G ⧸ H)) : fromAnn (toAnn χ) = χ := by
+    apply PontryaginDual.ext
+    intro y
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+    dsimp [fromAnn]
+    rw [happly (toAnn χ) x]
+    dsimp [toAnn]
+    rw [hq]
+  have hinv_right (ψ : lcaAnnihilator H) : toAnn (fromAnn ψ) = ψ := by
+    apply Subtype.ext
+    apply PontryaginDual.ext
+    intro x
+    dsimp [toAnn, fromAnn]
+    rw [hq, happly ψ x]
+  have hbij : Function.Bijective toAnn :=
+    ⟨fun χ φ h => (hinv_left χ).symm.trans ((congrArg fromAnn h).trans (hinv_left φ)),
+      fun ψ => ⟨fromAnn ψ, hinv_right ψ⟩⟩
+  have hto_cont : Continuous toAnn := by
+    rw [IsInducing.subtypeVal.continuous_iff (f := toAnn)]
+    exact (PontryaginDual.map q).continuous
+  have hfrom_cont : Continuous fromAnn := by
+    refine continuous_of_continuousAt_one fromAnn ?_
+    rw [ContinuousAt, map_one fromAnn]
+    refine (pontryaginDual_nhds_one_hasBasis (G := G ⧸ H)).tendsto_right_iff.mpr ?_
+    rintro ⟨K, V⟩ ⟨hK, hV⟩
+    obtain ⟨C, hC, hKC⟩ := exists_isCompact_quotient_preimage H hK
+    rw [IsInducing.subtypeVal.nhds_eq_comap (1 : lcaAnnihilator H)]
+    refine mem_comap.mpr ⟨{ψ : PontryaginDual G | MapsTo ψ C V},
+      pontryaginDual_nhds_one_hasBasis.mem_of_mem (i := (C, V)) ⟨hC, hV⟩, ?_⟩
+    intro ψ hψ
+    replace hψ : MapsTo (ψ.val : G → Circle) C V := by
+      simpa [Set.mem_ofPred] using hψ
+    show MapsTo (fromAnn ψ) K V
+    intro k hk
+    obtain ⟨x, hxC, rfl⟩ := hKC hk
+    dsimp [fromAnn]
+    rw [happly ψ x]
+    exact hψ hxC
+  let e : PontryaginDual (G ⧸ H) ≃ₜ* lcaAnnihilator H :=
+    { toFun := toAnn
+      invFun := fromAnn
+      left_inv := hinv_left
+      right_inv := hinv_right
+      map_mul' := toAnn.map_mul
+      continuous_toFun := hto_cont
+      continuous_invFun := hfrom_cont }
+  refine ⟨e, fun χ x => ?_⟩
+  dsimp [e, toAnn]
+  rw [hq]
 
 /-- Paper: Lemma D.1.4.6(2), p. 758. Restriction of characters identifies the
 dual modulo the annihilator with the dual of the subgroup. -/
