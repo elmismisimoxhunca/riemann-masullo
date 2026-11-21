@@ -773,7 +773,15 @@ to the identity.
 Deviation: The projections are onto the individual subspaces, as their declared
 codomains and the proof specify. The sequence is indexed from zero. -/
 theorem tendsto_filtration_orthogonalProjections :
-    ∀ x, Tendsto (fun i ↦ (P(i)) x) atTop (𝓝 x) := by sorry
+    ∀ x, Tendsto (fun i ↦ (P(i)) x) atTop (𝓝 x) := by
+  intro x
+  refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+  obtain ⟨y, hy, hxy⟩ := Metric.mem_closure_iff.mp (hdense x) ε hε
+  obtain ⟨j, hj⟩ := Set.mem_iUnion.mp hy
+  filter_upwards [eventually_ge_atTop j] with i hi
+  have hyi : y ∈ (V i : Submodule ℂ H) := hV hi hj
+  rw [dist_comm, (V i : Submodule ℂ H).dist_starProjection_eq_infDist]
+  exact (Metric.infDist_le_dist_of_mem hyi).trans_lt hxy
 
 -- Keep the separability hypothesis in the existing signature.
 set_option linter.unusedSectionVars false in
