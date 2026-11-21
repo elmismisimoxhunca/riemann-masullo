@@ -7,6 +7,8 @@ import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.MeasureTheory.Function.AEEqOfIntegral
 import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
 import Mathlib.MeasureTheory.Integral.Prod
+import Mathlib.MeasureTheory.Measure.SeparableMeasure
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
@@ -215,7 +217,24 @@ omit [μ.Regular] in
 space is separable. -/
 theorem weightedSobolev_separable [SecondCountableTopology G]
     (_hν : IsLCAPlancherelMeasure μ ν) (_hw : IsSobolevWeight w) :
-    SeparableSpace (WeightedSobolev ν w s) := by sorry
+    SeparableSpace (WeightedSobolev ν w s) := by
+  -- Second-countability of `G` passes to the dual, so the weighted Plancherel measure is
+  -- σ-finite on a countably generated Borel space and its L² space is separable.
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  have : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  have : SecondCountableTopology (PontryaginDual G) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap G Circle).secondCountableTopology
+  have : ν.IsHaarMeasure := _hν.1
+  have hσ : SigmaFinite ν := by infer_instance
+  have hσw : SigmaFinite (sobolevMeasure ν w s) := by
+    unfold sobolevMeasure
+    infer_instance
+  have hcg : MeasurableSpace.CountablyGenerated (PontryaginDual G) := by infer_instance
+  have hsepμ : MeasureTheory.IsSeparable (sobolevMeasure ν w s) := by infer_instance
+  have : Fact ((2 : ℝ≥0∞) ≠ ∞) := ⟨ENNReal.ofNat_ne_top⟩
+  have hsc : SecondCountableTopology (WeightedSobolev ν w s) := by infer_instance
+  exact SecondCountableTopology.to_separableSpace (α := WeightedSobolev ν w s)
 
 /-- Paper: Proposition 9.1.1.3(1), p. 396. In nonnegative degree the Sobolev space
 includes continuously and contractively into Haar L² via inverse Plancherel. -/
