@@ -1238,7 +1238,14 @@ theorem vectorContDiffOn_iff_weakDifferential {Ω : Set V} (hΩ : IsOpen Ω)
     (hd : 1 ≤ d) (f : V → E) :
     VectorContDiffOn (k := k) Ω f ↔
       ∃ D : Ω × V → E, HasWeakDifferentialOn k f (toPettisWeakCompletion E ∘ D) ∧
-        Continuous D := by sorry
+        Continuous D := by
+  constructor
+  · rintro ⟨D, hD⟩
+    -- Lemma C.5.1.12 turns the strong remainder into the scalar weak differential.
+    exact ⟨D, ((hasWeakCompletionDifferentialOn_iff hΩ f _).1 hD.2).1, hD.1⟩
+  · rintro ⟨D, hD, hc⟩
+    -- Lemma C.5.1.13(2): a continuous E-valued weak differential is strong.
+    exact ⟨D, hasStrongDifferentialOn_of_weak hΩ hd hD hc⟩
 
 /-- Paper: Theorem C.5.1.21(1, 3), p. 732. Strong continuous differentiability
 is equivalent to weak coordinate partials with continuous vector-valued lifts. -/
