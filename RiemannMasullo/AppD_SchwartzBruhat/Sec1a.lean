@@ -366,7 +366,12 @@ def lcaConvolution (μ : Measure G) (f g : G → ℂ) (x : G) : ℂ :=
 /-- Paper: (D.1.1.5), p. 746. Convolution on a one-point group is multiplication
 scaled by its total Haar mass. -/
 theorem lcaConvolution_subsingleton [Subsingleton G] (f g : G → ℂ) (x : G) :
-    lcaConvolution μ f g x = (μ univ).toReal * f x * g x := by sorry
+    lcaConvolution μ f g x = (μ univ).toReal * f x * g x := by
+  have hconst : ∀ y : G, f y * g (y⁻¹ * x) = f x * g x := fun y ↦ by
+    rw [Subsingleton.elim y x, Subsingleton.elim (x⁻¹ * x) x]
+  rw [lcaConvolution]
+  simp only [hconst, integral_const, Measure.real]
+  exact (Complex.real_smul (x := μ.real univ) (z := f x * g x)).trans (mul_assoc _ _ _).symm
 
 /-- Paper: (D.1.1.5)–(D.1.1.6), p. 746. The fibre integrals of two L¹ functions
 exist almost everywhere and their convolution is L¹ with the product norm bound. -/
