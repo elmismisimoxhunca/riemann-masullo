@@ -262,11 +262,93 @@ theorem dSequenceMaximal_eventually_singleton [μ.IsHaarMeasure]
     (h₀ : 0 < μ {1}) (hfin : μ {1} < ∞) (hU : ∀ᶠ k in atTop, U k = {1})
     (f : G → ℂ) (x : G) : dSequenceMaximal μ U f x = ‖f x‖ₑ := by sorry
 
+set_option linter.unusedSectionVars false in
+/-- Multiplication on the left by a fixed element preserves equality of sets
+up to a null set for an invariant measure. -/
+private theorem smul_ae_eq_mul_left [μ.IsHaarMeasure] (x : G) {s t : Set G}
+    (h : s =ᵐ[μ] t) :
+    x • s =ᵐ[μ] x • t := by
+  rw [ae_eq_set, ← Set.smul_set_sdiff, ← Set.smul_set_sdiff]
+  obtain ⟨h1, h2⟩ := ae_eq_set.mp h
+  rw [measure_smul μ x, measure_smul μ x]
+  exact ⟨h1, h2⟩
+
+-- The proof only needs measurability, so some automatic section variables stay unused.
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem A.5.3.6, p. 581. The local function maximal operator gives
 a function measurable for the completed Haar measure. -/
 theorem dSequenceMaximal_aemeasurable [μ.IsHaarMeasure] (hU : IsDSequence μ U)
     (hcompact : IsCompact (closure (U 0))) {f : G → ℂ} (hf : LocallyIntegrable f μ) :
-    AEMeasurable (dSequenceMaximal μ U f) μ := by sorry
+    AEMeasurable (dSequenceMaximal μ U f) μ := by
+  classical
+  -- A measurable representative of the norm of `f`.
+  obtain ⟨g, hg, hfg⟩ := hf.aestronglyMeasurable.aemeasurable
+  have hF : Measurable fun y ↦ ‖g y‖ₑ := hg.stronglyMeasurable.eNorm
+  have hnorm : (fun y ↦ ‖f y‖ₑ) =ᵐ[μ] (fun y ↦ ‖g y‖ₑ) := by
+    filter_upwards [hfg] with y hy
+    rw [hy]
+  -- Borel representatives of the sequence members.
+  have hVmeas : ∀ k, MeasurableSet (toMeasurable μ (U k)) :=
+    fun k ↦ measurableSet_toMeasurable μ _
+  have hVae : ∀ k, toMeasurable μ (U k) =ᵐ[μ] U k :=
+    fun k ↦ (hU.1 k).2.1.toMeasurable_ae_eq
+  -- Each translated averaged norm is measurable.
+  have hmeas : ∀ k : ℕ, Measurable (fun x : G ↦
+      ⨍⁻ y in x • toMeasurable μ (U k), ‖g y‖ₑ ∂μ) := by
+    intro k
+    have hpre : ∀ x : G, x • toMeasurable μ (U k)
+        = (fun y : G ↦ y * x⁻¹) ⁻¹' toMeasurable μ (U k) := by
+      intro x
+      ext y
+      rw [Set.mem_smul_set_iff_inv_smul_mem, Set.mem_preimage]
+      simp only [smul_eq_mul, mul_comm]
+    have hC : Measurable (fun _ : G ↦ (1 : ℝ≥0∞)) := measurable_const
+    have hW : Measurable (Function.uncurry
+        (fun (x y : G) ↦ ‖g y‖ₑ * ((toMeasurable μ (U k)).indicator 1 (y * x⁻¹)))) := by
+      have h1 : Measurable fun p : G × G ↦ ‖g p.2‖ₑ := hF.comp measurable_snd
+      have h2 : Measurable fun p : G × G ↦ p.2 * p.1⁻¹ :=
+        (measurable_snd).mul (Measurable.inv measurable_fst)
+      have h3 : Measurable fun p : G × G ↦
+          (toMeasurable μ (U k)).indicator 1 (p.2 * p.1⁻¹) :=
+        hC.indicator (hVmeas k) |>.comp h2
+      exact h1.mul h3
+    have hint : ∀ x : G, ⨍⁻ y in x • toMeasurable μ (U k), ‖g y‖ₑ ∂μ
+        = (∫⁻ y, ‖g y‖ₑ * ((toMeasurable μ (U k)).indicator 1 (y * x⁻¹)) ∂μ)
+            / μ (toMeasurable μ (U k)) := by
+      intro x
+      have hfun : ((fun z : G ↦ z * x⁻¹) ⁻¹' toMeasurable μ (U k)).indicator
+          (fun y ↦ ‖g y‖ₑ)
+          = fun y ↦ ‖g y‖ₑ * ((toMeasurable μ (U k)).indicator 1 (y * x⁻¹)) := by
+        funext y
+        have hmem : y ∈ (fun z : G ↦ z * x⁻¹) ⁻¹' toMeasurable μ (U k)
+            ↔ y * x⁻¹ ∈ toMeasurable μ (U k) := Set.mem_preimage
+        by_cases hy : y * x⁻¹ ∈ toMeasurable μ (U k)
+        · rw [Set.indicator_of_mem (hmem.mpr hy), Set.indicator_of_mem hy (1 : G → ℝ≥0∞),
+            Pi.one_apply, mul_one]
+        · rw [Set.indicator_of_notMem (fun hc ↦ hy (hmem.mp hc)),
+            Set.indicator_of_notMem hy (1 : G → ℝ≥0∞), mul_zero]
+      rw [setLAverage_eq μ (fun y ↦ ‖g y‖ₑ) _, measure_smul μ x, hpre x,
+        ← lintegral_indicator ((hVmeas k).preimage (measurable_mul_const (x⁻¹))), hfun]
+    rw [funext hint]
+    exact hW.lintegral_prod_right.div_const _
+  -- The maximal function coincides with the measurable limsup everywhere.
+  have hterm : ∀ (k : ℕ) (x : G),
+      ⨍⁻ y in x • U k, ‖f y‖ₑ ∂μ
+        = ⨍⁻ y in x • toMeasurable μ (U k), ‖g y‖ₑ ∂μ := by
+    intro k x
+    have hpre : x • toMeasurable μ (U k)
+        = (fun y : G ↦ y * x⁻¹) ⁻¹' toMeasurable μ (U k) := by
+      ext y
+      rw [Set.mem_smul_set_iff_inv_smul_mem, Set.mem_preimage]
+      simp only [smul_eq_mul, mul_comm]
+    rw [setLAverage_congr (smul_ae_eq_mul_left x (hVae k)).symm, hpre]
+    exact setLAverage_congr_fun_ae ((hVmeas k).preimage (measurable_mul_const (x⁻¹)))
+      (by filter_upwards [hnorm] with y hy _; exact hy)
+  refine ⟨fun x ↦ limsup (fun k ↦ ⨍⁻ y in x • toMeasurable μ (U k), ‖g y‖ₑ ∂μ) atTop,
+    Measurable.limsup (fun k ↦ hmeas k), ?_⟩
+  filter_upwards with x
+  simp only [dSequenceMaximal]
+  exact limsup_congr (Filter.eventually_atTop.mpr ⟨0, fun k _ ↦ hterm k x⟩)
 
 -- TODO(paper-gap): The auxiliary bound (A.5.3.11) fails for f = 1 on any compact
 -- set of positive Haar mass, since the log term vanishes and the left side is μ(K).
