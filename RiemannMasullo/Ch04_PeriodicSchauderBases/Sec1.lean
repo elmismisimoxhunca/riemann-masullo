@@ -303,7 +303,22 @@ theorem pi_isAbsolute :
 
 /-- Paper: Definition 4.1.2.1(4), p. 158. The coordinate basis of the complex
 sequence space with the product topology is boundedly complete. -/
-theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by sorry
+theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by
+  intro a _
+  -- In the product topology every coordinate series is eventually constant, so the
+  -- ordered partial sums converge to the scalar sequence itself.
+  refine ⟨a, ?_⟩
+  rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff]
+  simp only [Function.comp_def]
+  rw [tendsto_pi_nhds]
+  intro n
+  refine tendsto_atTop_of_eventually_const (i₀ := n + 1) fun N hN ↦ ?_
+  rw [Finset.sum_apply]
+  have hn : n ∈ Finset.range N := Finset.mem_range.mpr (Nat.lt_of_succ_le hN)
+  rw [Finset.sum_eq_single_of_mem n hn]
+  · rw [Pi.smul_apply, Pi.single_eq_same, smul_eq_mul, mul_one]
+  · intro m _ hmn
+    rw [Pi.smul_apply, Pi.single_eq_of_ne hmn.symm, smul_zero]
 
 /-- Paper: Definition 4.1.2.1(5), p. 158. A countable orthonormal Hilbert basis is
 shrinking, with its coefficients given by the inner products against its vectors. -/
