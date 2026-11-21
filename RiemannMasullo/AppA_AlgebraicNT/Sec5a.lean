@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.AppA_AlgebraicNT.Sec2b
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1a
+import RiemannMasullo.ForMathlib.Topology.Algebra.OpenSubgroup
 public import Mathlib.MeasureTheory.Constructions.Polish.Basic
 public import Mathlib.MeasureTheory.Function.LocallyIntegrable
 public import Mathlib.Topology.Algebra.ProperAction.Basic
@@ -241,7 +242,73 @@ theorem exists_isDDoublePrimeSequence_of_totallyDisconnected [FirstCountableTopo
     ∃ K : ℕ → OpenSubgroup G,
       let U : ℕ → Set G := fun k ↦ (K k : Set G)
       let V : ℕ → Set G := fun k ↦ U k * U k
-      IsDDoublePrimeSequence μ U V ∧ ∀ k, IsCompact (U k) ∧ μ (U k) ≤ μ (V k) := by sorry
+      IsDDoublePrimeSequence μ U V ∧ ∀ k, IsCompact (U k) ∧ μ (U k) ≤ μ (V k) := by
+  classical
+  -- A countable antitone neighborhood basis at the identity, shrunk to compact open subgroups
+  -- and then to their finite intersections so that the sequence decreases.
+  obtain ⟨u, hu, -⟩ := IsTopologicalGroup.exists_antitone_basis_nhds_one (G := G)
+  choose H hHcomp hHsub using fun n ↦
+    exists_isCompact_openSubgroup_subset (hu.mem n)
+  let K : ℕ → OpenSubgroup G := fun n ↦
+    OpenSubgroup.iInfOfFinite (fun i : Fin (n + 1) ↦ H (i : ℕ))
+  have hmem {n : ℕ} {x : G} : x ∈ K n ↔ ∀ i : Fin (n + 1), x ∈ H (i : ℕ) := by
+    simp only [K, OpenSubgroup.iInfOfFinite]
+    rw [← OpenSubgroup.mem_toSubgroup, Subgroup.mem_iInf]
+    simp [OpenSubgroup.mem_toSubgroup]
+  have hKsubH (n : ℕ) (i : Fin (n + 1)) : (K n : Set G) ⊆ H (i : ℕ) :=
+    fun _ hx ↦ (hmem.mp hx) i
+  have hKcomp (n : ℕ) : IsCompact (K n : Set G) :=
+    (hHcomp 0).of_isClosed_subset (K n).isClosed
+      (hKsubH n ⟨0, Nat.succ_pos n⟩)
+  have hKsubu (n : ℕ) : (K n : Set G) ⊆ u n :=
+    (hKsubH n ⟨n, Nat.lt_succ_self n⟩).trans (hHsub n)
+  have hAnti : Antitone fun n ↦ (K n : Set G) := by
+    intro m n hmn x hx
+    exact hmem.mpr fun i ↦ hmem.mp hx ⟨i, by omega⟩
+  have hsq (k : ℕ) : (K k : Set G) * (K k : Set G) = K k := by
+    ext x
+    constructor
+    · rintro ⟨a, ha, b, hb, rfl⟩
+      exact mul_mem ha hb
+    · intro hx
+      exact ⟨x, hx, 1, one_mem _, mul_one x⟩
+  have hinv (k : ℕ) : (K k : Set G)⁻¹ = K k := by
+    ext x
+    rw [Set.mem_inv]
+    exact inv_mem_iff
+  have hdiff (k : ℕ) : (K k : Set G) * (K k : Set G)⁻¹ = K k := by
+    rw [hinv, hsq]
+  refine ⟨K, ?_⟩
+  unfold IsDDoublePrimeSequence IsDPrimeSequence IsDSequence
+  dsimp only
+  refine ⟨⟨⟨⟨?_, hAnti, ?_⟩, ?_⟩, ?_⟩, ?_⟩
+  · intro k
+    exact ⟨one_mem _, (K k).isOpen.nullMeasurableSet,
+      (K k).isOpen.measure_pos μ ⟨1, one_mem _⟩, (hKcomp k).measure_lt_top⟩
+  · refine ⟨2, by positivity, fun k ↦ ?_⟩
+    have hpos : 0 < μ (K k : Set G) :=
+      (K k).isOpen.measure_pos μ ⟨1, one_mem _⟩
+    have hfin : μ (K k : Set G) ≠ ∞ := (hKcomp k).measure_lt_top.ne
+    have h12 : (1 : ℝ≥0∞) < ENNReal.ofReal 2 := by
+      rw [← ENNReal.ofReal_one]
+      exact (ENNReal.ofReal_lt_ofReal_iff (by norm_num)).mpr (by norm_num)
+    rw [hdiff]
+    refine ⟨hpos, ?_⟩
+    calc
+      μ (K k : Set G) = 1 * μ (K k : Set G) := by rw [one_mul]
+      _ < ENNReal.ofReal 2 * μ (K k : Set G) :=
+        ENNReal.mul_lt_mul_left hpos.ne' hfin h12
+  · intro W hW
+    obtain ⟨k, hk⟩ := hu.mem_iff.mp hW
+    exact ⟨k, (hKsubu k).trans hk⟩
+  · refine ⟨1, by positivity, fun k ↦ ⟨?_, ?_, ?_⟩⟩
+    · rw [hsq]
+      exact (K k).isOpen.nullMeasurableSet
+    · rw [hsq, hdiff]
+    · rw [hsq, ENNReal.ofReal_one, one_mul]
+  · intro k
+    refine ⟨hKcomp k, ?_⟩
+    rw [hsq]
 
 variable (H : OpenSubgroup G) (U : ℕ → Set H)
 
