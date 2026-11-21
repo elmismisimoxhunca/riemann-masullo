@@ -887,11 +887,220 @@ theorem differentiableOn_mellin_of_forwardSemiExponentialDecay :
   filter_upwards with t
   simpa using f.norm_le_seminorm ℂ (Real.log t)
 
+/-- The weighted derivatives have uniform polynomial bounds as the weight varies in a compact
+interval of nonnegative exponents. -/
+private theorem forward_uniform_weighted_deriv_bound (a b : ℝ) (ha : 0 ≤ a)
+    (k j : ℕ) : ∃ B : ℝ, ∀ σ ∈ Icc a b, ∀ x : ℝ,
+      |x| ^ k * Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖ ≤ B := by
+  obtain ⟨A, hA⟩ := forward_weighted_deriv_bound hf ha k j
+  by_cases hab : a ≤ b
+  · obtain ⟨D, hD⟩ := forward_weighted_deriv_bound hf (ha.trans hab) k j
+    refine ⟨max A D, fun σ hσ x ↦ ?_⟩
+    by_cases hx : 0 ≤ x
+    · calc
+        _ ≤ |x| ^ k * Real.exp (b * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖ := by
+          exact mul_le_mul_of_nonneg_right
+            (mul_le_mul_of_nonneg_left
+              (Real.exp_le_exp.mpr (mul_le_mul_of_nonneg_right hσ.2 hx)) (by positivity))
+            (norm_nonneg _)
+        _ ≤ D := hD x
+        _ ≤ _ := le_max_right _ _
+    · calc
+        _ ≤ |x| ^ k * Real.exp (a * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖ := by
+          exact mul_le_mul_of_nonneg_right
+            (mul_le_mul_of_nonneg_left
+              (Real.exp_le_exp.mpr (mul_le_mul_of_nonpos_right hσ.1 (le_of_not_ge hx)))
+              (by positivity)) (norm_nonneg _)
+        _ ≤ A := hA x
+        _ ≤ _ := le_max_left _ _
+  · exact ⟨A, fun σ hσ ↦ (hab (hσ.1.trans hσ.2)).elim⟩
+
+omit hf in
+private theorem verticalPoint_re (σ y : ℝ) : (verticalPoint σ y).re = σ := by
+  rw [Complex.add_re, Complex.ofReal_re, Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im,
+    Complex.I_re, Complex.I_im]
+  ring
+
+omit hf in
+private theorem verticalPoint_im (σ y : ℝ) : (verticalPoint σ y).im = y := by
+  rw [Complex.add_im, Complex.ofReal_im, Complex.mul_im, Complex.ofReal_re, Complex.ofReal_im,
+    Complex.I_re, Complex.I_im]
+  ring
+
+omit hf in
+private theorem norm_exp_verticalPoint_mul (σ y x : ℝ) :
+    ‖Complex.exp ((verticalPoint σ y) * ↑x)‖ = Real.exp (σ * x) := by
+  rw [Complex.norm_exp, Complex.mul_re, verticalPoint_re, Complex.ofReal_re, Complex.ofReal_im,
+    mul_zero, sub_zero]
+
+omit hf in
+/-- In logarithmic coordinates the Mellin integral is the Laplace transform of the profile. -/
+private theorem mellin_fromLog_eq_integral_cexp (s : ℂ) :
+    mellin (fromLog f) s = ∫ x : ℝ, (f : ℝ → ℂ) x * Complex.exp (s * ↑x) := by
+  have hsub := integral_comp_exp (fun t : ℝ ↦ (t : ℂ) ^ (s - 1) • f (Real.log t))
+  rw [mellin, ← hsub]
+  refine integral_congr_ae (Eventually.of_forall fun x ↦ ?_)
+  simp only [Real.log_exp, Complex.real_smul, smul_eq_mul]
+  rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
+    ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp, Complex.ofReal_exp]
+  rw [← mul_assoc, ← Complex.exp_add, mul_comm]
+  congr 1
+  ring_nf
+
+/-- A uniform multiple of `(1 + x ^ 2)⁻¹` dominates every nonnegative weight in the interval. -/
+private theorem weighted_iteratedDeriv_le_inv_one_add_sq (a b : ℝ) (ha : 0 ≤ a) (j : ℕ) :
+    ∃ C : ℝ, ∀ σ ∈ Icc a b, ∀ x : ℝ,
+      Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖ ≤ C * (1 + x ^ 2)⁻¹ := by
+  obtain ⟨B0, hB0⟩ := forward_uniform_weighted_deriv_bound f hf a b ha (0 : ℕ) j
+  obtain ⟨B2, hB2⟩ := forward_uniform_weighted_deriv_bound f hf a b ha 2 j
+  refine ⟨B0 + B2, fun σ hσ x ↦ ?_⟩
+  rw [← div_eq_mul_inv]
+  refine (le_div_iff₀ (by positivity)).mpr ?_
+  have h0 : Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖ ≤ B0 := by
+    simpa using hB0 σ hσ x
+  have h2 : x ^ 2 * (Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖) ≤ B2 := by
+    simpa [sq_abs, mul_assoc] using hB2 σ hσ x
+  calc
+    Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖ * (1 + x ^ 2)
+      = Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖ +
+          x ^ 2 * (Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖) := by ring
+    _ ≤ B0 + B2 := add_le_add h0 h2
+
+private theorem integrable_weighted_iteratedDeriv_norm (a b : ℝ) (ha : 0 ≤ a) (j : ℕ)
+    {σ : ℝ} (hσ : σ ∈ Icc a b) :
+    Integrable (fun x : ℝ ↦ Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖) := by
+  obtain ⟨C, hC⟩ := weighted_iteratedDeriv_le_inv_one_add_sq f hf a b ha j
+  have hmeas : AEStronglyMeasurable
+      (fun x : ℝ ↦ Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖) volume :=
+    ((Real.continuous_exp.comp (continuous_const.mul continuous_id)).mul
+      (((f.smooth ⊤).continuous_iteratedDeriv j (by simp)).norm)).aestronglyMeasurable
+  exact (integrable_inv_one_add_sq.const_mul C).mono_nonneg hmeas
+    (Eventually.of_forall fun _ ↦ by positivity)
+    (Eventually.of_forall fun x ↦ hC σ hσ x)
+
+private theorem integral_norm_weighted_iteratedDeriv_bound (a b : ℝ) (ha : 0 ≤ a) (j : ℕ) :
+    ∃ C : ℝ, ∀ σ ∈ Icc a b,
+      ∫ x : ℝ, Real.exp (σ * x) * ‖iteratedDeriv j (f : ℝ → ℂ) x‖ ≤ C := by
+  obtain ⟨B, hB⟩ := weighted_iteratedDeriv_le_inv_one_add_sq f hf a b ha j
+  refine ⟨B * Real.pi, fun σ hσ ↦ ?_⟩
+  have hdom : Integrable (fun x : ℝ ↦ B * (1 + x ^ 2)⁻¹) := integrable_inv_one_add_sq.const_mul B
+  refine (integral_mono_of_nonneg (Eventually.of_forall fun _ ↦ by positivity) hdom
+    (Eventually.of_forall fun x ↦ hB σ hσ x)).trans ?_
+  rw [integral_const_mul, integral_univ_inv_one_add_sq]
+
+private theorem integrable_cexp_mul_iteratedDeriv (a b : ℝ) (ha : 0 ≤ a)
+    (σ y : ℝ) (hσ : σ ∈ Icc a b) (j : ℕ) :
+    Integrable (fun x : ℝ ↦
+      iteratedDeriv j (f : ℝ → ℂ) x * Complex.exp ((verticalPoint σ y) * ↑x)) := by
+  refine (integrable_weighted_iteratedDeriv_norm f hf a b ha j hσ).mono ?_ ?_
+  · refine Continuous.aestronglyMeasurable ?_
+    refine (((f.smooth ⊤).continuous_iteratedDeriv j (by simp))).mul ?_
+    exact Complex.continuous_exp.comp
+      (continuous_const.mul (Complex.ofRealCLM.continuous.comp continuous_id))
+  · filter_upwards with x
+    rw [norm_mul, norm_exp_verticalPoint_mul, mul_comm, Real.norm_eq_abs,
+      abs_of_nonneg (by positivity)]
+
+/-- One integration by parts against the exponential, with vanishing boundary terms. -/
+private theorem integral_cexp_mul_iteratedDeriv_succ (a b : ℝ) (ha : 0 < a)
+    (σ y : ℝ) (hσ : σ ∈ Icc a b) (j : ℕ) :
+    ∫ x : ℝ, iteratedDeriv j (f : ℝ → ℂ) x * Complex.exp ((verticalPoint σ y) * ↑x) =
+      (-(verticalPoint σ y))⁻¹ *
+        ∫ x : ℝ, iteratedDeriv (j + 1) (f : ℝ → ℂ) x *
+          Complex.exp ((verticalPoint σ y) * ↑x) := by
+  let s := verticalPoint σ y
+  let u := fun t : ℝ ↦ iteratedDeriv j (f : ℝ → ℂ) t
+  let u' := fun t : ℝ ↦ iteratedDeriv (j + 1) (f : ℝ → ℂ) t
+  let v := fun t : ℝ ↦ Complex.exp (s * ↑t)
+  let v' := fun t : ℝ ↦ s * Complex.exp (s * ↑t)
+  have hs0 : s ≠ 0 := by
+    have hσpos : (0 : ℝ) < σ := lt_of_lt_of_le ha hσ.1
+    intro hs
+    have : σ = 0 := by simpa [s, hs] using (verticalPoint_re σ y).symm
+    exact hσpos.ne' this
+  have hu (x : ℝ) : HasDerivAt u (u' x) x := by
+    dsimp [u, u']
+    rw [iteratedDeriv_succ]
+    exact (((f.smooth ⊤).differentiable_iteratedDeriv j
+      (ENat.natCast_lt_of_coe_top_le_withTop le_rfl j)) x).hasDerivAt
+  have hv (x : ℝ) : HasDerivAt v (v' x) x := by
+    dsimp [v, v']
+    have hlin : HasDerivAt (fun t : ℝ ↦ s * ↑t) s x := by
+      simpa [mul_one] using ((hasDerivAt_id x).ofReal_comp.const_mul s)
+    simpa [mul_comm] using hlin.cexp
+  have huv : Integrable (u * v) :=
+    integrable_cexp_mul_iteratedDeriv f hf a b ha.le σ y hσ j
+  have hu'v : Integrable (u' * v) :=
+    integrable_cexp_mul_iteratedDeriv f hf a b ha.le σ y hσ (j + 1)
+  have huv' : Integrable (u * v') := by
+    have hfun : u * v' = fun x ↦ s * (u x * v x) := by
+      funext x; simp only [Pi.mul_apply, v']; ring
+    rw [hfun]
+    exact huv.const_mul s
+  have hparts : ∫ x, u x * v' x = -∫ x, u' x * v x :=
+    integral_mul_deriv_eq_deriv_mul_of_integrable (fun x _ ↦ hu x) (fun x _ ↦ hv x) huv' hu'v huv
+  have hsmul : ∫ x, u x * v' x = s * ∫ x, u x * v x := by
+    have hfun : (fun x ↦ u x * v' x) = fun x ↦ s * (u x * v x) := by
+      funext x; simp only [v']; ring
+    rw [hfun]
+    exact integral_const_mul s fun x ↦ u x * v x
+  rw [hsmul] at hparts
+  calc
+    ∫ x, u x * v x = s⁻¹ * (s * ∫ x, u x * v x) := by
+      rw [← mul_assoc, inv_mul_cancel₀ hs0, one_mul]
+    _ = s⁻¹ * (-∫ x, u' x * v x) := by rw [hparts]
+    _ = (-s)⁻¹ * ∫ x, u' x * v x := by rw [mul_neg, ← neg_mul, ← inv_neg]
+
+private theorem integral_cexp_mul_eq_inv_pow_iteratedDeriv (a b : ℝ) (ha : 0 < a)
+    (σ y : ℝ) (hσ : σ ∈ Icc a b) (n : ℕ) :
+    ∫ x : ℝ, (f : ℝ → ℂ) x * Complex.exp ((verticalPoint σ y) * ↑x) =
+      (-(verticalPoint σ y))⁻¹ ^ n *
+        ∫ x : ℝ, iteratedDeriv n (f : ℝ → ℂ) x * Complex.exp ((verticalPoint σ y) * ↑x) := by
+  induction n with
+  | zero => simp [iteratedDeriv_zero]
+  | succ n ih =>
+    rw [ih, integral_cexp_mul_iteratedDeriv_succ f hf a b ha σ y hσ n, ← mul_assoc, ← pow_succ]
+
 /-- Paper: Proposition B.2.1.5(2), p. 594. For each positive integer
 power, one constant gives the vertical decay bound throughout the prescribed closed strip. -/
 theorem mellin_heightBound_of_forwardSemiExponentialDecay
     (a b : ℝ) (ha : 0 < a) (hab : a < b) (N : ℕ) (hN : 1 ≤ N) :
-    ∃ C > (0 : ℝ), heightBound (mellin (fromLog f)) (Icc a b) N C := by sorry
+    ∃ C > (0 : ℝ), heightBound (mellin (fromLog f)) (Icc a b) N C := by
+  -- The estimate does not use `a < b` or `1 ≤ N` beyond the stated range.
+  have _ := hab
+  have _ := hN
+  obtain ⟨B, hB⟩ := integral_norm_weighted_iteratedDeriv_bound f hf a b ha.le N
+  refine ⟨max B 1, lt_of_lt_of_le zero_lt_one (le_max_right _ _), fun σ hσ y hy ↦ ?_⟩
+  let s := verticalPoint σ y
+  have hmeq := mellin_fromLog_eq_integral_cexp f s
+  have hiter := integral_cexp_mul_eq_inv_pow_iteratedDeriv f hf a b ha σ y hσ N
+  have hreal : ∫ x : ℝ, ‖iteratedDeriv N (f : ℝ → ℂ) x * Complex.exp (s * ↑x)‖ ≤ max B 1 := by
+    have hpoint (x : ℝ) : ‖iteratedDeriv N (f : ℝ → ℂ) x * Complex.exp (s * ↑x)‖ =
+        Real.exp (σ * x) * ‖iteratedDeriv N (f : ℝ → ℂ) x‖ := by
+      rw [norm_mul, norm_exp_verticalPoint_mul, mul_comm]
+    rw [integral_congr_ae (Eventually.of_forall hpoint)]
+    exact (hB σ hσ).trans (le_max_left _ _)
+  have hdecay : ‖s‖⁻¹ ^ N ≤ (|y| ^ N)⁻¹ := by
+    have him : |y| ≤ ‖s‖ := by
+      rw [← verticalPoint_im σ y]
+      exact Complex.abs_im_le_norm s
+    rw [← inv_pow]
+    exact pow_le_pow_left₀ (inv_nonneg.mpr (norm_nonneg _))
+      (inv_anti₀ (abs_pos.mpr hy) him) N
+  calc
+    ‖mellin (fromLog f) s‖
+      = ‖(-s)⁻¹‖ ^ N * ‖∫ x : ℝ, iteratedDeriv N (f : ℝ → ℂ) x * Complex.exp (s * ↑x)‖ := by
+        rw [hmeq, hiter, norm_mul, norm_pow]
+    _ = ‖s‖⁻¹ ^ N * ‖∫ x : ℝ, iteratedDeriv N (f : ℝ → ℂ) x * Complex.exp (s * ↑x)‖ := by
+        rw [norm_inv, norm_neg]
+    _ ≤ ‖s‖⁻¹ ^ N * ∫ x : ℝ, ‖iteratedDeriv N (f : ℝ → ℂ) x * Complex.exp (s * ↑x)‖ := by
+        exact mul_le_mul_of_nonneg_left (norm_integral_le_integral_norm _)
+          (pow_nonneg (inv_nonneg.mpr (norm_nonneg _)) _)
+    _ ≤ (|y| ^ N)⁻¹ * ∫ x : ℝ, ‖iteratedDeriv N (f : ℝ → ℂ) x * Complex.exp (s * ↑x)‖ := by
+        exact mul_le_mul_of_nonneg_right hdecay (integral_nonneg fun _ ↦ norm_nonneg _)
+    _ ≤ (|y| ^ N)⁻¹ * max B 1 := by
+        exact mul_le_mul_of_nonneg_left hreal (inv_nonneg.mpr (pow_nonneg (abs_nonneg _) _))
+    _ = max B 1 / |y| ^ N := by rw [inv_mul_eq_div]
 
 /-- Paper: Proposition B.2.1.5(3), p. 594. The Lᵖ norms on the vertical
 lines admit the displayed central and tail bound, uniformly in the abscissa.
