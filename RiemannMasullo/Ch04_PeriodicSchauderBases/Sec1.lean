@@ -340,7 +340,28 @@ theorem tsum_seminorm_coordinates (q : Seminorm ℂ E) (u : E)
 space has equicontinuous basic projections and fails equicontinuity for its
 coefficient functionals. -/
 theorem pi_coeff_not_equicontinuousAt :
-    ¬ EquicontinuousAt (fun n (u : ℕ → ℂ) ↦ coordinateFunctional n u) 0 := by sorry
+    ¬ EquicontinuousAt (fun n (u : ℕ → ℂ) ↦ coordinateFunctional n u) 0 := by
+  rw [Metric.equicontinuousAt_iff_right]
+  push Not
+  refine ⟨1 / 2, by norm_num, ?_⟩
+  rw [Filter.frequently_iff]
+  intro t ht
+  rw [nhds_pi] at ht
+  obtain ⟨I, hIfin, q, hq, hqsub⟩ := Filter.mem_pi.mp ht
+  obtain ⟨j, hj⟩ := hIfin.exists_notMem
+  refine ⟨Pi.single j (1 : ℂ), ?_, j, ?_⟩
+  · refine hqsub ?_
+    rw [Set.mem_pi]
+    intro a ha
+    have haj : a ≠ j := by
+      intro haeq
+      subst haeq
+      exact hj ha
+    rw [Pi.single_eq_of_ne haj]
+    exact mem_of_mem_nhds (hq a)
+  · simp only [ContinuousLinearMap.proj_apply, Pi.zero_apply, Pi.single_eq_same,
+      dist_eq_norm, zero_sub, norm_neg, norm_one]
+    norm_num
 
 /-- Paper: Remark 4.1.2.2, p. 159. A Schauder basis with equicontinuous
 coefficient functionals is regular. -/
