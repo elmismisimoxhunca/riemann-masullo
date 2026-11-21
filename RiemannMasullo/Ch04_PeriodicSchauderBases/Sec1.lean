@@ -219,7 +219,15 @@ def partialProjection (k : ℕ) : E →L[ℂ] E :=
 /-- Paper: Definition 4.1.2.1(1), p. 158. The kth basic projection keeps exactly
 the basis vectors with index at most k. -/
 theorem partialProjection_apply_basis (h : IsSchauderBasis x f) (k n : ℕ) :
-    partialProjection x f k (x n) = if n ≤ k then x n else 0 := by sorry
+    partialProjection x f k (x n) = if n ≤ k then x n else 0 := by
+  have horth (m : ℕ) : (f m) (x n) = if m = n then (1 : ℂ) else 0 := by
+    simpa [ContinuousLinearMap.coe_coe] using h.1 m n
+  simp only [partialProjection, sum_apply, ContinuousLinearMap.smulRight_apply]
+  simp_rw [horth]
+  have hterm (m : ℕ) :
+      (if m = n then (1 : ℂ) else 0) • x m = if m = n then x n else 0 := by
+    split_ifs with hmn <;> simp [hmn]
+  simp_rw [hterm, Finset.sum_ite_eq', Finset.mem_Iic]
 
 /-- Paper: Definition 4.1.2.1(1), p. 158. The basic projections of an equicontinuous
 basis form an equicontinuous family. For linear maps it suffices to test at zero. -/
