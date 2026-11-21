@@ -5,15 +5,20 @@ public import RiemannMasullo.AppC_LCTVS.Sec2b
 public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
+public import Mathlib.Topology.Instances.ZMod
 import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
+import RiemannMasullo.ForMathlib.Topology.Algebra.ContinuousMonoidHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.LocalSubgroup
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Complex.CircleLocalHom
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
 import Mathlib.Geometry.Manifold.HasGroupoid
 import Mathlib.Analysis.Normed.Module.Connected
 import Mathlib.Order.WellQuasiOrder
 import Mathlib.Topology.Homotopy.Lifting
+import Mathlib.Topology.Algebra.Group.OpenMapping
+import Mathlib.Topology.Baire.LocallyCompactRegular
 
 /-!
 # Structure of locally compact abelian groups and their Schwartz–Bruhat spaces
@@ -58,24 +63,137 @@ theorem isLocallyEuclidean_of_discrete (X : Type*) [TopologicalSpace X]
   ⟨0, ⟨ChartedSpace.ofDiscreteTopology⟩⟩
 
 /-- Paper: (D.1.4.2), p. 757. A presentation identifies a group topologically
-with a product of real, torus, free discrete and finite factors.
-Deviation: The finite factor is enumerated by `Fin finiteOrder`. -/
+with a product of real, torus, free discrete and finite discrete abelian factors. -/
 structure ElementaryLCAPresentation (G : Type*) [CommGroup G] [TopologicalSpace G] where
   realDim : ℕ
   torusDim : ℕ
   latticeRank : ℕ
-  finiteOrder : ℕ
-  finiteGroup : AddCommGroup (Fin finiteOrder)
-  equiv : letI := finiteGroup
-    G ≃ₜ* Multiplicative (ElementaryLieGroup realDim torusDim latticeRank (Fin finiteOrder))
+  finiteFactor : Type
+  [finiteGroup : AddCommGroup finiteFactor]
+  [finiteFintype : Fintype finiteFactor]
+  [finiteTopology : TopologicalSpace finiteFactor]
+  [finiteDiscrete : DiscreteTopology finiteFactor]
+  equiv : G ≃ₜ* Multiplicative (ElementaryLieGroup realDim torusDim latticeRank finiteFactor)
+
+attribute [instance] ElementaryLCAPresentation.finiteGroup ElementaryLCAPresentation.finiteFintype
+  ElementaryLCAPresentation.finiteTopology ElementaryLCAPresentation.finiteDiscrete
+
+/-- Paper: (D.1.4.2), p. 757. The Klein four group admits an elementary presentation
+whose finite factor has order four and is noncyclic.
+Deviation: Sanity check for the finite abelian factor. -/
+theorem ElementaryLCAPresentation.exists_kleinFour :
+    ∃ e : ElementaryLCAPresentation (Multiplicative (ZMod 2 × ZMod 2)),
+      Fintype.card e.finiteFactor = 4 ∧ ¬ IsAddCyclic e.finiteFactor := by sorry
+
+/-- A continuous homomorphism from a torus to a real vector group vanishes,
+since the multiples of a nonzero vector cannot all lie in a compact range. -/
+private theorem elementary_torus_to_euclidean_eq_zero {m n : ℕ}
+    (f : (Fin n → AddCircle (1 : ℝ)) →+ EuclideanSpace ℝ (Fin m))
+    (hf : Continuous f) (x : Fin n → AddCircle (1 : ℝ)) : f x = 0 := by
+  obtain ⟨C, hC⟩ := isBounded_iff_forall_norm_le.mp (isCompact_range hf).isBounded
+  by_contra hx
+  have hpos : 0 < ‖f x‖ := norm_pos_iff.mpr hx
+  obtain ⟨k, hk⟩ := exists_nat_gt (C / ‖f x‖)
+  have hbound := hC (f (k • x)) ⟨k • x, rfl⟩
+  rw [map_nsmul, ← Nat.cast_smul_eq_nsmul ℝ, norm_smul,
+    Real.norm_of_nonneg (Nat.cast_nonneg k)] at hbound
+  exact (not_lt_of_ge hbound) ((div_lt_iff₀ hpos).mp hk)
+
+/-- The subgroup of a finite torus killed by doubling has cardinality two to
+the power of the number of circle coordinates. -/
+private theorem elementary_torus_two_torsion_card (n : ℕ) :
+    Nat.card {x : Fin n → AddCircle (1 : ℝ) // (2 : ℕ) • x = 0} = 2 ^ n := by
+  let half : AddCircle (1 : ℝ) := ((1 / 2 : ℝ) : AddCircle (1 : ℝ))
+  have horder : addOrderOf half = 2 := by
+    simpa [half] using
+      (AddCircle.addOrderOf_period_div (p := (1 : ℝ)) (n := 2) (by decide))
+  have hhalf : half ≠ 0 := by
+    intro h
+    simp [h] at horder
+  let f (i : Fin 2) : {x : AddCircle (1 : ℝ) // (2 : ℕ) • x = 0} :=
+    ⟨if i = 0 then 0 else half, by
+      split
+      · exact nsmul_zero _
+      · exact horder ▸ addOrderOf_nsmul_eq_zero half⟩
+  have hf : Function.Bijective f := by
+    constructor
+    · intro i j h
+      have hval := congrArg Subtype.val h
+      fin_cases i <;> fin_cases j <;> simp_all [f, Ne.symm hhalf]
+    · intro x
+      obtain ⟨k, hk, he⟩ := (AddCircle.nsmul_eq_zero_iff (by decide : 0 < 2)).mp x.property
+      refine ⟨⟨k, hk⟩, Subtype.ext ?_⟩
+      interval_cases k <;> simpa [f, half] using he
+  let coords : {x : Fin n → AddCircle (1 : ℝ) // (2 : ℕ) • x = 0} ≃
+      (Fin n → Fin 2) :=
+    (Equiv.subtypeEquiv (Equiv.refl _) (fun _ ↦ funext_iff)).trans
+      (Equiv.subtypePiEquivPi.trans (Equiv.piCongrRight fun _ ↦ (Equiv.ofBijective f hf).symm))
+  rw [Nat.card_congr coords, Nat.card_fun, Nat.card_fin, Nat.card_fin]
 
 /-- Paper: (D.1.4.2), p. 757. Two elementary presentations have the same real
 dimension, torus dimension and free lattice rank, and isomorphic finite factors.
 Deviation: The finite factors are compared up to group isomorphism. -/
 theorem ElementaryLCAPresentation.invariants (e e' : ElementaryLCAPresentation G) :
     e.realDim = e'.realDim ∧ e.torusDim = e'.torusDim ∧ e.latticeRank = e'.latticeRank ∧
-      Nonempty (@AddEquiv (Fin e.finiteOrder) (Fin e'.finiteOrder)
-        e.finiteGroup.toAdd e'.finiteGroup.toAdd) := by sorry
+      Nonempty (e.finiteFactor ≃+ e'.finiteFactor) := by
+  let model (p : ElementaryLCAPresentation G) :=
+    ElementaryLieGroup p.realDim p.torusDim p.latticeRank p.finiteFactor
+  let compare := e.equiv.symm.trans e'.equiv
+  let φ : model e ≃ₜ+ model e' :=
+    { MulEquiv.toAdditive compare.toMulEquiv with
+      continuous_toFun := compare.continuous_toFun
+      continuous_invFun := compare.continuous_invFun }
+  let assoc (p : ElementaryLCAPresentation G) :
+      (EuclideanSpace ℝ (Fin p.realDim) × (Fin p.torusDim → AddCircle (1 : ℝ))) ×
+        ((Fin p.latticeRank → ℤ) × p.finiteFactor) ≃ₜ+ model p :=
+    ContinuousAddEquiv.mk' (Homeomorph.prodAssoc _ _ _) (fun _ _ ↦ rfl)
+  let ψ := (assoc e).trans (φ.trans (assoc e').symm)
+  have connected_to_discrete {A B A' B' : Type} [AddZeroClass A] [AddZeroClass B]
+      [AddZeroClass A'] [AddZeroClass B'] [TopologicalSpace A] [TopologicalSpace B]
+      [TopologicalSpace A'] [TopologicalSpace B'] [PreconnectedSpace A] [DiscreteTopology B']
+      (g : A × B ≃ₜ+ A' × B') (a : A) : (g (a, 0)).2 = 0 := by
+    let f : A → B' := fun x ↦ (g (x, 0)).2
+    have hf : Continuous f := (g.continuous_toFun.comp (continuous_id.prodMk continuous_const)).snd
+    calc
+      (g (a, 0)).2 = (g (0, 0)).2 := TotallyDisconnectedSpace.eq_of_continuous f hf a 0
+      _ = 0 := congrArg Prod.snd (map_zero g)
+  obtain ⟨⟨connected⟩, ⟨discrete⟩⟩ := continuousAddEquiv_factors_of_snd_eq_zero ψ
+    (connected_to_discrete ψ) (connected_to_discrete ψ.symm)
+  let swap {A B : Type} [AddZeroClass A] [AddZeroClass B]
+      [TopologicalSpace A] [TopologicalSpace B] : B × A ≃ₜ+ A × B :=
+    ContinuousAddEquiv.mk' (Homeomorph.prodComm _ _) (fun _ _ ↦ rfl)
+  let γ := swap.trans (connected.trans swap.symm)
+  have torus_to_real {m n m' n' : ℕ}
+      (g : (Fin n → AddCircle (1 : ℝ)) × EuclideanSpace ℝ (Fin m) ≃ₜ+
+        (Fin n' → AddCircle (1 : ℝ)) × EuclideanSpace ℝ (Fin m')) (x : Fin n → AddCircle (1 : ℝ)) :
+      (g (x, 0)).2 = 0 :=
+    elementary_torus_to_euclidean_eq_zero
+      ((AddMonoidHom.snd _ _).comp (g.toAddEquiv.toAddMonoidHom.comp (AddMonoidHom.inl _ _)))
+      (g.continuous_toFun.comp (continuous_id.prodMk continuous_const)).snd x
+  obtain ⟨⟨torus⟩, ⟨real⟩⟩ := continuousAddEquiv_factors_of_snd_eq_zero γ
+    (torus_to_real γ) (torus_to_real γ.symm)
+  let δ := swap.trans (discrete.trans swap.symm)
+  have finite_to_lattice {F F' : Type} [AddCommGroup F] [AddCommGroup F']
+      [TopologicalSpace F] [TopologicalSpace F'] [Finite F] {r r' : ℕ}
+      (g : F × (Fin r → ℤ) ≃ₜ+ F' × (Fin r' → ℤ)) (x : F) : (g (x, 0)).2 = 0 := by
+    let f : F →+ (Fin r' → ℤ) :=
+      (AddMonoidHom.snd _ _).comp (g.toAddEquiv.toAddMonoidHom.comp (AddMonoidHom.inl _ _))
+    have h := congrArg f (addOrderOf_nsmul_eq_zero x)
+    rw [map_nsmul, map_zero] at h
+    exact (nsmul_eq_zero_iff_right (addOrderOf_pos x).ne').mp h
+  obtain ⟨⟨finite⟩, ⟨lattice⟩⟩ := continuousAddEquiv_factors_of_snd_eq_zero δ
+    (finite_to_lattice δ) (finite_to_lattice δ.symm)
+  refine ⟨?_, ?_, ?_, ⟨finite.toAddEquiv⟩⟩
+  · let linear := real.toAddEquiv.toRealLinearEquiv real.continuous_toFun real.continuous_invFun
+    simpa only [finrank_euclideanSpace, Fintype.card_fin] using linear.toLinearEquiv.finrank_eq
+  · have h := Nat.card_congr (torus.toEquiv.subtypeEquiv (p := fun x ↦ (2 : ℕ) • x = 0)
+      (q := fun y ↦ (2 : ℕ) • y = 0) fun x ↦ by
+        change (2 : ℕ) • x = 0 ↔ (2 : ℕ) • torus x = 0
+        rw [← map_nsmul, ← map_zero torus, torus.injective.eq_iff])
+    rw [elementary_torus_two_torsion_card, elementary_torus_two_torsion_card] at h
+    exact Nat.pow_right_injective (by decide : 2 ≤ 2) h
+  · simpa only [Module.finrank_pi, Fintype.card_fin] using
+      lattice.toAddEquiv.toIntLinearEquiv.finrank_eq
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
@@ -712,25 +830,271 @@ theorem lcaDualAnnihilator_annihilator (H : Subgroup G) (hH : IsClosed (H : Set 
   · intro hx χ
     exact (mem_lcaAnnihilator_iff H χ.val).mp χ.property ⟨x, hx⟩
 
+omit [T2Space G] in
+/-- A compact subset of a quotient of a locally compact group lies in the image of a compact set. -/
+private theorem exists_isCompact_quotient_preimage (H : Subgroup G) {K : Set (G ⧸ H)}
+    (hK : IsCompact K) : ∃ C : Set G, IsCompact C ∧ K ⊆ QuotientGroup.mk '' C := by
+  obtain ⟨L, hLcomp, hL⟩ := exists_compact_mem_nhds (1 : G)
+  have hU : QuotientGroup.mk '' L ∈ 𝓝 (1 : G ⧸ H) :=
+    (QuotientGroup.isOpenMap_coe (N := H)).image_mem_nhds hL
+  obtain ⟨t, ht⟩ := compact_covered_by_mul_left_translates hK
+    ⟨(1 : G ⧸ H), mem_interior_iff_mem_nhds.mpr hU⟩
+  refine ⟨⋃ g ∈ t, Homeomorph.mulLeft (g.out)⁻¹ '' L,
+    t.isCompact_biUnion fun g _ =>
+      hLcomp.image (Homeomorph.mulLeft (g.out)⁻¹).continuous, ?_⟩
+  intro k hk
+  obtain ⟨g, hg, hkU⟩ := mem_iUnion₂.mp (ht hk)
+  rw [mem_preimage, mem_image] at hkU
+  obtain ⟨y, hy, hgy⟩ := hkU
+  refine ⟨(g.out)⁻¹ * y, mem_iUnion₂.mpr ⟨g, hg, mem_image_of_mem _ hy⟩, ?_⟩
+  rw [QuotientGroup.mk_mul, QuotientGroup.mk_inv, QuotientGroup.out_eq', hgy,
+    inv_mul_cancel_left]
+
 /-- Paper: Lemma D.1.4.6(2), p. 758. Pullback by the quotient map identifies
 the dual of a quotient with the annihilator. -/
 theorem lcaQuotientDual_equiv_annihilator (H : Subgroup G) (hH : IsClosed (H : Set G)) :
     ∃ e : PontryaginDual (G ⧸ H) ≃ₜ* lcaAnnihilator H,
-      ∀ (χ : PontryaginDual (G ⧸ H)) x, (e χ).val x = χ (QuotientGroup.mk x) := by sorry
+      ∀ (χ : PontryaginDual (G ⧸ H)) x, (e χ).val x = χ (QuotientGroup.mk x) := by
+  -- Closedness of `H` makes the quotient Hausdorff.
+  have hpre : QuotientGroup.mk ⁻¹' ({1} : Set (G ⧸ H)) = (H : Set G) := by
+    simpa [QuotientGroup.mk_one] using QuotientGroup.preimage_mk_one H
+  have : T2Space (G ⧸ H) := IsTopologicalGroup.t2Space_iff_one_closed.mpr <| by
+    rw [← (QuotientGroup.isQuotientMap_mk H).isCoinducing.isClosed_preimage, hpre]
+    exact hH
+  let q : G →ₜ* G ⧸ H :=
+    { toMonoidHom := QuotientGroup.mk' H
+      continuous_toFun := QuotientGroup.continuous_mk }
+  have hq (x : G) : q x = QuotientGroup.mk x := by
+    change QuotientGroup.mk' H x = QuotientGroup.mk x
+    exact QuotientGroup.mk'_apply H x
+  have hker (ψ : lcaAnnihilator H) : H ≤ ψ.val.toMonoidHom.ker := by
+    intro x hx
+    exact (mem_lcaAnnihilator_iff H ψ.val).1 ψ.property ⟨x, hx⟩
+  let toAnn : PontryaginDual (G ⧸ H) →* lcaAnnihilator H :=
+    { toFun := fun χ => ⟨PontryaginDual.map q χ, by
+        rw [mem_lcaAnnihilator_iff]
+        intro x
+        rw [PontryaginDual.map_apply]
+        have : q x.val = 1 := by
+          change QuotientGroup.mk x.val = 1
+          exact (QuotientGroup.eq_one_iff _).2 x.property
+        rw [this, map_one]⟩
+      map_one' := Subtype.ext (map_one (PontryaginDual.map q))
+      map_mul' := fun χ φ => Subtype.ext (map_mul (PontryaginDual.map q) χ φ) }
+  let fromAnnFun (ψ : lcaAnnihilator H) : PontryaginDual (G ⧸ H) :=
+    { toMonoidHom := QuotientGroup.lift H ψ.val.toMonoidHom (hker ψ)
+      continuous_toFun :=
+        (QuotientGroup.isQuotientMap_mk H).continuous_iff.2 ψ.val.continuous_toFun }
+  have happly (ψ : lcaAnnihilator H) (x : G) :
+      fromAnnFun ψ (QuotientGroup.mk x) = ψ.val x := by
+    dsimp [fromAnnFun]
+    exact QuotientGroup.lift_mk' H (hker ψ) x
+  let fromAnn : lcaAnnihilator H →* PontryaginDual (G ⧸ H) :=
+    { toFun := fromAnnFun
+      map_one' := by
+        apply PontryaginDual.ext
+        intro y
+        obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+        rw [happly 1 x]
+        rfl
+      map_mul' := fun ψ φ => by
+        apply PontryaginDual.ext
+        intro y
+        obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+        rw [happly (ψ * φ) x]
+        have hr :
+            (fromAnnFun ψ * fromAnnFun φ) (QuotientGroup.mk x) =
+              fromAnnFun ψ (QuotientGroup.mk x) * fromAnnFun φ (QuotientGroup.mk x) :=
+          ContinuousMonoidHom.mul_apply _ _ _
+        rw [hr, happly ψ x, happly φ x, Subgroup.coe_mul]
+        rfl }
+  have hinv_left (χ : PontryaginDual (G ⧸ H)) : fromAnn (toAnn χ) = χ := by
+    apply PontryaginDual.ext
+    intro y
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+    dsimp [fromAnn]
+    rw [happly (toAnn χ) x]
+    dsimp [toAnn]
+    rw [hq]
+  have hinv_right (ψ : lcaAnnihilator H) : toAnn (fromAnn ψ) = ψ := by
+    apply Subtype.ext
+    apply PontryaginDual.ext
+    intro x
+    dsimp [toAnn, fromAnn]
+    rw [hq, happly ψ x]
+  have hbij : Function.Bijective toAnn :=
+    ⟨fun χ φ h => (hinv_left χ).symm.trans ((congrArg fromAnn h).trans (hinv_left φ)),
+      fun ψ => ⟨fromAnn ψ, hinv_right ψ⟩⟩
+  have hto_cont : Continuous toAnn := by
+    rw [IsInducing.subtypeVal.continuous_iff (f := toAnn)]
+    exact (PontryaginDual.map q).continuous
+  have hfrom_cont : Continuous fromAnn := by
+    refine continuous_of_continuousAt_one fromAnn ?_
+    rw [ContinuousAt, map_one fromAnn]
+    refine (pontryaginDual_nhds_one_hasBasis (G := G ⧸ H)).tendsto_right_iff.mpr ?_
+    rintro ⟨K, V⟩ ⟨hK, hV⟩
+    obtain ⟨C, hC, hKC⟩ := exists_isCompact_quotient_preimage H hK
+    rw [IsInducing.subtypeVal.nhds_eq_comap (1 : lcaAnnihilator H)]
+    refine mem_comap.mpr ⟨{ψ : PontryaginDual G | MapsTo ψ C V},
+      pontryaginDual_nhds_one_hasBasis.mem_of_mem (i := (C, V)) ⟨hC, hV⟩, ?_⟩
+    intro ψ hψ
+    replace hψ : MapsTo (ψ.val : G → Circle) C V := by
+      simpa [Set.mem_ofPred] using hψ
+    show MapsTo (fromAnn ψ) K V
+    intro k hk
+    obtain ⟨x, hxC, rfl⟩ := hKC hk
+    dsimp [fromAnn]
+    rw [happly ψ x]
+    exact hψ hxC
+  let e : PontryaginDual (G ⧸ H) ≃ₜ* lcaAnnihilator H :=
+    { toFun := toAnn
+      invFun := fromAnn
+      left_inv := hinv_left
+      right_inv := hinv_right
+      map_mul' := toAnn.map_mul
+      continuous_toFun := hto_cont
+      continuous_invFun := hfrom_cont }
+  refine ⟨e, fun χ x => ?_⟩
+  dsimp [e, toAnn]
+  rw [hq]
+
+open scoped Pointwise in
+/-- Some compact subgroup has a σ-compact annihilator. The subgroup is the
+intersection of a decreasing sequence of compact identity neighborhoods. -/
+private theorem exists_compact_subgroup_sigmaCompact_annihilator :
+    ∃ K : Subgroup G, IsCompact (K : Set G) ∧ SigmaCompactSpace (lcaAnnihilator K) := by
+  let N := {U : Set G // U ∈ 𝓝 (1 : G) ∧ IsCompact U}
+  have hNext (U : N) : ∃ V : N, (V : Set G)⁻¹ = V.val ∧ V.val * V.val ⊆ U.val := by
+    obtain ⟨V, hV, hVc, hVi, hVV⟩ := exists_closed_nhds_one_inv_eq_mul_subset U.property.1
+    have hVU : V ⊆ U.val := fun x hx ↦ hVV (mul_one x ▸ Set.mul_mem_mul hx (mem_of_mem_nhds hV))
+    exact ⟨⟨V, hV, U.property.2.of_isClosed_subset hVc hVU⟩, hVi, hVV⟩
+  choose next hInv hMul using hNext
+  obtain ⟨U₀, hU₀, hU₀nhds⟩ := exists_compact_mem_nhds (1 : G)
+  let seq : ℕ → N := Nat.rec ⟨U₀, hU₀nhds, hU₀⟩ fun _ U ↦ next U
+  let U (n : ℕ) : Set G := (seq n).val
+  have hOne (n : ℕ) : (1 : G) ∈ U n := mem_of_mem_nhds (seq n).property.1
+  have hMulU (n : ℕ) : U (n + 1) * U (n + 1) ⊆ U n := hMul (seq n)
+  have hAnti : Antitone U := antitone_nat_of_succ_le fun n x hx ↦
+    hMulU n (mul_one x ▸ Set.mul_mem_mul hx (hOne (n + 1)))
+  let K : Subgroup G :=
+    { carrier := ⋂ n, U n
+      one_mem' := mem_iInter.mpr hOne
+      mul_mem' := fun hx hy ↦ mem_iInter.mpr fun n ↦ hMulU n
+        (Set.mul_mem_mul (mem_iInter.mp hx (n + 1)) (mem_iInter.mp hy (n + 1)))
+      inv_mem' := fun hx ↦ mem_iInter.mpr fun n ↦ hAnti (Nat.le_succ n) (by
+          change _ ∈ (next (seq n)).val
+          rw [← hInv (seq n)]
+          simpa only [Set.mem_inv, inv_inv] using mem_iInter.mp hx (n + 1)) }
+  have hUc (n) : IsCompact (U n) := (seq n).property.2
+  have hUK : IsClosed (K : Set G) := isClosed_iInter fun n ↦ (hUc n).isClosed
+  have hK : IsCompact (K : Set G) := (hUc 0).of_isClosed_subset hUK (iInter_subset U 0)
+  refine ⟨K, hK, ?_⟩
+  obtain ⟨r, hr, hPolar⟩ := exists_isCompact_pontryaginDual_polar (G := G)
+  let A := lcaAnnihilator K
+  have hA : IsClosed (A : Set (PontryaginDual G)) :=
+    isClosed_singleton.preimage
+      (PontryaginDual.map (⟨K.subtype, continuous_subtype_val⟩ : K →ₜ* G)).continuous
+  let P (n : ℕ) : Set A := Subtype.val ⁻¹' {χ | MapsTo χ (U n) (Metric.closedBall 1 r)}
+  refine ⟨⟨P, fun n ↦ (?_ : IsCompact (P n)), eq_univ_of_forall fun χ ↦ ?_⟩⟩
+  · exact hA.isClosedEmbedding_subtypeVal.isCompact_preimage (hPolar _ (seq n).property.1)
+  · let W := (χ.val : PontryaginDual G) ⁻¹' Metric.ball 1 r
+    have hW : IsOpen W := Metric.isOpen_ball.preimage χ.val.continuous
+    have hKW : (K : Set G) ⊆ W := fun x hx ↦
+      show χ.val x ∈ Metric.ball 1 r by
+        rw [(mem_lcaAnnihilator_iff K χ.val).mp χ.property ⟨x, hx⟩]
+        exact Metric.mem_ball_self hr
+    have hDisj : Disjoint (U 0 \ W) (⋂ n, U n) :=
+      Set.disjoint_left.mpr fun x hx hxn ↦ hx.2 (hKW hxn)
+    obtain ⟨n, hn⟩ := ((hUc 0).diff hW).elim_directed_family_closed U
+      (fun n ↦ (hUc n).isClosed) hDisj hAnti.directed_ge
+    refine mem_iUnion.mpr ⟨n, fun x hx ↦ Metric.ball_subset_closedBall ?_⟩
+    by_contra hxW
+    exact Set.disjoint_left.mp hn ⟨hAnti (Nat.zero_le n) hx, hxW⟩ hx
+
+/-- Restriction to a closed subgroup is an open map on the dual groups. -/
+private theorem isOpenMap_restrict_dual (H : Subgroup G) (hH : IsClosed (H : Set G)) :
+    IsOpenMap (PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)) := by
+  let f := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)
+  let : LocallyCompactSpace H := hH.locallyCompactSpace
+  obtain ⟨K, hK, hSigma⟩ := exists_compact_subgroup_sigmaCompact_annihilator (G := G)
+  -- The restriction between the two open annihilators is surjective.
+  let L := K.comap H.subtype
+  have hL : IsCompact (L : Set H) := hH.isClosedEmbedding_subtypeVal.isCompact_preimage hK
+  let A := lcaAnnihilator K
+  let B := lcaAnnihilator L
+  let : SigmaCompactSpace A := hSigma
+  let : CompactSpace L := isCompact_iff_compactSpace.mp hL
+  have hB : IsOpen (B : Set (PontryaginDual H)) :=
+    (isOpen_discrete ({1} : Set (PontryaginDual L))).preimage
+      (PontryaginDual.map (⟨L.subtype, continuous_subtype_val⟩ : L →ₜ* H)).continuous
+  let : LocallyCompactSpace B := hB.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let g : A →* B := (f.toMonoidHom.comp A.subtype).codRestrict B fun χ ↦
+    (mem_lcaAnnihilator_iff L _).mpr fun x ↦
+      (mem_lcaAnnihilator_iff K χ.val).mp χ.property ⟨(x.val : G), x.property⟩
+  have hg : Continuous g := (f.continuous.comp continuous_subtype_val).subtype_mk _
+  have hgSurj : Function.Surjective g := by
+    intro χ
+    obtain ⟨ψ, hψ, hψK⟩ := exists_pontryaginDual_extension_trivial_on_compact H K hH hK χ.val
+      (fun x hx ↦ (mem_lcaAnnihilator_iff L χ.val).mp χ.property ⟨x, hx⟩)
+    exact ⟨⟨ψ, (mem_lcaAnnihilator_iff K ψ).mpr hψK⟩, Subtype.ext (PontryaginDual.ext hψ)⟩
+  have hOpen := g.isOpenMap_of_sigmaCompact hgSurj hg
+  have hImg (U : Set (PontryaginDual G)) (hU : U ∈ 𝓝 1) : f '' U ∈ 𝓝 1 := by
+    have hU' : (Subtype.val : A → PontryaginDual G) ⁻¹' U ∈ 𝓝 (1 : A) :=
+      continuous_subtype_val.continuousAt.preimage_mem_nhds hU
+    have hV := hOpen.image_mem_nhds hU'
+    rw [map_one g] at hV
+    apply mem_of_superset (hB.isOpenEmbedding_subtypeVal.isOpenMap.image_mem_nhds hV)
+    rintro _ ⟨_, ⟨χ, hχ, rfl⟩, rfl⟩
+    exact ⟨χ.val, hχ, rfl⟩
+  exact IsTopologicalGroup.isOpenMap_iff_nhds_one.mpr fun U hU ↦
+    mem_of_superset (hImg (f ⁻¹' U) hU) (image_preimage_subset f U)
 
 /-- Paper: Lemma D.1.4.6(2), p. 758. Restriction of characters identifies the
 dual modulo the annihilator with the dual of the subgroup. -/
 theorem lcaDualQuotient_equiv_subgroupDual (H : Subgroup G) (hH : IsClosed (H : Set G)) :
     ∃ e : (PontryaginDual G ⧸ lcaAnnihilator H) ≃ₜ* PontryaginDual H,
-      ∀ (χ : PontryaginDual G) (x : H), e (QuotientGroup.mk χ) x = χ x.val := by sorry
+      ∀ (χ : PontryaginDual G) (x : H), e (QuotientGroup.mk χ) x = χ x.val := by
+  let f := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)
+  have hSurj : Function.Surjective f := by
+    intro χ
+    obtain ⟨ψ, hψ, _⟩ := exists_pontryaginDual_extension_trivial_on_compact H ⊥ hH
+      (by simp) χ (fun x hx ↦ by
+        have hx1 : x = 1 := Subtype.ext (Subgroup.mem_bot.mp hx)
+        rw [hx1, map_one])
+    exact ⟨ψ, PontryaginDual.ext hψ⟩
+  have hOpen := isOpenMap_restrict_dual H hH
+  let e := QuotientGroup.quotientKerEquivOfSurjective f.toMonoidHom hSurj
+  have hq := QuotientGroup.isQuotientMap_mk (lcaAnnihilator H)
+  have hf := hOpen.isQuotientMap f.continuous hSurj
+  refine ⟨e.toContinuousMulEquiv fun _ ↦ ?_, fun _ _ ↦ rfl⟩
+  exact (hq.isCoinducing.isOpen_preimage.symm.trans hf.isCoinducing.isOpen_preimage)
 
+-- Retain the LCA assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.1.4.6(3), p. 758. The annihilator of a compact subgroup is open. -/
 theorem isOpen_lcaAnnihilator (H : Subgroup G) (hH : IsCompact (H : Set G)) :
-    IsOpen (lcaAnnihilator H : Set (PontryaginDual G)) := by sorry
+    IsOpen (lcaAnnihilator H : Set (PontryaginDual G)) := by
+  let : CompactSpace H := isCompact_iff_compactSpace.mp hH
+  let restrict := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)
+  change IsOpen (restrict ⁻¹' ({1} : Set (PontryaginDual H)))
+  exact (isOpen_discrete _).preimage restrict.continuous
 
 /-- Paper: Lemma D.1.4.6(4), p. 758. The annihilator of an open subgroup is compact. -/
 theorem isCompact_lcaAnnihilator (H : Subgroup G) (hH : IsOpen (H : Set G)) :
-    IsCompact (lcaAnnihilator H : Set (PontryaginDual G)) := by sorry
+    IsCompact (lcaAnnihilator H : Set (PontryaginDual G)) := by
+  let : DiscreteTopology (G ⧸ H) := QuotientGroup.discreteTopology hH
+  obtain ⟨e, _⟩ := lcaQuotientDual_equiv_annihilator H (H.isClosed_of_isOpen hH)
+  exact isCompact_iff_compactSpace.mpr e.toHomeomorph.compactSpace
+
+/-- Paper: (D.1.4.9), p. 759. Evaluation at points of the original group is dense
+in the dual of each open compactly generated subgroup of its Pontryagin dual.
+Deviation: This isolates the density consequence of biduality and character extension. -/
+theorem lca_dualSubgroup_eval_denseRange
+    (H : OpenCompactlyGeneratedSubgroups (PontryaginDual G)) :
+    DenseRange ((PontryaginDual.map
+      (⟨H.val.subtype, continuous_subtype_val⟩ : H.val →ₜ* PontryaginDual G)).comp
+        (pontryaginDual_eval (G := G))) := by
+  sorry
 
 /-- Paper: (D.1.4.9)–(D.1.4.10), p. 759. The evaluation map onto the dual of
 an open compactly generated subgroup of the dual is an open quotient. Its
@@ -738,7 +1102,41 @@ kernel is the compact annihilator of the subgroup. -/
 theorem lca_dualSubgroup_quotient (H : OpenCompactlyGeneratedSubgroups (PontryaginDual G)) :
     ∃ γ : G →ₜ* PontryaginDual H.val,
       (∀ x (χ : H.val), γ x χ = χ.val x) ∧ IsOpenQuotientMap γ ∧
-        γ.toMonoidHom.ker = lcaDualAnnihilator H.val ∧ IsCompact (γ.toMonoidHom.ker : Set G) := by sorry
+        γ.toMonoidHom.ker = lcaDualAnnihilator H.val ∧ IsCompact (γ.toMonoidHom.ker : Set G) := by
+  let r := PontryaginDual.map (⟨H.val.subtype, continuous_subtype_val⟩ : H.val →ₜ* PontryaginDual G)
+  let γ := r.comp (pontryaginDual_eval (G := G))
+  have hEval (x : G) (χ : H.val) : γ x χ = χ.val x := rfl
+  have hH := H.val.isClosed_of_isOpen H.property.1
+  -- The kernel of restriction is dual to the discrete quotient by the open subgroup.
+  let : DiscreteTopology (PontryaginDual G ⧸ H.val) := QuotientGroup.discreteTopology H.property.1
+  obtain ⟨a, _⟩ := lcaQuotientDual_equiv_annihilator H.val hH
+  have hCompact : IsCompact (lcaAnnihilator H.val : Set (PontryaginDual (PontryaginDual G))) :=
+    isCompact_iff_compactSpace.mpr a.toHomeomorph.compactSpace
+  obtain ⟨e, he⟩ := lcaDualQuotient_equiv_subgroupDual H.val hH
+  have hr : (r : PontryaginDual (PontryaginDual G) → PontryaginDual H.val) =
+      e ∘ QuotientGroup.mk := funext fun χ ↦ PontryaginDual.ext fun ψ ↦ (he χ ψ).symm
+  have hClosedR : IsClosedMap r := hr ▸
+    e.toHomeomorph.isClosedMap.comp (QuotientGroup.isClosedMap_coe hCompact)
+  have hEmb := isClosedEmbedding_pontryaginDual_eval (G := G)
+  have hClosed : IsClosedMap γ := hClosedR.comp hEmb.isClosedMap
+  have hRange : IsClosed (range γ) := by
+    rw [← image_univ]
+    exact hClosed _ isClosed_univ
+  have hSurj : Function.Surjective γ := by
+    intro ψ
+    change ψ ∈ range γ
+    rw [← hRange.closure_eq]
+    exact lca_dualSubgroup_eval_denseRange H ψ
+  have hQ := hClosed.isQuotientMap γ.continuous hSurj
+  let iso := (QuotientGroup.quotientKerEquivOfSurjective γ.toMonoidHom hSurj).toContinuousMulEquiv
+    fun _ ↦ (QuotientGroup.isQuotientMap_mk γ.toMonoidHom.ker).isCoinducing.isOpen_preimage.symm.trans
+      hQ.isCoinducing.isOpen_preimage
+  refine ⟨γ, hEval, iso.toHomeomorph.isOpenQuotientMap.comp QuotientGroup.isOpenQuotientMap_mk,
+    ?_, hEmb.isCompact_preimage hCompact⟩
+  ext x
+  rw [MonoidHom.mem_ker, mem_lcaDualAnnihilator_iff]
+  exact ⟨fun h χ ↦ congrArg (fun ψ : PontryaginDual H.val ↦ ψ χ) h,
+    fun h ↦ PontryaginDual.ext (fun χ ↦ h χ)⟩
 
 -- TODO(paper-gap): p. 759 calls the quotient codomains Uᵢ small subgroups of G.
 -- The kernels Kᵢ are the subgroups that become small, as on p. 760.
@@ -748,7 +1146,15 @@ one of the compact annihilators.
 Deviation: The small subgroups are the kernels Kᵢ, as stated on p. 760. -/
 theorem exists_lcaDualAnnihilator_subset_nhds {U : Set G} (hU : U ∈ 𝓝 (1 : G)) :
     ∃ H : OpenCompactlyGeneratedSubgroups (PontryaginDual G),
-      (lcaDualAnnihilator H.val : Set G) ⊆ U := by sorry
+      (lcaDualAnnihilator H.val : Set G) ⊆ U := by
+  obtain ⟨K, hK, hTest⟩ := exists_pontryaginDual_compact_test hU
+  obtain ⟨H, hKH⟩ := exists_openCompactlyGeneratedSubgroup_contains hK
+  refine ⟨H, fun x hx ↦ hTest x ?_⟩
+  intro χ hχ
+  have hχx := (mem_lcaDualAnnihilator_iff H.val x).mp hx ⟨χ, hKH hχ⟩
+  change χ x = 1 at hχx
+  rw [hχx, dist_self]
+  norm_num
 
 -- TODO(paper-gap): The component group of Aᵢⱼ can be infinite, as for G = ℤ with
 -- Gⱼ = ℤ and Kᵢ = 1. Its component group is finitely generated by (D.1.4.12).
@@ -773,7 +1179,103 @@ theorem lca_openSubgroup_inverseLimit (J : OpenCompactlyGeneratedSubgroups G) :
     let δ : J.val → ((H : I) → J.val ⧸ K H) := fun x _ ↦ QuotientGroup.mk x
     Nonempty I ∧ IsDirectedOrder I ∧
       IsEmbedding δ ∧ range δ = {a | ∀ (H H' : I), H ≤ H' →
-      ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'} := by sorry
+      ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'} := by
+  let I := {H : OpenCompactlyGeneratedSubgroups (PontryaginDual G) //
+    lcaDualAnnihilator H.val ≤ J.val}
+  let K (H : I) : Subgroup J.val := (lcaDualAnnihilator H.val.val).comap J.val.subtype
+  let δ : J.val →ₜ* ((H : I) → J.val ⧸ K H) :=
+    { toFun := fun x H ↦ QuotientGroup.mk x
+      map_one' := funext fun H ↦ QuotientGroup.mk_one (N := K H)
+      map_mul' := fun x y ↦ funext fun H ↦ QuotientGroup.mk_mul (K H) x y
+      continuous_toFun := continuous_pi fun H ↦ QuotientGroup.continuous_mk }
+  change Nonempty I ∧ IsDirectedOrder I ∧ IsEmbedding δ ∧
+    range δ = {a | ∀ (H H' : I), H ≤ H' → ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'}
+  have hSmall {V : Set J.val} (hV : V ∈ 𝓝 (1 : J.val)) :
+      ∃ H : I, (K H : Set J.val) ⊆ V := by
+    obtain ⟨H, hH⟩ := exists_lcaDualAnnihilator_subset_nhds
+      (J.property.1.isOpenEmbedding_subtypeVal.isOpenMap.image_mem_nhds hV)
+    refine ⟨⟨H, fun x hx ↦ ?_⟩, ?_⟩
+    · obtain ⟨y, _, rfl⟩ := hH hx
+      exact y.property
+    · intro x hx
+      obtain ⟨y, hy, hyx⟩ := hH (Subgroup.mem_comap.mp hx)
+      exact (Subtype.ext hyx : y = x) ▸ hy
+  let : Nonempty I := ⟨(hSmall Filter.univ_mem).choose⟩
+  let : IsDirectedOrder (OpenCompactlyGeneratedSubgroups (PontryaginDual G)) :=
+    (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).1
+  have hAnti : Antitone (fun H : OpenCompactlyGeneratedSubgroups (PontryaginDual G) ↦
+      lcaDualAnnihilator H.val) := by
+    intro H H' h x hx
+    exact (mem_lcaDualAnnihilator_iff H.val x).mpr fun χ ↦
+      (mem_lcaDualAnnihilator_iff H'.val x).mp hx (Subgroup.inclusion h χ)
+  let : IsDirectedOrder I := ⟨fun H H' ↦ by
+    obtain ⟨L, hHL, hH'L⟩ := exists_ge_ge H.val H'.val
+    exact ⟨⟨L, (hAnti hHL).trans H.property⟩, hHL, hH'L⟩⟩
+  -- A neighborhood can be tested in a quotient whose kernel lies in a smaller neighborhood.
+  have hInducing : IsInducing δ := by
+    rw [IsTopologicalGroup.isInducing_iff_nhds_one]
+    refine le_antisymm ?_ ?_
+    · have h : Tendsto δ (𝓝 1) (𝓝 (δ 1)) := δ.continuous.tendsto 1
+      rw [map_one] at h
+      exact h.le_comap
+    · intro U hU
+      obtain ⟨V, hV, h1V, hVV⟩ := exists_open_nhds_one_mul_subset hU
+      obtain ⟨H, hH⟩ := hSmall (hV.mem_nhds h1V)
+      let q : J.val → J.val ⧸ K H := QuotientGroup.mk
+      have hqV : q '' V ∈ 𝓝 (1 : J.val ⧸ K H) :=
+        (QuotientGroup.isOpenMap_coe (N := K H)).image_mem_nhds (hV.mem_nhds h1V)
+      refine Filter.mem_comap.mpr ⟨(fun a ↦ a H) ⁻¹' (q '' V),
+        (continuous_apply H).continuousAt.preimage_mem_nhds hqV, ?_⟩
+      intro x hx
+      obtain ⟨y, hy, hyx⟩ : q x ∈ q '' V := hx
+      have hDiff : y⁻¹ * x ∈ K H := QuotientGroup.eq.mp hyx
+      exact hVV ⟨y, hy, y⁻¹ * x, hH hDiff, mul_inv_cancel_left y x⟩
+  refine ⟨inferInstance, inferInstance, ⟨hInducing, hInducing.injective⟩, ?_⟩
+  ext a
+  constructor
+  · rintro ⟨x, rfl⟩ H H' _
+    exact ⟨x, rfl, rfl⟩
+  · intro ha
+    change ∀ (H H' : I), H ≤ H' → ∃ x : J.val, δ x H = a H ∧ δ x H' = a H' at ha
+    let F (H : I) : Set J.val := {x | δ x H = a H}
+    have hNonempty (H : I) : (F H).Nonempty := by
+      obtain ⟨x, hx⟩ := QuotientGroup.mk_surjective (a H)
+      exact ⟨x, hx⟩
+    have hCompact (H : I) : IsCompact (K H : Set J.val) := by
+      have hEval := (isClosedEmbedding_pontryaginDual_eval (G := G)).comp
+        (J.val.isClosed_of_isOpen J.property.1).isClosedEmbedding_subtypeVal
+      have hPreimage : (K H : Set J.val) =
+          (pontryaginDual_eval ∘ (Subtype.val : J.val → G)) ⁻¹'
+            (lcaAnnihilator H.val.val : Set (PontryaginDual (PontryaginDual G))) := by
+        ext x
+        exact (mem_lcaDualAnnihilator_iff H.val.val x.val).trans
+          (mem_lcaAnnihilator_iff H.val.val (pontryaginDual_eval x.val)).symm
+      rw [hPreimage]
+      exact hEval.isCompact_preimage (isCompact_lcaAnnihilator H.val.val H.val.property.1)
+    -- The fibers are translates of compact kernels and decrease along the index order.
+    have hFiberCompact (H : I) : IsCompact (F H) := by
+      obtain ⟨y, hy⟩ := hNonempty H
+      have hFiber : F H = (fun z : J.val ↦ y * z) '' (K H : Set J.val) := by
+        ext x
+        constructor
+        · intro hx
+          exact ⟨y⁻¹ * x, QuotientGroup.eq.mp (hy.trans hx.symm), mul_inv_cancel_left y x⟩
+        · rintro ⟨z, hz, rfl⟩
+          change (QuotientGroup.mk (y * z) : J.val ⧸ K H) = a H
+          rw [QuotientGroup.mk_mul, (QuotientGroup.eq_one_iff z).mpr hz, mul_one]
+          exact hy
+      rw [hFiber]
+      exact (hCompact H).image (continuous_const.mul continuous_id)
+    have hFiberAnti : Antitone F := by
+      intro H H' h x hx
+      obtain ⟨y, hy, hy'⟩ := ha H H' h
+      have hDiff : x⁻¹ * y ∈ K H' := QuotientGroup.eq.mp (hx.trans hy'.symm)
+      have hK : K H' ≤ K H := Subgroup.comap_mono (hAnti (show H.val ≤ H'.val from h))
+      exact (QuotientGroup.eq.mpr (hK hDiff)).trans hy
+    obtain ⟨x, hx⟩ := IsCompact.nonempty_iInter_of_directed_nonempty_isCompact_isClosed
+      F (directed_of_isDirected_le hFiberAnti) hNonempty hFiberCompact
+      (fun H ↦ (hFiberCompact H).isClosed)
+    exact ⟨x, funext (mem_iInter.mp hx)⟩
 
 end Structure
 
@@ -1258,9 +1760,100 @@ theorem isBruhatGoodSubgroup_bot_iff :
     exact isCompactlyGeneratedGroup_of_continuousMulEquiv eTop.symm
       (isCompactlyGeneratedGroup_dual_of_isLocallyEuclidean h)
 
+/-- Paper: Lemma D.1.4.6(4), p. 758. An open subgroup of the dual has a
+compact annihilator in the original group. -/
+private theorem isCompact_lcaDualAnnihilator (H : Subgroup (PontryaginDual G))
+    (hH : IsOpen (H : Set (PontryaginDual G))) :
+    IsCompact (lcaDualAnnihilator H : Set G) := by
+  have hCompact := isCompact_lcaAnnihilator H hH
+  convert (isClosedEmbedding_pontryaginDual_eval (G := G)).isCompact_preimage hCompact using 1
+  ext x
+  exact (mem_lcaDualAnnihilator_iff H x).trans
+    (mem_lcaAnnihilator_iff H (pontryaginDual_eval x)).symm
+
+/-- Paper: Definition D.1.5.1, p. 760. The intersection of two good
+subgroups is good. Its annihilator is the join of their annihilators. -/
+private theorem isBruhatGoodSubgroup_inf {K L : Subgroup G}
+    (hK : IsBruhatGoodSubgroup K) (hL : IsBruhatGoodSubgroup L) :
+    IsBruhatGoodSubgroup (K ⊓ L) := by
+  have hLc := isCompact_lcaDualAnnihilator (lcaAnnihilator L) hL.2.1
+  rw [lcaDualAnnihilator_annihilator L hL.1] at hLc
+  have hAnti : Antitone (lcaAnnihilator (G := G)) := fun _ _ h χ hχ ↦
+    (mem_lcaAnnihilator_iff _ χ).mpr fun x ↦
+      (mem_lcaAnnihilator_iff _ χ).mp hχ ⟨x, h x.property⟩
+  have hAnn : lcaAnnihilator (K ⊓ L) = lcaAnnihilator K ⊔ lcaAnnihilator L := by
+    apply le_antisymm _ (sup_le (hAnti inf_le_left) (hAnti inf_le_right))
+    intro χ hχ
+    let restrict : PontryaginDual K :=
+      PontryaginDual.map ⟨K.subtype, continuous_subtype_val⟩ χ
+    obtain ⟨ψ, hψ, hψL⟩ := exists_pontryaginDual_extension_trivial_on_compact K L hK.1 hLc
+      restrict (fun x hx ↦ (mem_lcaAnnihilator_iff _ χ).mp hχ ⟨x, x.property, hx⟩)
+    refine Subgroup.mem_sup.mpr ⟨χ * ψ⁻¹, ?_, ψ, (mem_lcaAnnihilator_iff L ψ).mpr hψL, ?_⟩
+    · refine (mem_lcaAnnihilator_iff K _).mpr fun x ↦ ?_
+      change χ x * (ψ x)⁻¹ = 1
+      rw [hψ x]
+      exact mul_inv_cancel _
+    · exact inv_mul_cancel_right χ ψ
+  let A : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator K, hK.2⟩
+  let B : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator L, hL.2⟩
+  obtain ⟨C, hAC, hBC⟩ := (openCompactlyGeneratedSubgroups_colimit
+    (G := PontryaginDual G)).1.directed A B
+  have hOpen : IsOpen (lcaAnnihilator (K ⊓ L) : Set (PontryaginDual G)) :=
+    Subgroup.isOpen_mono (hAnti inf_le_left) hK.2.1
+  refine ⟨hK.1.inter hL.1, hOpen, ?_⟩
+  let J := lcaAnnihilator (K ⊓ L)
+  have hJC : J ≤ C.val := by
+    change lcaAnnihilator (K ⊓ L) ≤ C.val
+    rw [hAnn]
+    exact sup_le (show A.val ≤ C.val from hAC) (show B.val ≤ C.val from hBC)
+  have hClosed : IsClosed (J.subgroupOf C.val : Set C.val) :=
+    (J.isClosed_of_isOpen hOpen).preimage continuous_subtype_val
+  let : LocallyCompactSpace C.val := C.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨U, hU, hUc, hGen⟩ := isCompactlyGeneratedGroup_closedSubgroup C.property.2
+    (J.subgroupOf C.val) hClosed
+  let e := Subgroup.subgroupOfEquivOfLe hJC
+  have he : Continuous e := (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _
+  have he' : Continuous e.symm := (continuous_subtype_val.subtype_mk _).subtype_mk _
+  refine ⟨e '' U, ?_, hUc.image he, ?_⟩
+  · have hEq : e '' U = e.symm ⁻¹' U := e.toEquiv.image_eq_preimage_symm U
+    rw [hEq]
+    exact he'.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hU)
+  · change Subgroup.closure (e.toMonoidHom '' U) = ⊤
+    rw [← MonoidHom.map_closure e.toMonoidHom, hGen,
+      Subgroup.map_top_of_surjective e.toMonoidHom e.surjective]
+
+/-- Paper: Lemma D.1.4.6(1), p. 758. An open subgroup of the dual is recovered
+from its annihilator in the original group.
+Deviation: We isolate the open-subgroup case on the dual side. Once evaluation
+is surjective onto the bidual, this follows by separating points in the discrete quotient. -/
+theorem lcaAnnihilator_dualAnnihilator_of_open (H : Subgroup (PontryaginDual G))
+    (hH : IsOpen (H : Set (PontryaginDual G))) :
+    lcaAnnihilator (lcaDualAnnihilator H) = H := by
+  sorry
+
 /-- Paper: Lemma D.1.5.2, p. 760. Structural pairs form a nonempty directed order. -/
 theorem bruhatStructuralPair_filtered :
-    Nonempty (BruhatStructuralPair G) ∧ IsDirectedOrder (BruhatStructuralPair G) := by sorry
+    Nonempty (BruhatStructuralPair G) ∧ IsDirectedOrder (BruhatStructuralPair G) := by
+  constructor
+  · obtain ⟨A, _⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 1
+    let K := lcaDualAnnihilator A.val
+    have hKc : IsCompact (K : Set G) := isCompact_lcaDualAnnihilator A.val A.property.1
+    have hAnn : lcaAnnihilator K = A.val :=
+      lcaAnnihilator_dualAnnihilator_of_open A.val A.property.1
+    have hK : IsBruhatGoodSubgroup K :=
+      ⟨hKc.isClosed, hAnn.symm ▸ A.property⟩
+    obtain ⟨H, hKH⟩ := exists_openCompactlyGeneratedSubgroup_contains hKc
+    exact ⟨⟨(H.val, OrderDual.toDual K), H.property.1, H.property.2, hK, hKH⟩⟩
+  · constructor
+    intro p q
+    obtain ⟨H, hp, hq⟩ := (openCompactlyGeneratedSubgroups_colimit (G := G)).1.directed
+      ⟨p.val.1, p.property.1, p.property.2.1⟩ ⟨q.val.1, q.property.1, q.property.2.1⟩
+    let K := OrderDual.ofDual p.val.2 ⊓ OrderDual.ofDual q.val.2
+    have hK := isBruhatGoodSubgroup_inf p.property.2.2.1 q.property.2.2.1
+    have hKH : K ≤ H.val := inf_le_left.trans (p.property.2.2.2.trans hp)
+    have hKp : K ≤ OrderDual.ofDual p.val.2 := inf_le_left
+    have hKq : K ≤ OrderDual.ofDual q.val.2 := inf_le_right
+    exact ⟨⟨(H.val, OrderDual.toDual K), H.property.1, H.property.2, hK, hKH⟩, ⟨hp, hKp⟩, ⟨hq, hKq⟩⟩
 
 /-- Paper: Lemma D.1.5.2(1), p. 761. The quotient attached to a structural pair
 has an elementary presentation. -/
@@ -1272,7 +1865,38 @@ in the dual, with the annihilator of the good subgroup as the open subgroup. -/
 theorem BruhatStructuralPair.dual (p : BruhatStructuralPair G) :
     ∃ q : BruhatStructuralPair (PontryaginDual G),
       q.val.1 = lcaAnnihilator (OrderDual.ofDual p.val.2) ∧
-      OrderDual.ofDual q.val.2 = lcaAnnihilator p.val.1 := by sorry
+      OrderDual.ofDual q.val.2 = lcaAnnihilator p.val.1 := by
+  let H := p.val.1
+  let k := OrderDual.ofDual p.val.2
+  obtain ⟨hH, hGen, ⟨_, hkOpen, hkGen⟩, hkH⟩ := p.property
+  have hCompact := isCompact_lcaAnnihilator H hH
+  refine ⟨⟨(lcaAnnihilator k, OrderDual.toDual (lcaAnnihilator H)), hkOpen, hkGen,
+    ⟨hCompact.isClosed, isOpen_lcaAnnihilator _ hCompact, ?_⟩, ?_⟩, rfl, rfl⟩
+  · obtain ⟨e, he⟩ := pontryaginDual_bidual (G := G)
+    let A := lcaAnnihilator (lcaAnnihilator H)
+    change IsCompactlyGeneratedGroup A
+    have hMem (x : G) : e x ∈ A ↔ x ∈ H := by
+      change e x ∈ lcaAnnihilator (lcaAnnihilator H) ↔ x ∈ H
+      rw [mem_lcaAnnihilator_iff]
+      simp_rw [he]
+      rw [← mem_lcaDualAnnihilator_iff, lcaDualAnnihilator_annihilator H
+        (H.isClosed_of_isOpen hH)]
+    let f : H →* A := (e.toMonoidHom.comp H.subtype).codRestrict A
+      fun x ↦ (hMem x).mpr x.property
+    have hSurj : Function.Surjective f := by
+      intro y
+      obtain ⟨x, hx⟩ := e.surjective (y : PontryaginDual (PontryaginDual G))
+      exact ⟨⟨x, (hMem x).mp (hx.symm ▸ y.property)⟩, Subtype.ext hx⟩
+    have hInducing : IsInducing f := IsInducing.subtypeVal.of_comp_iff.mp
+      (e.toHomeomorph.isInducing.comp IsInducing.subtypeVal)
+    have hOpen : IsOpenMap f := hInducing.isOpenMap (hSurj.range_eq ▸ isOpen_univ)
+    obtain ⟨U, hU, hUc, hUgen⟩ := hGen
+    refine ⟨f '' U, ?_, hUc.image hInducing.continuous, ?_⟩
+    · simpa only [map_one] using hOpen.image_mem_nhds hU
+    · rw [← MonoidHom.map_closure, hUgen, Subgroup.map_top_of_surjective f hSurj]
+  · intro χ hχ
+    exact (mem_lcaAnnihilator_iff k χ).mpr fun x ↦
+      (mem_lcaAnnihilator_iff H χ).mp hχ ⟨x, hkH x.property⟩
 
 section Fourier
 
@@ -1323,8 +1947,7 @@ def IsBruhatContDiff (p : ℕ) (f : G → ℂ) : Prop :=
     ∀ a : BruhatStructuralPair G, OrderDual.ofDual a.val.2 = k →
       ∃ f₀ : a.quotient → ℂ, (∀ x : a.val.1, f₀ (QuotientGroup.mk x) = f x.val) ∧
         ∀ (e : ElementaryLCAPresentation a.quotient)
-          (z : Fin e.latticeRank → ℤ) (b : Fin e.finiteOrder),
-          letI := e.finiteGroup
+          (z : Fin e.latticeRank → ℤ) (b : e.finiteFactor),
           ContDiff ℝ (p : ℕ∞) (fun xt ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd
             (elementaryCover xt z b))))
 
@@ -1392,7 +2015,7 @@ omit hTop hT2 hLC
 is the existing elementary Schwartz space with its seminorm topology. -/
 abbrev SchwartzBruhatStage {A : Type*} [CommGroup A] [TopologicalSpace A]
     (e : ElementaryLCAPresentation A) :=
-  ElementarySchwartz e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder)
+  ElementarySchwartz e.realDim e.torusDim e.latticeRank e.finiteFactor
 
 open Classical in
 /-- Paper: Definition D.1.5.3(2), p. 762. A stage function is pulled back along
@@ -1400,19 +2023,17 @@ the quotient and extended by zero outside the open subgroup.
 Deviation: The printed composition is reversed and omits restriction to the open subgroup. -/
 def schwartzBruhatStageRealization (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) : SchwartzBruhatStage e →ₗ[ℂ] (G → ℂ) :=
-  letI := e.finiteGroup
   (LinearMap.pi fun x : G ↦
     if hx : x ∈ a.val.1 then
       LinearMap.proj (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))
     else 0).comp (elementarySchwartzSubmodule e.realDim e.torusDim e.latticeRank
-      (Fin e.finiteOrder)).subtype
+      e.finiteFactor).subtype
 
 open Classical in
 /-- Paper: Definition D.1.5.3(2), p. 762. The realization evaluates a stage
 function at the quotient coordinate on the open subgroup and vanishes outside it. -/
 theorem schwartzBruhatStageRealization_apply (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) (f : SchwartzBruhatStage e) (x : G) :
-    letI := e.finiteGroup
     schwartzBruhatStageRealization a e f x =
       if hx : x ∈ a.val.1 then
         f (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))

@@ -119,6 +119,8 @@ def query(**params):
 
 def matters_to_everyone(path):
     """Whether a change to this file on main can change the result of any pull request's check."""
+    if path == "RiemannMasullo/External/ATTRIBUTION.md":
+        return False  # The source credits are not a build or checker input.
     if path in BUILD_FILES or path.startswith(BUILD_DIRS):
         return True
     return path.endswith(".lean") and not plain_proof.library_file(path)
@@ -284,6 +286,9 @@ class Merger:
                     return True
                 return "GitHub did not merge it"
             except ApiError as problem:
+                if problem.status == 403 and problem.message == "Resource not accessible by integration":
+                    # The same workflow token can still merge another pull request.
+                    return "the workflow token cannot merge this pull request (needs a project member)"
                 if problem.status == 405 and "modified" in problem.message:
                     continue          # main moved under us; try again
                 if problem.status == 409:
