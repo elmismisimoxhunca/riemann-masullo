@@ -483,7 +483,19 @@ local notation "classIntegrand" => fun (ω : PontryaginDual J₁) (f : ℬₛ) (
 is absolutely convergent at each S-idele class. -/
 theorem sLocalHomogeneousAdelicTheta_integrable [Measure.IsHaarMeasure μ]
     (ω : PontryaginDual J₁) (f : ℬₛ) (g : Jₛ) :
-    Integrable (classIntegrand ω f g) μ := by sorry
+    Integrable (classIntegrand ω f g) μ := by
+  have hcompact : CompactSpace J₁ :=
+    isCompact_iff_compactSpace.mp
+      ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  have hopen : OpensMeasurableSpace J₁ := ⟨le_refl _⟩
+  have hchar : Continuous (fun h : J₁ ↦ (ω h : ℂ)) :=
+    continuous_subtype_val.comp ω.continuous_toFun
+  have hcont : Continuous (classIntegrand ω f g) :=
+    ((sLocalAdelicThetaOnClasses F S f).continuous_toFun.comp
+      (continuous_const.mul continuous_subtype_val)).mul hchar
+  obtain ⟨C, hC⟩ := isCompact_univ.exists_bound_of_continuousOn hcont.continuousOn
+  exact Integrable.of_bound (hcont.aestronglyMeasurable_of_compactSpace) C
+    (Eventually.of_forall fun h ↦ hC h (Set.mem_univ h))
 
 /-- Paper: Proposition 2.3.1.4(1), p. 105. On a compact set of S-ideles
 the integrands have a common constant majorant on the compact norm-one classes.
