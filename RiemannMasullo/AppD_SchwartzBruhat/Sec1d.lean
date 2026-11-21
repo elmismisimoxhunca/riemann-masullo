@@ -6,6 +6,9 @@ public import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 public import Mathlib.MeasureTheory.Integral.IntervalIntegral.Periodic
 public import Mathlib.MeasureTheory.Integral.IntegralEqImproper
 public import Mathlib.MeasureTheory.Function.LpSeminorm.LpNorm
+public import Mathlib.MeasureTheory.Function.LpSeminorm.SMul
+public import Mathlib.MeasureTheory.Function.LpSeminorm.TriangleInequality
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
 public import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 public import Mathlib.Analysis.InnerProductSpace.Calculus
 
@@ -1513,11 +1516,381 @@ theorem latticeSchwartz_sup_generates (r : ℕ) :
     GeneratesSeminormTopology (fun γ : Fin r → ℕ ↦ fun f : RapidDecaySequence r ↦
       ⨆ a, (‖latticeSchwartzMonomial γ f a‖₊ : ℝ≥0∞)) := by sorry
 
+section LatticeLpAux
+
+/-! ### Auxiliaries for the lattice Lᵖ family
+
+The Lᵖ seminorms of the monomial-weighted sequences are controlled by the weighted
+absolute sums `rapidDecaySequenceBound` of the rapidly decreasing sequence space, and
+conversely each weighted absolute sum is controlled by finitely many Lᵖ seminorms: the
+monomial weights dominate `(1 + ‖a‖) ^ j ∏ (1 + |a i|) ^ (r + 1)`, and
+`∏ (1 + |a i|) ^ (-(r + 1))` is summable over `ℤ ^ r`. -/
+
+/-- For counting measure on a countable space and a natural exponent `p ≥ 1`, the Lᵖ norm
+is at most the ℓ¹ sum: `∑ yᵖ ≤ (∑ y)ᵖ` because each term is at most the total. -/
+private theorem eLpNorm_count_le_tsum_enorm {α : Type*} [MeasurableSpace α]
+    [MeasurableSingletonClass α] [Countable α] (g : α → ℂ) (p : ℕ) (hp : 1 ≤ p) :
+    eLpNorm g (p : ℝ≥0∞) Measure.count ≤ ∑' a, ‖g a‖ₑ := by
+  have hp0 : (p : ℝ≥0∞) ≠ 0 := by exact_mod_cast (show p ≠ 0 by omega)
+  rw [eLpNorm_eq_lintegral_rpow_eNorm_toReal hp0 (ENNReal.natCast_ne_top p)
+    (measurable_of_countable g).aestronglyMeasurable, lintegral_count]
+  simp only [ENNReal.toReal_natCast, ENNReal.rpow_natCast]
+  set S := ∑' a, ‖g a‖ₑ with hS
+  have hsum : ∑' a, ‖g a‖ₑ ^ p ≤ S ^ p := by
+    obtain ⟨q, rfl⟩ : ∃ q, p = q + 1 := ⟨p - 1, by omega⟩
+    calc ∑' a, ‖g a‖ₑ ^ (q + 1) = ∑' a, ‖g a‖ₑ * ‖g a‖ₑ ^ q := by
+          simp_rw [pow_succ']
+      _ ≤ ∑' a, ‖g a‖ₑ * S ^ q := by
+          gcongr with a
+          exact le_tsum (fun b ↦ ‖g b‖ₑ) a
+      _ = S ^ (q + 1) := by rw [ENNReal.tsum_mul_right, pow_succ']
+  calc (∑' a, ‖g a‖ₑ ^ p) ^ (1 / (p : ℝ)) ≤ (S ^ p) ^ (1 / (p : ℝ)) := by
+        gcongr
+    _ = S := by
+        rw [one_div, ENNReal.pow_rpow_inv_natCast (by omega)]
+
+/-- For counting measure on a countable space and a natural exponent `p ≥ 1`, each value
+of a function is bounded by its Lᵖ norm. -/
+private theorem enorm_le_eLpNorm_count {α : Type*} [MeasurableSpace α]
+    [MeasurableSingletonClass α] [Countable α] (g : α → ℂ) (p : ℕ) (hp : 1 ≤ p) (a : α) :
+    ‖g a‖ₑ ≤ eLpNorm g (p : ℝ≥0∞) Measure.count := by
+  have hp0 : (p : ℝ≥0∞) ≠ 0 := by exact_mod_cast (show p ≠ 0 by omega)
+  rw [eLpNorm_eq_lintegral_rpow_eNorm_toReal hp0 (ENNReal.natCast_ne_top p)
+    (measurable_of_countable g).aestronglyMeasurable, lintegral_count]
+  simp only [ENNReal.toReal_natCast, ENNReal.rpow_natCast]
+  calc ‖g a‖ₑ = (‖g a‖ₑ ^ p) ^ (1 / (p : ℝ)) := by
+        rw [one_div, ENNReal.pow_rpow_inv_natCast (by omega)]
+    _ ≤ (∑' b, ‖g b‖ₑ ^ p) ^ (1 / (p : ℝ)) := by
+        gcongr
+        exact le_tsum (fun b ↦ ‖g b‖ₑ ^ p) a
+
+/-- Paper: Example D.1.10.5, p. 786. Each coordinate of a lattice point is at most its
+Euclidean length. -/
+private theorem lattice_abs_le_norm {r : ℕ} (a : Fin r → ℤ) (i : Fin r) :
+    |(a i : ℝ)| ≤ ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r))‖ := by
+  have h := PiLp.norm_apply_le (WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r)) i
+  simpa using h
+
+/-- Paper: Example D.1.10.5, p. 786. The Euclidean length of a lattice point is at most
+the sum of the absolute values of its coordinates. -/
+private theorem lattice_norm_le_sum {r : ℕ} (a : Fin r → ℤ) :
+    ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ≤ ∑ i, |(a i : ℝ)| := by
+  rw [EuclideanSpace.norm_eq]
+  refine Real.sqrt_le_iff.mpr ⟨Finset.sum_nonneg fun i _ ↦ abs_nonneg _, ?_⟩
+  calc ∑ i, ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r)) i‖ ^ 2
+      = ∑ i, |(a i : ℝ)| ^ 2 := by simp
+    _ ≤ (∑ i, |(a i : ℝ)|) ^ 2 :=
+        Finset.sum_sq_le_sq_sum_of_nonneg fun i _ ↦ abs_nonneg _
+
+/-- For nonnegative reals, `1 + ∑ tᵢ ≤ ∏ (1 + tᵢ)`. -/
+private theorem one_add_sum_le_prod_one_add {ι : Type*} (s : Finset ι) (t : ι → ℝ)
+    (ht : ∀ i, 0 ≤ t i) :
+    1 + ∑ i ∈ s, t i ≤ ∏ i ∈ s, (1 + t i) := by
+  classical
+  induction s using Finset.induction_on with
+  | empty => simp
+  | insert i s hi ih =>
+    rw [Finset.sum_insert hi, Finset.prod_insert hi]
+    have h0 : 0 ≤ ∑ i ∈ s, t i := Finset.sum_nonneg fun i _ ↦ ht i
+    nlinarith [ht i]
+
+/-- For `t ≥ 0`, `(1 + t) ^ N ≤ 2 ^ N ∑_{k ≤ N} t ^ k` (binomial theorem with
+`choose N k ≤ 2 ^ N`). -/
+private theorem one_add_pow_le_two_pow_mul_sum (t : ℝ) (ht : 0 ≤ t) (N : ℕ) :
+    (1 + t) ^ N ≤ 2 ^ N * ∑ k ∈ Finset.range (N + 1), t ^ k := by
+  calc (1 + t) ^ N = (t + 1) ^ N := by ring
+    _ = ∑ k ∈ Finset.range (N + 1), t ^ k * 1 ^ (N - k) * (N.choose k : ℝ) := add_pow t 1 N
+    _ ≤ ∑ k ∈ Finset.range (N + 1), t ^ k * 2 ^ N := by
+        simp only [one_pow, mul_one]
+        gcongr with k hk
+        exact_mod_cast Nat.choose_le_two_pow N k
+    _ = 2 ^ N * ∑ k ∈ Finset.range (N + 1), t ^ k := by
+        rw [Finset.mul_sum]
+        exact Finset.sum_congr rfl fun k _ ↦ mul_comm _ _
+
+/-- A product weight sums over `ℤ ^ r` to the `r`-th power of the one-dimensional sum
+(induction on `r` with `Fin.consEquiv`). -/
+private theorem tsum_fin_pi_prod_eq_pow (h : ℤ → ℝ≥0∞) :
+    ∀ r : ℕ, ∑' a : Fin r → ℤ, ∏ i, h (a i) = (∑' n, h n) ^ r
+  | 0 => by
+    simp
+  | r + 1 => by
+    rw [← (Fin.consEquiv (fun _ : Fin (r + 1) ↦ ℤ)).tsum_eq]
+    simp only [Fin.consEquiv_apply, Fin.prod_univ_succ, Fin.cons_zero, Fin.cons_succ]
+    rw [tsum_prod (f := fun (n : ℤ) (b : Fin r → ℤ) ↦ h n * ∏ i : Fin r, h (b i))]
+    simp_rw [ENNReal.tsum_mul_left, tsum_fin_pi_prod_eq_pow h r, ENNReal.tsum_mul_right,
+      pow_succ']
+
+/-- The sequence `(1 + n) ^ (-2)` is summable over `ℕ`: its partial sums are at most
+`2 - 2 / (N + 1)` by telescoping. -/
+private theorem summable_inv_one_add_nat_sq : Summable fun n : ℕ ↦ ((1 + (n : ℝ)) ^ 2)⁻¹ := by
+  have key : ∀ N : ℕ,
+      ∑ i ∈ Finset.range N, ((1 + (i : ℝ)) ^ 2)⁻¹ ≤ (2 : ℝ) - 2 / ((N : ℝ) + 1) := by
+    intro N
+    induction N with
+    | zero => norm_num
+    | succ N ih =>
+      rw [Finset.sum_range_succ]
+      have hN : (0 : ℝ) ≤ N := N.cast_nonneg
+      have h : ((1 + (N : ℝ)) ^ 2)⁻¹ ≤ 2 / ((N : ℝ) + 1) - 2 / (((N + 1 : ℕ) : ℝ) + 1) := by
+        push_cast
+        rw [div_sub_div _ _ (by positivity) (by positivity), inv_eq_one_div,
+          div_le_div_iff₀ (by positivity) (by positivity)]
+        nlinarith
+      linarith
+  refine summable_of_sum_range_le (c := 2) (fun n ↦ by positivity) (fun N ↦ (key N).trans ?_)
+  have : 0 ≤ 2 / ((N : ℝ) + 1) := by positivity
+  linarith
+
+/-- The sequence `(1 + |n|) ^ (-e)` is summable over `ℤ` for `e ≥ 2`. -/
+private theorem summable_inv_one_add_abs_pow {e : ℕ} (he : 2 ≤ e) :
+    Summable fun n : ℤ ↦ ((1 + |(n : ℝ)|) ^ e)⁻¹ := by
+  have hle : ∀ t : ℝ, 0 ≤ t → ((1 + |t|) ^ e)⁻¹ ≤ ((1 + t) ^ 2)⁻¹ := by
+    intro t ht
+    rw [abs_of_nonneg ht]
+    apply inv_anti₀ (by positivity)
+    exact pow_le_pow_right₀ (by linarith) he
+  refine summable_int_iff_summable_nat_and_neg.mpr ⟨?_, ?_⟩
+  · refine summable_inv_one_add_nat_sq.of_nonneg_of_le (fun n ↦ by positivity) (fun n ↦ ?_)
+    have := hle (n : ℝ) n.cast_nonneg
+    simpa using this
+  · refine summable_inv_one_add_nat_sq.of_nonneg_of_le (fun n ↦ by positivity) (fun n ↦ ?_)
+    have := hle (n : ℝ) n.cast_nonneg
+    simpa using this
+
+/-- Paper: Example D.1.10.5, p. 786. The Lᵖ seminorm of a monomial-weighted rapidly
+decreasing sequence is bounded by a single weighted absolute sum, with the weight order
+increased by `r + 1`. Proof: pointwise `‖∏ (a i) ^ γ i‖ · ‖f a‖ ≤ (1 + ‖a‖) ^ ∑γ ‖f a‖ ≤
+(1 + ‖a‖) ^ (r + 1 + ∑γ) ‖f a‖`, and the counting-measure Lᵖ norm is at most the ℓ¹ sum. -/
+private theorem latticeSchwartzMonomial_eLpNorm_le {r : ℕ} (γ : Fin r → ℕ)
+    (f : RapidDecaySequence r) (p : ℕ) (hp : 1 ≤ p) :
+    eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count ≤
+      rapidDecaySequenceBound (r + 1 + ∑ i, γ i) (f : (Fin r → ℤ) → ℂ) := by
+  refine (eLpNorm_count_le_tsum_enorm _ p hp).trans ?_
+  rw [rapidDecaySequenceBound]
+  refine tsum_le_tsum fun a ↦ ?_
+  set x : EuclideanSpace ℝ (Fin r) := WithLp.toLp 2 (fun i ↦ (a i : ℝ)) with hx
+  have hw : (1 : ℝ≥0∞) + (‖x‖₊ : ℝ≥0∞) = ((1 + ‖x‖₊ : ℝ≥0) : ℝ≥0∞) := by push_cast; rfl
+  rw [hw, eNorm_eq_nnNorm, ← ENNReal.coe_pow, ← ENNReal.coe_mul, ENNReal.coe_le_coe,
+    ← NNReal.coe_le_coe]
+  push_cast
+  rw [latticeSchwartzMonomial, norm_mul, norm_prod]
+  gcongr
+  have h1 : (1 : ℝ) ≤ 1 + ‖x‖ := by linarith [norm_nonneg x]
+  calc ∏ i, ‖(a i : ℂ) ^ γ i‖ ≤ ∏ i, (1 + ‖x‖) ^ γ i := by
+        gcongr with i
+        rw [norm_pow]
+        gcongr
+        have := lattice_abs_le_norm a i
+        rw [Complex.norm_intCast]
+        linarith
+    _ = (1 + ‖x‖) ^ ∑ i, γ i := Finset.prod_pow_eq_pow_sum _ _ _
+    _ ≤ (1 + ‖x‖) ^ (r + 1 + ∑ i, γ i) := pow_le_pow_right₀ h1 (by omega)
+
+/-- Paper: Example D.1.10.5, p. 786. The weight `(1 + ‖a‖) ^ j ∏ (1 + |a i|) ^ (r + 1)` is
+bounded by a multiple of the sum of the monomials `∏ |a i| ^ γ i` with every exponent at most
+`j + r + 1`. Proof: `1 + ‖a‖ ≤ ∏ (1 + |a i|)`, then expand each factor with
+`one_add_pow_le_two_pow_mul_sum` and the product of sums with `Finset.prod_univ_sum`. -/
+private theorem lattice_weight_le_sum_monomial {r : ℕ} (a : Fin r → ℤ) (j : ℕ) :
+    (1 + ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r))‖) ^ j *
+        ∏ i, (1 + |(a i : ℝ)|) ^ (r + 1) ≤
+      2 ^ ((j + r + 1) * r) * ∑ γ ∈ Fintype.piFinset (fun _ : Fin r ↦ Finset.range (j + r + 2)),
+        ∏ i, |(a i : ℝ)| ^ γ i := by
+  have hw : 1 + ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ≤
+      ∏ i, (1 + |(a i : ℝ)|) :=
+    (add_le_add_right (lattice_norm_le_sum a) 1).trans
+      (one_add_sum_le_prod_one_add _ _ fun i ↦ abs_nonneg _)
+  calc (1 + ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r))‖) ^ j *
+        ∏ i, (1 + |(a i : ℝ)|) ^ (r + 1)
+      ≤ (∏ i, (1 + |(a i : ℝ)|)) ^ j * ∏ i, (1 + |(a i : ℝ)|) ^ (r + 1) := by
+        gcongr
+    _ = ∏ i, (1 + |(a i : ℝ)|) ^ (j + r + 1) := by
+        rw [← Finset.prod_pow, ← Finset.prod_mul_distrib]
+        refine Finset.prod_congr rfl fun i _ ↦ ?_
+        rw [← pow_add]
+        ring_nf
+    _ ≤ ∏ i, (2 ^ (j + r + 1) * ∑ k ∈ Finset.range (j + r + 1 + 1), |(a i : ℝ)| ^ k) :=
+        Finset.prod_le_prod₀ (fun i _ ↦ by positivity)
+          (fun i _ ↦ one_add_pow_le_two_pow_mul_sum _ (abs_nonneg _) _)
+    _ = 2 ^ ((j + r + 1) * r) *
+          ∏ i, ∑ k ∈ Finset.range (j + r + 2), |(a i : ℝ)| ^ k := by
+        rw [Finset.prod_mul_distrib, Finset.prod_const, Finset.card_univ, Fintype.card_fin,
+          ← pow_mul]
+    _ = _ := by rw [Finset.prod_univ_sum]
+
+/-- Paper: Example D.1.10.5, p. 786. Each weighted absolute sum of a rapidly decreasing
+sequence is bounded by a fixed multiple of the sum of the counting-measure Lᵖ norms of the
+monomial-weighted sequences with every exponent at most `j + r + 1`. Proof: pointwise
+`(1 + ‖a‖) ^ j ‖f a‖ ≤ ∏ (1 + |a i|) ^ (-(r + 1)) · 2 ^ ((j + r + 1) r) ∑ ‖γ f (a)‖`
+(`lattice_weight_le_sum_monomial`), each `‖γ f (a)‖` is at most the Lᵖ norm of `γ f`, and
+`∑ ∏ (1 + |a i|) ^ (-(r + 1)) = (∑ (1 + |n|) ^ (-(r + 1))) ^ r` is finite. -/
+private theorem exists_rapidDecaySequenceSeminorm_le_sum (r j p : ℕ) (hp : 1 ≤ p) :
+    ∃ C : ℝ≥0, ∀ f : RapidDecaySequence r,
+      rapidDecaySequenceSeminorm j f ≤
+        (C : ℝ) * ∑ γ ∈ Fintype.piFinset (fun _ : Fin r ↦ Finset.range (j + r + 2)),
+          (eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count).toReal := by
+  classical
+  set S := Fintype.piFinset (fun _ : Fin r ↦ Finset.range (j + r + 2)) with hS
+  let h : ℤ → ℝ≥0∞ := fun n ↦ ENNReal.ofReal (((1 + |(n : ℝ)|) ^ (r + 1))⁻¹)
+  set K : ℝ≥0∞ := (∑' n, h n) ^ r with hK
+  have hKfin : K ≠ ⊤ := by
+    rcases Nat.eq_zero_or_pos r with hr | hr
+    · rw [hK, hr, pow_zero]
+      exact ENNReal.one_ne_top
+    · apply ENNReal.pow_ne_top
+      have hsum := summable_inv_one_add_abs_pow (e := r + 1) (by omega)
+      rw [← ENNReal.ofReal_tsum_of_nonneg (fun n ↦ by positivity) hsum]
+      exact ENNReal.ofReal_ne_top
+  refine ⟨K.toNNReal * 2 ^ ((j + r + 1) * r), fun f ↦ ?_⟩
+  have hfin : ∀ γ, eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count ≠ ⊤ :=
+    fun γ ↦ ((latticeSchwartzMonomial_eLpNorm_le γ f p hp).trans_lt
+      ((show rapidDecaySequenceSubmodule r from f).property _)).ne
+  set M : ℝ≥0∞ := 2 ^ ((j + r + 1) * r) *
+    ∑ γ ∈ S, eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count with hM
+  have hMfin : M ≠ ⊤ := ENNReal.mul_ne_top (ENNReal.pow_ne_top ENNReal.ofNat_ne_top)
+    (ENNReal.sum_ne_top.2 fun γ _ ↦ hfin γ)
+  have hbound : rapidDecaySequenceBound j (f : (Fin r → ℤ) → ℂ) ≤ K * M := by
+    rw [rapidDecaySequenceBound, hK, ← tsum_fin_pi_prod_eq_pow h r, ← ENNReal.tsum_mul_right]
+    refine tsum_le_tsum fun a ↦ ?_
+    set x : EuclideanSpace ℝ (Fin r) := WithLp.toLp 2 (fun i ↦ (a i : ℝ)) with hx
+    have hU : 0 < ∏ i, (1 + |(a i : ℝ)|) ^ (r + 1) := by positivity
+    have hnorm : ∀ γ : Fin r → ℕ, ‖latticeSchwartzMonomial γ f a‖ =
+        (∏ i, |(a i : ℝ)| ^ γ i) * ‖f a‖ := by
+      intro γ
+      rw [latticeSchwartzMonomial, norm_mul, norm_prod]
+      simp [norm_pow, Complex.norm_intCast]
+    have hR : (1 + ‖x‖) ^ j * ‖f a‖ ≤ (∏ i, ((1 + |(a i : ℝ)|) ^ (r + 1))⁻¹) *
+        (2 ^ ((j + r + 1) * r) * ∑ γ ∈ S, ‖latticeSchwartzMonomial γ f a‖) := by
+      rw [Finset.prod_inv_distrib]
+      simp_rw [hnorm, ← Finset.sum_mul]
+      rw [inv_mul_eq_div, le_div_iff₀ hU]
+      calc (1 + ‖x‖) ^ j * ‖f a‖ * ∏ i, (1 + |(a i : ℝ)|) ^ (r + 1)
+          = ((1 + ‖x‖) ^ j * ∏ i, (1 + |(a i : ℝ)|) ^ (r + 1)) * ‖f a‖ := by ring
+        _ ≤ (2 ^ ((j + r + 1) * r) * ∑ γ ∈ S, ∏ i, |(a i : ℝ)| ^ γ i) * ‖f a‖ :=
+          mul_le_mul_of_nonneg_right (lattice_weight_le_sum_monomial a j) (norm_nonneg _)
+        _ = _ := by ring
+    have hL : (1 + (‖x‖₊ : ℝ≥0∞)) ^ j * (‖f a‖₊ : ℝ≥0∞) =
+        ENNReal.ofReal ((1 + ‖x‖) ^ j * ‖f a‖) := by
+      rw [ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_pow (by positivity),
+        ENNReal.ofReal_add zero_le_one (norm_nonneg _), ENNReal.ofReal_one, ofReal_norm,
+        ofReal_norm, eNorm_eq_nnNorm, eNorm_eq_nnNorm]
+    rw [hL]
+    refine (ENNReal.ofReal_le_ofReal hR).trans ?_
+    rw [ENNReal.ofReal_mul (Finset.prod_nonneg fun i _ ↦ by positivity),
+      ENNReal.ofReal_prod_of_nonneg (fun i _ ↦ by positivity),
+      ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_pow (by norm_num), ENNReal.ofReal_ofNat,
+      ENNReal.ofReal_sum_of_nonneg (fun γ _ ↦ norm_nonneg _)]
+    simp_rw [ofReal_norm]
+    rw [hM]
+    gcongr with γ hγ
+    exact enorm_le_eLpNorm_count _ p hp a
+  have hsemi : rapidDecaySequenceSeminorm j f =
+      (rapidDecaySequenceBound j (f : (Fin r → ℤ) → ℂ)).toReal := rfl
+  rw [hsemi]
+  calc (rapidDecaySequenceBound j (f : (Fin r → ℤ) → ℂ)).toReal
+      ≤ (K * M).toReal := ENNReal.toReal_mono (ENNReal.mul_ne_top hKfin hMfin) hbound
+    _ = _ := by
+      have h2 : ((2 : ℝ≥0∞) ^ ((j + r + 1) * r)).toReal = (2 : ℝ) ^ ((j + r + 1) * r) := by
+        simp
+      rw [ENNReal.toReal_mul, hM, ENNReal.toReal_mul, ENNReal.toReal_sum (fun γ _ ↦ hfin γ), h2,
+        NNReal.coe_mul, ENNReal.coe_toNNReal_eq_toReal, NNReal.coe_pow, NNReal.coe_ofNat, mul_assoc]
+
+/-- Paper: Example D.1.10.5, p. 786. The monomial weight is additive:
+`γ(f + g) = γf + γg` as lattice functions. -/
+private theorem latticeSchwartzMonomial_add {r : ℕ} (γ : Fin r → ℕ)
+    (f g : RapidDecaySequence r) :
+    (latticeSchwartzMonomial γ (f + g) : (Fin r → ℤ) → ℂ) =
+      (latticeSchwartzMonomial γ f : (Fin r → ℤ) → ℂ) +
+        (latticeSchwartzMonomial γ g : (Fin r → ℤ) → ℂ) := by
+  funext a
+  change (∏ i, (a i : ℂ) ^ γ i) * (f.val a + g.val a) = _
+  simp only [Pi.add_apply, latticeSchwartzMonomial, mul_add]
+
+/-- Paper: Example D.1.10.5, p. 786. The monomial weight is homogeneous:
+`γ(cf) = c · γf` as lattice functions. -/
+private theorem latticeSchwartzMonomial_smul {r : ℕ} (γ : Fin r → ℕ) (c : ℂ)
+    (f : RapidDecaySequence r) :
+    (latticeSchwartzMonomial γ (c • f) : (Fin r → ℤ) → ℂ) =
+      c • (latticeSchwartzMonomial γ f : (Fin r → ℤ) → ℂ) := by
+  funext a
+  change (∏ i, (a i : ℂ) ^ γ i) * (c * f.val a) = _
+  simp only [Pi.smul_apply, latticeSchwartzMonomial, smul_eq_mul]
+  rw [mul_left_comm]
+
+end LatticeLpAux
+
 /-- Paper: Example D.1.10.5, p. 786. The counting-measure Lᵖ seminorms of
 the monomial-weighted sequences generate the rapidly decreasing sequence topology. -/
 theorem latticeSchwartz_lp_generates (r p : ℕ) (hp : 1 ≤ p) :
     GeneratesLpSeminorms (Measure.count : Measure (Fin r → ℤ)) (p : ℝ≥0∞)
-      (latticeSchwartzMonomial (r := r)) := by sorry
+      (latticeSchwartzMonomial (r := r)) := by
+  classical
+  have hfin : ∀ (γ : Fin r → ℕ) (f : RapidDecaySequence r),
+      eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count < ⊤ := by
+    intro γ f
+    exact (latticeSchwartzMonomial_eLpNorm_le γ f p hp).trans_lt
+      ((show rapidDecaySequenceSubmodule r from f).property _)
+  have hmem : ∀ (γ : Fin r → ℕ) (f : RapidDecaySequence r),
+      MemLp (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count :=
+    fun γ f ↦ hfin γ f
+  let P : (Fin r → ℕ) → Seminorm ℂ (RapidDecaySequence r) := fun γ ↦
+    Seminorm.of (fun f ↦ (eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count).toReal)
+      (fun f g ↦ by
+        have hp1 : (1 : ℝ≥0∞) ≤ (p : ℝ≥0∞) := by exact_mod_cast hp
+        have hfg := latticeSchwartzMonomial_add γ f g
+        calc (eLpNorm (latticeSchwartzMonomial γ (f + g)) (p : ℝ≥0∞) Measure.count).toReal
+            ≤ (eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count +
+                eLpNorm (latticeSchwartzMonomial γ g) (p : ℝ≥0∞) Measure.count).toReal :=
+              ENNReal.toReal_mono
+                (ENNReal.add_ne_top.2 ⟨(hfin γ f).ne, (hfin γ g).ne⟩)
+                (by rw [hfg]; exact eLpNorm_add_le hp1)
+          _ = (eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count).toReal +
+                (eLpNorm (latticeSchwartzMonomial γ g) (p : ℝ≥0∞) Measure.count).toReal :=
+              ENNReal.toReal_add (hfin γ f).ne (hfin γ g).ne)
+      (fun c f ↦ by
+        have hcf := latticeSchwartzMonomial_smul γ c f
+        rw [hcf, eLpNorm_const_smul, ENNReal.toReal_mul]
+        simp)
+  refine ⟨fun γ f ↦ hmem γ f, ⟨P, ?_, ?_⟩⟩
+  · refine (rapidDecaySequence_withSeminorms).congr ?_ ?_
+    · refine Seminorm.IsBounded.of_real ?_
+      intro γ
+      refine ⟨({r + 1 + ∑ i, γ i} : Finset ℕ), 1, fun f ↦ ?_⟩
+      have hle := latticeSchwartzMonomial_eLpNorm_le γ f p hp
+      have hsemi : rapidDecaySequenceSeminorm (r + 1 + ∑ i, γ i) f =
+          (rapidDecaySequenceBound (r + 1 + ∑ i, γ i) (f : (Fin r → ℤ) → ℂ)).toReal := rfl
+      calc P γ f
+          = (eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count).toReal := rfl
+        _ ≤ (rapidDecaySequenceBound (r + 1 + ∑ i, γ i) (f : (Fin r → ℤ) → ℂ)).toReal :=
+              ENNReal.toReal_mono
+                ((show rapidDecaySequenceSubmodule r from f).property _).ne hle
+        _ = 1 * (({r + 1 + ∑ i, γ i} : Finset ℕ).sup rapidDecaySequenceSeminorm) f := by
+              rw [Finset.sup_singleton, hsemi, one_mul]
+    · refine Seminorm.IsBounded.of_real ?_
+      intro j
+      obtain ⟨C, hC⟩ := exists_rapidDecaySequenceSeminorm_le_sum r j p hp
+      set S : Finset (Fin r → ℕ) :=
+        Fintype.piFinset (fun _ : Fin r ↦ Finset.range (j + r + 2)) with hS_def
+      refine ⟨S, (C : ℝ) * S.card, fun f ↦ ?_⟩
+      have h1 := hC f
+      have h2 : ∑ γ ∈ S,
+          (eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count).toReal ≤
+          (S.card : ℝ) * ((S.sup P) f) := by
+        refine le_trans (Finset.sum_le_card_nsmul S _ ((S.sup P) f) (fun γ hγ ↦ ?_)) ?_
+        · show P γ f ≤ (S.sup P) f
+          exact Seminorm.le_finset_sup_apply hγ
+        · rw [nsmul_eq_mul]
+      calc rapidDecaySequenceSeminorm j f
+          ≤ (C : ℝ) * ∑ γ ∈ S,
+              (eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count).toReal := h1
+        _ ≤ (C : ℝ) * ((S.card : ℝ) * ((S.sup P) f)) :=
+              mul_le_mul_of_nonneg_left h2 C.coe_nonneg
+        _ = ((C : ℝ) * (S.card : ℝ)) * ((S.sup P) f) := by ring
+  · intro γ f
+    show ENNReal.ofReal (P γ f) = eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count
+    show ENNReal.ofReal
+      ((eLpNorm (latticeSchwartzMonomial γ f) (p : ℝ≥0∞) Measure.count).toReal) = _
+    exact ENNReal.ofReal_toReal (hfin γ f).ne
 
 end SchwartzTopologies
 
