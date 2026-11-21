@@ -1384,7 +1384,64 @@ abbrev injectiveTensorNorm (E F : Type*) [NormedAddCommGroup E] [NormedSpace ℂ
 and its operator norm is the injective norm of the tensor. -/
 theorem injectiveTensorNorm_eq_opNorm (z : E ⊗[ℂ] F) :
     ∃ T : StrongDual ℂ E →L[ℂ] F, T.toLinearMap = tensorDualOperator z ∧
-      injectiveTensorNorm E F z = ‖T‖ := by sorry
+      injectiveTensorNorm E F z = ‖T‖ := by
+  let U : {U : Set E // U ∈ 𝓝 0} :=
+    ⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩
+  let V : {V : Set F // V ∈ 𝓝 0} :=
+    ⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩
+  have hUV : injectiveTensorSeminorm U V = injectiveTensorNorm E F := rfl
+  have hballE : StrongDual.polar ℂ U.val = Metric.closedBall (0 : StrongDual ℂ E) 1 := by
+    rw [NormedSpace.polar_closedBall (𝕜 := ℂ) one_pos, inv_one]
+  have hballF : StrongDual.polar ℂ V.val = Metric.closedBall (0 : StrongDual ℂ F) 1 := by
+    rw [NormedSpace.polar_closedBall (𝕜 := ℂ) one_pos, inv_one]
+  let p := injectiveTensorNorm E F
+  have hunit : ∀ φ : StrongDual ℂ E, ‖φ‖ ≤ 1 → ‖tensorDualOperator z φ‖ ≤ p z := by
+    intro φ hφ
+    obtain ⟨ψ, hψ, hψeq⟩ := exists_dual_vector'' ℂ (tensorDualOperator z φ)
+    have hφmem : φ ∈ StrongDual.polar ℂ U.val := by
+      rw [hballE, mem_closedBall_zero_iff]; exact hφ
+    have hψmem : ψ ∈ StrongDual.polar ℂ V.val := by
+      rw [hballF, mem_closedBall_zero_iff]; exact hψ
+    have hsem : injectiveTensorSeminorm U V z ≤ p z := by rw [hUV]
+    have hle := (injectiveTensorSeminorm_le_iff U V z (p z)).mp hsem φ hφmem ψ hψmem
+    rw [← tensorDualOperator_eval z φ ψ] at hle
+    have hnorm : ‖tensorDualOperator z φ‖ = ‖ψ (tensorDualOperator z φ)‖ := by
+      rw [hψeq, norm_algebraMap', norm_norm]
+    exact hnorm.trans_le hle
+  have hbound : ∀ φ : StrongDual ℂ E, ‖tensorDualOperator z φ‖ ≤ p z * ‖φ‖ := by
+    intro φ
+    by_cases h0 : φ = 0
+    · simp [h0]
+    · have hnormφ : ‖φ‖ ≠ 0 := norm_ne_zero_iff.mpr h0
+      let c : ℂ := (‖φ‖ : ℝ)
+      have hc : c ≠ 0 := by dsimp [c]; exact_mod_cast hnormφ
+      have hφeq : c • (c⁻¹ • φ) = φ := by rw [smul_smul, mul_inv_cancel₀ hc, one_smul]
+      have hcnorm : ‖c‖ = ‖φ‖ := Complex.norm_of_nonneg (norm_nonneg _)
+      have hunitnorm : ‖c⁻¹ • φ‖ = 1 := by
+        rw [norm_smul, norm_inv, hcnorm, inv_mul_cancel₀ hnormφ]
+      have hle := hunit (c⁻¹ • φ) hunitnorm.le
+      calc
+        ‖tensorDualOperator z φ‖ = ‖c • tensorDualOperator z (c⁻¹ • φ)‖ := by
+          rw [← map_smul, hφeq]
+        _ = ‖c‖ * ‖tensorDualOperator z (c⁻¹ • φ)‖ := norm_smul _ _
+        _ ≤ ‖c‖ * p z := mul_le_mul_of_nonneg_left hle (norm_nonneg _)
+        _ = p z * ‖φ‖ := by rw [hcnorm, mul_comm]
+  let T := (tensorDualOperator z).mkContinuous (p z) hbound
+  refine ⟨T, rfl, ?_⟩
+  refine le_antisymm ?_ (LinearMap.mkContinuous_norm_le _ (apply_nonneg p z) hbound)
+  rw [← hUV]
+  refine (injectiveTensorSeminorm_le_iff U V z ‖T‖).mpr fun φ hφ ψ hψ ↦ ?_
+  rw [hballE, mem_closedBall_zero_iff] at hφ
+  rw [hballF, mem_closedBall_zero_iff] at hψ
+  rw [← tensorDualOperator_eval z φ ψ]
+  calc
+    ‖ψ (tensorDualOperator z φ)‖ = ‖ψ (T φ)‖ := by rw [LinearMap.mkContinuous_apply]
+    _ ≤ ‖ψ‖ * ‖T φ‖ := ψ.le_opNorm _
+    _ ≤ 1 * ‖T φ‖ := mul_le_mul_of_nonneg_right hψ (norm_nonneg _)
+    _ = ‖T φ‖ := one_mul _
+    _ ≤ ‖T‖ * ‖φ‖ := T.le_opNorm _
+    _ ≤ ‖T‖ * 1 := mul_le_mul_of_nonneg_left hφ (T.opNorm_nonneg)
+    _ = ‖T‖ := mul_one _
 
 /-- Paper: Example C.2.3.4, p. 677. The unit-ball seminorm alone generates the ε-topology. -/
 theorem injectiveTensorNorm_withSeminorms :
