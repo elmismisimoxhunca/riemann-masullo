@@ -3149,11 +3149,60 @@ theorem projectiveTensorMap_continuous :
   change ContinuousAt ((fun w : G × H ↦ q.val (w.1 ⊗ₜ[ℂ] w.2)) ∘ fun v : E × F ↦ (f v.1, g v.2)) 0
   exact ContinuousAt.comp_of_eq q.property hfg.continuousAt (by simp)
 
+/-- A linear image of an absolutely convex set is absolutely convex. -/
+private theorem absConvex_linear_image {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup Y] [Module ℂ Y]
+    {S : Set X} (hS : AbsConvex ℂ S) (L : X →ₗ[ℂ] Y) : AbsConvex ℂ (L '' S) :=
+  ⟨hS.1.image L, hS.2.linear_image L⟩
+
+/-- The absolutely convex hull of a linear image sits inside the image of the hull. -/
+private theorem absConvexHull_subset_linear_image {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup Y] [Module ℂ Y]
+    (L : X →ₗ[ℂ] Y) (S : Set X) :
+    absConvexHull ℂ (L '' S) ⊆ L '' absConvexHull ℂ S :=
+  absConvexHull_min (image_mono subset_absConvexHull)
+    (absConvex_linear_image absConvex_absConvexHull L)
+
 include hf hg
 
 /-- Paper: §C.2.3.2, p. 679. Tensoring quotient maps gives a projective quotient map. -/
 theorem projectiveTensorMap_isQuotientMap :
-    IsQuotientMap (projectiveTensorMap f.toLinearMap g.toLinearMap) := by sorry
+    IsQuotientMap (projectiveTensorMap f.toLinearMap g.toLinearMap) := by
+  let T := projectiveTensorMap f.toLinearMap g.toLinearMap
+  have hsurj : Function.Surjective T := by
+    intro z
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+      obtain ⟨a, ha⟩ := hf.surjective x
+      obtain ⟨b, hb⟩ := hg.surjective y
+      exact ⟨a ⊗ₜ[ℂ] b, by rw [projectiveTensorMap_tmul, ha, hb]⟩
+    | add x y hx hy =>
+      obtain ⟨x, rfl⟩ := hx
+      obtain ⟨y, rfl⟩ := hy
+      exact ⟨x + y, map_add T x y⟩
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let : IsTopologicalAddGroup F := PolynormableSpace.isTopologicalAddGroup ℂ F
+  have hfOpen : IsOpenMap f :=
+    (AddMonoidHom.isOpenQuotientMap_of_isQuotientMap hf).isOpenMap
+  have hgOpen : IsOpenMap g :=
+    (AddMonoidHom.isOpenQuotientMap_of_isQuotientMap hg).isOpenMap
+  -- (C.2.3.15): a basic projective neighborhood is the absolutely convex hull of a product of
+  -- factor neighborhoods, and a quotient map sends those to neighborhoods.
+  have hopen : IsOpenMap T := by
+    rw [IsTopologicalAddGroup.isOpenMap_iff_nhds_zero, le_map_iff]
+    intro W hW
+    obtain ⟨U, V, hU, hV, hUV⟩ := projectiveTensor_nhds_superset_absConvexHull hW
+    have hFU : f '' U ∈ 𝓝 (0 : G) := by
+      simpa [map_zero f] using hfOpen.image_mem_nhds hU
+    have hGV : g '' V ∈ 𝓝 (0 : H) := by
+      simpa [map_zero g] using hgOpen.image_mem_nhds hV
+    have heq : T '' image2 (TensorProduct.tmul ℂ) U V =
+        image2 (TensorProduct.tmul ℂ) (f '' U) (g '' V) :=
+      image_image2_distrib fun x y => projectiveTensorMap_tmul f g x y
+    refine mem_of_superset (projectiveTensor_absConvexHull_mem_nhds hFU hGV) ?_
+    rw [← heq]
+    exact (absConvexHull_subset_linear_image T _).trans (image_mono hUV)
+  exact IsOpenMap.isQuotientMap hopen (projectiveTensorMap_continuous f g) hsurj
 
 /-- Paper: Proposition C.2.3.7, p. 679. The extension to completions is a quotient map
 onto its range with the subspace topology. -/
