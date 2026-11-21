@@ -5,6 +5,7 @@ public import Mathlib.Analysis.Complex.Circle
 public import Mathlib.Analysis.SpecialFunctions.Complex.Arg
 public import Mathlib.Geometry.Manifold.Instances.UnitsOfNormedAlgebra
 public import Mathlib.Geometry.Manifold.Submersion
+import Mathlib.Analysis.InnerProductSpace.Calculus
 import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
 import all Mathlib.Geometry.Manifold.Submersion
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.PolarCoord
@@ -12,6 +13,7 @@ import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
 import all RiemannMasullo.AppA_AlgebraicNT.Sec1
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
 # Logarithmic coordinates and idelic fundamental domains
@@ -2136,6 +2138,39 @@ theorem ideleFundamentalDomain_finite_translates (K : Set N₁) (hK : IsCompact 
   obtain ⟨k, e, ⟨hk, he⟩, hke⟩ := Set.smul_inter_nonempty_iff'.mp hx
   exact ⟨⟨(k, e), ⟨hk, he⟩, congrArg Subtype.val hke⟩, ⟨x, rfl⟩⟩
 
+/-- A continuous monoid homomorphism `ℝ≥0ˣ → ℝˣ` is a real power `t ↦ t^c`. The image lands in the positive units because `ℝ≥0ˣ` is connected. -/
+
+private theorem continuous_nnreal_units_real_rpow (φ : ℝ≥0ˣ →* ℝˣ) (hφ : Continuous φ) :
+    ∃ c : ℝ, ∀ t : ℝ≥0ˣ, (φ t).val = (t.val : ℝ) ^ c := by
+  let c : ℝ≥0ˣ →ₜ* ℂ :=
+    ⟨Complex.ofRealHom.toMonoidHom.comp ((Units.coeHom ℝ).comp φ),
+      Complex.continuous_ofReal.comp (Units.continuous_val.comp hφ)⟩
+  obtain ⟨z, hz, -⟩ := existsUnique_complexPower c
+  refine ⟨z.re, fun t ↦ ?_⟩
+  have ht : 0 < (t.val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  have hp : 0 < (φ t).val := by
+    let u : ℝ≥0ˣ := (Nonneg.unitsHomeomorphPos ℝ).symm ⟨Real.sqrt (t.val : ℝ), Real.sqrt_pos.2 ht⟩
+    have hu : u * u = t := by
+      apply Units.ext
+      apply NNReal.coe_injective
+      change Real.sqrt (t.val : ℝ) * Real.sqrt (t.val : ℝ) = (t.val : ℝ)
+      exact Real.mul_self_sqrt ht.le
+    rw [← hu, map_mul, Units.val_mul]
+    exact mul_self_pos.mpr (Units.ne_zero _)
+  have h := congrArg norm (hz t)
+  change ‖((φ t).val : ℂ)‖ = ‖((t.val : ℝ) : ℂ) ^ z‖ at h
+  rw [Complex.norm_real, Real.norm_eq_abs, abs_of_pos hp,
+    Complex.norm_cpow_eq_rpow_re_of_pos ht] at h
+  exact h
+
+/-- A continuous monoid homomorphism `ℝ≥0ˣ → ℂˣ` is a complex power `t ↦ t^c`. The modulus is a real power and the argument is a continuous homomorphism into the circle. -/
+
+private theorem continuous_nnreal_units_complex_cpow (φ : ℝ≥0ˣ →* ℂˣ) (hφ : Continuous φ) :
+    ∃ c : ℂ, ∀ t : ℝ≥0ˣ, (φ t).val = ((t.val : ℝ) : ℂ) ^ c := by
+  let c : ℝ≥0ˣ →ₜ* ℂ := ⟨(Units.coeHom ℂ).comp φ, Units.continuous_val.comp hφ⟩
+  obtain ⟨z, hz, -⟩ := existsUnique_complexPower c
+  exact ⟨z, hz⟩
+
 variable (s : ℝ≥0ˣ →* (InfiniteAdeleRing F)ˣ) (hs : Continuous s) (hn : RightInverse s (infiniteIdeleNorm F))
 
 include hs hn in
@@ -2151,7 +2186,190 @@ theorem infiniteIdeleNormSection_product :
       (∃ f : mixedEmbedding.mixedSpace F → ℝ × mixedEmbedding.mixedSpace F,
         ContDiffOn ℝ ∞ f {z | IsUnit z} ∧ ∀ g : 𝕀∞, f (m g.val) =
           (((e.symm g).1.val : ℝ), m (e.symm g).2.val.val)) := by
-  sorry
+  intro m
+  let E := mixedEmbedding.mixedSpace F
+  have hNorm : Continuous (infiniteIdeleNorm F) := infiniteIdeleNorm_continuous F
+  have hKer (g : 𝕀∞) : (s (infiniteIdeleNorm F g))⁻¹ * g ∈ N∞ := by
+    rw [MonoidHom.mem_ker, map_mul, map_inv, hn _, inv_mul_cancel]
+  let e : (ℝ≥0ˣ × N∞) ≃ₜ* 𝕀∞ :=
+    { toFun := fun p ↦ s p.1 * p.2.val
+      invFun := fun g ↦ (infiniteIdeleNorm F g, ⟨(s (infiniteIdeleNorm F g))⁻¹ * g, hKer g⟩)
+      left_inv := by
+        rintro ⟨t, g⟩
+        have ht : infiniteIdeleNorm F (s t * g.val) = t := by
+          rw [map_mul, hn t, MonoidHom.mem_ker.mp g.property, mul_one]
+        refine Prod.ext ht (Subtype.ext ?_)
+        change (s (infiniteIdeleNorm F (s t * g.val)))⁻¹ * (s t * g.val) = g.val
+        rw [ht, inv_mul_cancel_left]
+      right_inv := fun g ↦ mul_inv_cancel_left (s (infiniteIdeleNorm F g)) g
+      map_mul' := by
+        rintro ⟨t, g⟩ ⟨u, h⟩
+        change s (t * u) * (g.val * h.val) = (s t * g.val) * (s u * h.val)
+        rw [map_mul, mul_mul_mul_comm]
+      continuous_toFun := (hs.comp continuous_fst).mul (continuous_subtype_val.comp continuous_snd)
+      continuous_invFun :=
+        hNorm.prodMk (((hs.comp hNorm).inv.mul continuous_id).subtype_mk hKer) }
+  let φR (v : {w : InfinitePlace F // w.IsReal}) : ℝ≥0ˣ →* ℝˣ :=
+    (Units.map (ringEquivRealOfIsReal v.2).toRingHom.toMonoidHom).comp
+      ((Units.map (Pi.evalRingHom (fun w : InfinitePlace F ↦ w.Completion) v.1).toMonoidHom).comp s)
+  let φC (v : {w : InfinitePlace F // w.IsComplex}) : ℝ≥0ˣ →* ℂˣ :=
+    (Units.map (ringEquivComplexOfIsComplex v.2).toRingHom.toMonoidHom).comp
+      ((Units.map (Pi.evalRingHom (fun w : InfinitePlace F ↦ w.Completion) v.1).toMonoidHom).comp s)
+  have hφR (v : {w : InfinitePlace F // w.IsReal}) : Continuous (φR v) :=
+    (((isometryEquivRealOfIsReal v.2).continuous).units_map _).comp
+      (((continuous_apply v.1).units_map _).comp hs)
+  have hφC (v : {w : InfinitePlace F // w.IsComplex}) : Continuous (φC v) :=
+    (((isometryEquivComplexOfIsComplex v.2).continuous).units_map _).comp
+      (((continuous_apply v.1).units_map _).comp hs)
+  choose cR hcR using fun v ↦ continuous_nnreal_units_real_rpow (φR v) (hφR v)
+  choose cC hcC using fun v ↦ continuous_nnreal_units_complex_cpow (φC v) (hφC v)
+  have hsection (t : ℝ≥0ˣ) :
+      m (s t).val =
+        (fun v : {w : InfinitePlace F // w.IsReal} ↦ (t.val : ℝ) ^ cR v,
+          fun v : {w : InfinitePlace F // w.IsComplex} ↦ ((t.val : ℝ) : ℂ) ^ cC v) := by
+    ext v
+    · simpa [m, InfiniteAdeleRing.ringEquiv_mixedSpace_apply, φR] using hcR v t
+    · simpa [m, InfiniteAdeleRing.ringEquiv_mixedSpace_apply, φC] using hcC v t
+  let fwd : ℝ × E → E := fun p ↦
+    (fun v ↦ p.1 ^ cR v * p.2.1 v, fun v ↦ ((p.1 : ℂ) ^ cC v) * p.2.2 v)
+  have hcpow {c : ℂ} {x : ℝ} (hx : 0 < x) :
+      ContDiffAt ℝ ∞ (fun y : ℝ ↦ (y : ℂ) ^ c) x := by
+    have hformula : (fun y : ℝ ↦ (y : ℂ) ^ c) =ᶠ[𝓝 x]
+        fun y : ℝ ↦ Complex.exp (Complex.log (y : ℂ) * c) := by
+      filter_upwards [eventually_gt_nhds hx] with y hy
+      rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hy.ne')]
+    refine ContDiffAt.congr_of_eventuallyEq ?_ hformula
+    have hcoe : ContDiffAt ℝ ∞ (fun y : ℝ ↦ (y : ℂ)) x :=
+      Complex.ofRealCLM.contDiff.contDiffAt
+    have hlog : ContDiffAt ℝ ∞ (fun y : ℝ ↦ Complex.log (y : ℂ)) x :=
+      ((Complex.contDiffAt_log (Complex.ofReal_mem_slitPlane.mpr hx)).restrict_scalars ℝ).comp x hcoe
+    exact (hlog.mul (contDiffAt_const (c := c))).cexp
+  have hfwd : ContDiffOn ℝ ∞ fwd {p | 0 < p.1} := by
+    intro p hp
+    have hp0 : p.1 ≠ 0 := hp.ne'
+    refine ContDiffAt.contDiffWithinAt ?_
+    refine (contDiffAt_pi.mpr fun v ↦ ?_).prodMk (contDiffAt_pi.mpr fun v ↦ ?_)
+    · exact (contDiffAt_fst.rpow_const_of_ne hp0).mul (by
+        fun_prop : ContDiffAt ℝ ∞ (fun q : ℝ × mixedEmbedding.mixedSpace F ↦ q.2.1 v) p)
+    · exact ((hcpow hp).comp p contDiffAt_fst).mul (by
+        fun_prop : ContDiffAt ℝ ∞ (fun q : ℝ × mixedEmbedding.mixedSpace F ↦ q.2.2 v) p)
+  have hfwd_agree (t : ℝ≥0ˣ) (g : N∞) :
+      fwd ((t.val : ℝ), m g.val.val) = m (e (t, g)).val := by
+    have hmul : m (e (t, g)).val = m (s t).val * m g.val.val := by
+      change m (s t * g.val).val = m (s t).val * m g.val.val
+      rw [Units.val_mul]
+      exact map_mul m _ _
+    rw [hmul, hsection]
+    rfl
+  let nrm : E → ℝ := fun z ↦ ∏ v : InfinitePlace F, mixedEmbedding.normAtPlace v z ^ v.mult
+  let bwd : E → ℝ × E := fun z ↦
+    (nrm z, (fun v ↦ nrm z ^ (-cR v) * z.1 v, fun v ↦ ((nrm z : ℂ) ^ (-cC v)) * z.2 v))
+  have hbwd : ContDiffOn ℝ ∞ bwd {z | IsUnit z} := by
+    intro z hz
+    have hne1 (v : {w : InfinitePlace F // w.IsReal}) : z.1 v ≠ 0 := by
+      have hu : IsUnit z.1 := (Prod.isUnit_iff.mp hz).1
+      exact ((Pi.isUnit_iff.mp hu) v).ne_zero
+    have hne2 (v : {w : InfinitePlace F // w.IsComplex}) : z.2 v ≠ 0 := by
+      have hu : IsUnit z.2 := (Prod.isUnit_iff.mp hz).2
+      exact ((Pi.isUnit_iff.mp hu) v).ne_zero
+    have hplace (v : InfinitePlace F) :
+        ContDiffAt ℝ ∞ (mixedEmbedding.normAtPlace v) z := by
+      by_cases hv : v.IsReal
+      · have hfun : mixedEmbedding.normAtPlace v =
+            fun w : mixedEmbedding.mixedSpace F ↦ ‖w.1 ⟨v, hv⟩‖ := by
+          funext w; rw [mixedEmbedding.normAtPlace_apply_of_isReal hv]
+        rw [hfun]
+        exact (contDiffAt_norm ℝ (hne1 ⟨v, hv⟩)).comp z (by fun_prop : ContDiffAt ℝ ∞
+          (fun w : mixedEmbedding.mixedSpace F ↦ w.1 ⟨v, hv⟩) z)
+      · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+        have hfun : mixedEmbedding.normAtPlace v =
+            fun w : mixedEmbedding.mixedSpace F ↦ ‖w.2 ⟨v, hc⟩‖ := by
+          funext w; rw [mixedEmbedding.normAtPlace_apply_of_isComplex hc]
+        rw [hfun]
+        exact (contDiffAt_norm ℝ (hne2 ⟨v, hc⟩)).comp z (by fun_prop : ContDiffAt ℝ ∞
+          (fun w : mixedEmbedding.mixedSpace F ↦ w.2 ⟨v, hc⟩) z)
+    have hnrm : ContDiffAt ℝ ∞ nrm z := by
+      simpa [nrm, Finset.prod_apply] using contDiffAt_prod fun v _ ↦ (hplace v).pow v.mult
+    have hpos : 0 < nrm z := by
+      refine Finset.prod_pos fun v _ ↦ ?_
+      have hnz : mixedEmbedding.normAtPlace v z ≠ 0 := by
+        by_cases hv : v.IsReal
+        · rw [mixedEmbedding.normAtPlace_apply_of_isReal hv, norm_ne_zero_iff]
+          exact hne1 ⟨v, hv⟩
+        · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+          rw [mixedEmbedding.normAtPlace_apply_of_isComplex hc, norm_ne_zero_iff]
+          exact hne2 ⟨v, hc⟩
+      exact pow_pos (lt_of_le_of_ne (mixedEmbedding.normAtPlace_nonneg v z) hnz.symm) _
+    refine ContDiffAt.contDiffWithinAt ?_
+    refine (hnrm.prodMk ((contDiffAt_pi.mpr fun v ↦ ?_).prodMk (contDiffAt_pi.mpr fun v ↦ ?_)))
+    · exact (hnrm.rpow_const_of_ne hpos.ne').mul
+        (by fun_prop : ContDiffAt ℝ ∞ (fun w : mixedEmbedding.mixedSpace F ↦ w.1 v) z)
+    · exact ((hcpow hpos).comp z hnrm).mul
+        (by fun_prop : ContDiffAt ℝ ∞ (fun w : mixedEmbedding.mixedSpace F ↦ w.2 v) z)
+  have hbwd_agree (g : 𝕀∞) :
+      bwd (m g.val) = (((e.symm g).1.val : ℝ), m (e.symm g).2.val.val) := by
+    let t := infiniteIdeleNorm F g
+    have ht1 : (e.symm g).1 = t := rfl
+    have hval : (e.symm g).2.val = (s t)⁻¹ * g := rfl
+    have hnorm : nrm (m g.val) = (t.val : ℝ) := by
+      have hright : ((infiniteIdeleNorm F g).val : ℝ) = ∏ v, ‖g.val v‖ ^ v.mult := by
+        simp [infiniteIdeleNorm, Units.coe_prod, Pi.evalRingHom_apply]
+        rfl
+      rw [show (t.val : ℝ) = ((infiniteIdeleNorm F g).val : ℝ) from rfl]
+      rw [hright]
+      simp only [nrm]
+      refine Finset.prod_congr rfl fun v _ ↦ ?_
+      by_cases hv : v.IsReal
+      · rw [mixedEmbedding.normAtPlace_apply_of_isReal hv]
+        simp only [m, InfiniteAdeleRing.ringEquiv_mixedSpace_apply, ringEquivRealOfIsReal_apply]
+        rw [← (isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero (map_zero _) (g.val v),
+          Real.norm_eq_abs]
+      · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+        rw [mixedEmbedding.normAtPlace_apply_of_isComplex hc]
+        simp only [m, InfiniteAdeleRing.ringEquiv_mixedSpace_apply,
+          ringEquivComplexOfIsComplex_apply]
+        rw [← (isometry_extensionEmbedding v).norm_map_of_map_zero (map_zero _) (g.val v)]
+    have hmulR (a b : 𝕀∞) (v) :
+        (m (a * b).val).1 v = (m a.val).1 v * (m b.val).1 v := by
+      rw [Units.val_mul, map_mul m]
+      rfl
+    have hmulC (a b : 𝕀∞) (v) :
+        (m (a * b).val).2 v = (m a.val).2 v * (m b.val).2 v := by
+      rw [Units.val_mul, map_mul m]
+      rfl
+    have hpowR (v) : (m (s t).val).1 v = (t.val : ℝ) ^ cR v :=
+      congrFun (congrArg Prod.fst (hsection t)) v
+    have hpowC (v) : (m (s t).val).2 v = ((t.val : ℝ) : ℂ) ^ cC v :=
+      congrFun (congrArg Prod.snd (hsection t)) v
+    have hinvR (v) : (m ((s t)⁻¹).val).1 v = ((t.val : ℝ) ^ cR v)⁻¹ := by
+      have hone : (m ((s t)⁻¹).val).1 v * (m (s t).val).1 v = 1 := by
+        rw [← hmulR, inv_mul_cancel]
+        simp [map_one, Pi.one_apply]
+      rw [hpowR] at hone
+      exact eq_inv_of_mul_eq_one_left hone
+    have hinvC (v) : (m ((s t)⁻¹).val).2 v = (((t.val : ℝ) : ℂ) ^ cC v)⁻¹ := by
+      have hone : (m ((s t)⁻¹).val).2 v * (m (s t).val).2 v = 1 := by
+        rw [← hmulC, inv_mul_cancel]
+        simp [map_one, Pi.one_apply]
+      rw [hpowC] at hone
+      exact eq_inv_of_mul_eq_one_left hone
+    have hpair :
+        ((fun v ↦ (t.val : ℝ) ^ (-cR v) * (m g.val).1 v),
+          fun v ↦ ((t.val : ℝ) : ℂ) ^ (-cC v) * (m g.val).2 v) =
+        m ((s t)⁻¹ * g).val := by
+      refine Prod.ext (funext fun v ↦ ?_) (funext fun v ↦ ?_)
+      · dsimp
+        rw [map_mul m]
+        rw [show (m ((s t)⁻¹).val * m g.val).1 v =
+          (m ((s t)⁻¹).val).1 v * (m g.val).1 v from rfl]
+        rw [hinvR, Real.rpow_neg (NNReal.coe_nonneg _)]
+      · dsimp
+        rw [map_mul m]
+        rw [show (m ((s t)⁻¹).val * m g.val).2 v =
+          (m ((s t)⁻¹).val).2 v * (m g.val).2 v from rfl]
+        rw [hinvC, Complex.cpow_neg]
+    simp only [bwd, ht1, hnorm, hval, hpair]
+  refine ⟨e, fun _ _ ↦ rfl, ⟨fwd, hfwd, hfwd_agree⟩, ⟨bwd, hbwd, hbwd_agree⟩⟩
 
 include hr₁ hr hs hn in
 /-- Paper: Lemma A.2.3.12, p. 553. Multiplication of a principal idele, a section
