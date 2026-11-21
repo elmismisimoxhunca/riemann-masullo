@@ -2072,9 +2072,55 @@ locally convex and nuclear. -/
 theorem finitePlaceSchwartz_nuclear (w : Places(F)) :
     IsNuclearTVS.{v} ℬ(w.adicCompletion F) := by sorry
 
+section FinestMontel
+
+open scoped Pointwise
+
+/-- Every seminorm is continuous in the finest locally convex topology, so that topology is
+barrelled. -/
+private theorem finestLocallyConvex_barrelled (E : Type*) [AddCommGroup E] [Module ℂ E] :
+    BarrelledSpace ℂ (FinestLocallyConvex E) := by
+  refine ⟨fun p _ ↦ ?_⟩
+  exact (finestLocallyConvex_withSeminorms E).continuous_seminorm p
+
+/-- Closed von Neumann bounded sets are compact in the finest locally convex topology: each is
+closed and absorbed by a compact neighborhood inside a finite-dimensional subspace. -/
+private theorem finestLocallyConvex_montel (E : Type*) [AddCommGroup E] [Module ℂ E] :
+    MontelSpace ℂ (FinestLocallyConvex E) := by
+  refine ⟨fun s hs hbd ↦ ?_⟩
+  obtain ⟨S, hfin, hsub, hbdS⟩ := (finestLocallyConvex_isVonNBounded_iff (E := E) s).mp hbd
+  have : FiniteDimensional ℂ S := hfin
+  have : LocallyCompactSpace S := LocallyCompactSpace.of_finiteDimensional_of_complete ℂ S
+  obtain ⟨K, hK, hKnhds⟩ := exists_compact_mem_nhds (0 : S)
+  let pre : Set S := Subtype.val ⁻¹' s
+  have habs : Absorbs ℂ K pre := hbdS hKnhds
+  obtain ⟨a, ha⟩ := habs.exists
+  have hpre : IsCompact pre :=
+    (hK.smul a).of_isClosed_subset (hs.preimage continuous_subtype_val) ha
+  have himage : Subtype.val '' pre = s := by
+    unfold pre
+    apply image_preimage_eq_of_subset
+    rw [Subtype.range_val]
+    exact hsub
+  rw [← himage]
+  exact hpre.image continuous_subtype_val
+
+end FinestMontel
+
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is Montel. -/
 theorem finitePlaceSchwartz_montel (w : Places(F)) :
-    BarrelledSpace ℂ ℬ(w.adicCompletion F) ∧ MontelSpace ℂ ℬ(w.adicCompletion F) := by sorry
+    BarrelledSpace ℂ ℬ(w.adicCompletion F) ∧ MontelSpace ℂ ℬ(w.adicCompletion F) := by
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F)))
+  let tS : TopologicalSpace E := (inferInstance : TopologicalSpace ℬ(w.adicCompletion F))
+  let tF : TopologicalSpace E := (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  have htop : tS = tF := finitePlaceSchwartz_finestTopology F w
+  refine ⟨?_, ?_⟩
+  · change @BarrelledSpace ℂ E _ _ _ tS
+    exact Eq.mpr (congrArg (fun t ↦ @BarrelledSpace ℂ E _ _ _ t) htop)
+      (finestLocallyConvex_barrelled E)
+  · change @MontelSpace ℂ E _ _ _ tS
+    exact Eq.mpr (congrArg (fun t ↦ @MontelSpace ℂ E _ _ _ t) htop)
+      (finestLocallyConvex_montel E)
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local strong dual is Fréchet. -/
 theorem finitePlaceSchwartz_strongDual_frechet (w : Places(F)) :
