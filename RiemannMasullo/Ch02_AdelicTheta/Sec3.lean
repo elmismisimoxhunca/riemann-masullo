@@ -989,11 +989,115 @@ theorem sLocalHomogeneousAdelicTheta_integrand_bounded [Measure.IsHaarMeasure μ
     ∃ C : ℝ, 0 ≤ C ∧ Integrable (fun _ : J₁ ↦ C) μ ∧
       ∀ g ∈ K, ∀ h : J₁, ‖classIntegrand ω f (classOf g) h‖ ≤ C := by sorry
 
+/-- Uniform convergence on a set, together with integrability of the terms,
+implies convergence of the integrals over that set for a finite measure. -/
+private theorem tendsto_setIntegral_of_tendstoUniformlyOn {ι α : Type*}
+    [MeasurableSpace α] {μ : Measure α} [IsFiniteMeasure μ]
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {F : ι → α → E} {u : α → E} {s : Set α} {l : Filter ι}
+    (hu : TendstoUniformlyOn F u l s) (hFi : ∀ i, IntegrableOn (F i) s μ)
+    (hui : IntegrableOn u s μ) :
+    Tendsto (fun i ↦ ∫ x in s, F i x ∂μ) l (𝓝 (∫ x in s, u x ∂μ)) := by
+  have hμs : μ s < ⊤ :=
+    lt_of_le_of_lt (measure_mono (subset_univ s)) (measure_lt_top μ univ)
+  have key : ∀ d : ℝ, 0 < d → ∀ᶠ i in l,
+      ‖∫ x in s, F i x ∂μ - ∫ x in s, u x ∂μ‖ ≤ d := by
+    intro d hd
+    have hc : (0 : ℝ) < max (μ.real s) 1 := by positivity
+    have hle := (Metric.tendstoUniformlyOn_iff).mp hu (d / max (μ.real s) 1) (div_pos hd hc)
+    filter_upwards [hle] with i hi
+    have h1 : ‖∫ x in s, (F i - u) x ∂μ‖ ≤ d := by
+      refine le_trans (norm_setIntegral_le_of_norm_le_const
+        (C := d / max (μ.real s) 1) hμs fun x hx ↦ ?_) ?_
+      · calc ‖(F i - u) x‖ = ‖u x - F i x‖ := norm_sub_rev _ _
+          _ = dist (u x) (F i x) := (dist_eq_norm _ _).symm
+          _ ≤ d / max (μ.real s) 1 := (hi x hx).le
+      · refine le_trans (mul_le_mul_of_nonneg_left (le_max_left (μ.real s) 1)
+          (by positivity)) (le_of_eq (div_mul_cancel₀ d hc.ne'))
+    rw [show (∫ x in s, (F i - u) x ∂μ) =
+      (∫ x in s, F i x ∂μ - ∫ x in s, u x ∂μ) from integral_sub (hFi i) hui] at h1
+    exact h1
+  refine tendsto_def.mpr fun U hU ↦ ?_
+  obtain ⟨r, hr, hrb⟩ := Metric.mem_nhds_iff.mp hU
+  refine (key (r / 2) (by positivity)).mono fun i hi ↦ hrb ?_
+  rw [Metric.mem_ball, dist_eq_norm]
+  linarith
+
 /-- Paper: Proposition 2.3.1.4(1), p. 105. Integrating the character-weighted
 theta function gives a continuous function on the S-idele classes. -/
 theorem sLocalHomogeneousAdelicTheta_continuous [Measure.IsHaarMeasure μ]
     (ω : PontryaginDual J₁) (f : ℬₛ) :
-    Continuous (fun g : Jₛ ↦ ∫ h, classIntegrand ω f g h ∂μ) := by sorry
+    Continuous (fun g : Jₛ ↦ ∫ h, classIntegrand ω f g h ∂μ) := by
+  classical
+  -- The norm-one classes form a compact group.
+  haveI hcomp : CompactSpace J₁ := by
+    have hker : (MonoidHom.ker (sIdeleQuotientNorm F S) : Set Jₛ) =
+        (sIdeleQuotientNorm F S) ⁻¹' {1} := by
+      ext g
+      simp [MonoidHom.mem_ker]
+    exact isCompact_iff_compactSpace.mp (by
+      rw [hker]
+      exact (isProperMap_sIdeleQuotientNorm F S).isCompact_preimage isCompact_singleton)
+  haveI : IsFiniteMeasure μ := ⟨isCompact_univ.measure_lt_top⟩
+  -- The uncurried integrand is continuous.
+  have hΦ : Continuous fun p : Jₛ × J₁ ↦
+      sLocalAdelicThetaOnClasses F S f (p.1 * p.2.val) * (ω p.2 : ℂ) :=
+    Continuous.mul
+      ((map_continuous (sLocalAdelicThetaOnClasses F S f)).comp
+        (continuous_fst.mul (continuous_subtype_val.comp continuous_snd)))
+      (continuous_subtype_val.comp ((map_continuous ω).comp continuous_snd))
+  -- Currying turns continuity on the product into a continuous curve in C(J₁, ℂ).
+  have hΘ : Continuous
+      ((ContinuousMap.curry (ContinuousMap.mk
+        (fun p : Jₛ × J₁ ↦ sLocalAdelicThetaOnClasses F S f (p.1 * p.2.val) * (ω p.2 : ℂ)) hΦ :
+        C(Jₛ × J₁, ℂ)) : Jₛ → C(J₁, ℂ))) :=
+    map_continuous (ContinuousMap.curry (ContinuousMap.mk _ hΦ))
+  refine continuous_iff_continuousAt.mpr fun g₀ ↦ ?_
+  -- Hence the integrands converge uniformly in the parameter.
+  have htu : TendstoUniformlyOn
+      (fun (g : Jₛ) (h : J₁) ↦ sLocalAdelicThetaOnClasses F S f (g * h.val) * (ω h : ℂ))
+      (fun h : J₁ ↦ sLocalAdelicThetaOnClasses F S f (g₀ * h.val) * (ω h : ℂ))
+      (𝓝 g₀) univ := by
+    have hlim := ContinuousMap.tendsto_iff_tendstoUniformly
+      (F := ((ContinuousMap.curry (ContinuousMap.mk
+        (fun p : Jₛ × J₁ ↦ sLocalAdelicThetaOnClasses F S f (p.1 * p.2.val) * (ω p.2 : ℂ)) hΦ :
+        C(Jₛ × J₁, ℂ)) : Jₛ → C(J₁, ℂ))))
+      (f := ContinuousMap.curry (ContinuousMap.mk
+        (fun p : Jₛ × J₁ ↦ sLocalAdelicThetaOnClasses F S f (p.1 * p.2.val) * (ω p.2 : ℂ)) hΦ)
+        g₀)
+      (p := 𝓝 g₀)
+    have hcont : Tendsto ((ContinuousMap.curry (ContinuousMap.mk
+        (fun p : Jₛ × J₁ ↦ sLocalAdelicThetaOnClasses F S f (p.1 * p.2.val) * (ω p.2 : ℂ)) hΦ :
+        C(Jₛ × J₁, ℂ)) : Jₛ → C(J₁, ℂ))) (𝓝 g₀)
+        (𝓝 ((ContinuousMap.curry (ContinuousMap.mk
+        (fun p : Jₛ × J₁ ↦ sLocalAdelicThetaOnClasses F S f (p.1 * p.2.val) * (ω p.2 : ℂ)) hΦ :
+        C(Jₛ × J₁, ℂ)) : Jₛ → C(J₁, ℂ)) g₀)) :=
+      hΘ.tendsto g₀
+    exact (tendstoUniformlyOn_univ).mpr (hlim.mp hcont)
+  -- Integrability of every integrand on the compact group.
+  have hint (g : Jₛ) : Integrable
+      (fun h : J₁ ↦ sLocalAdelicThetaOnClasses F S f (g * h.val) * (ω h : ℂ)) μ := by
+    haveI : BorelSpace J₁ := ⟨rfl⟩
+    have hAt : Continuous fun h : J₁ ↦
+        sLocalAdelicThetaOnClasses F S f (g * h.val) * (ω h : ℂ) := by
+      refine Continuous.mul
+        ((map_continuous (sLocalAdelicThetaOnClasses F S f)).comp
+          (continuous_const (y := g) |>.mul continuous_subtype_val)) ?_
+      exact continuous_subtype_val.comp ((map_continuous ω).comp continuous_id)
+    have hmeas : AEStronglyMeasurable
+        (fun h : J₁ ↦ sLocalAdelicThetaOnClasses F S f (g * h.val) * (ω h : ℂ)) μ :=
+      hAt.measurable.aestronglyMeasurable
+    obtain ⟨M, hM⟩ :=
+      IsCompact.exists_bound_of_continuousOn isCompact_univ hAt.continuousOn
+    exact (integrable_const M).mono' hmeas
+      (Eventually.of_forall fun h ↦ hM h (Set.mem_univ h))
+  refine ContinuousAt.congr_of_eventuallyEq
+    (f := fun g : Jₛ ↦ ∫ x in univ, sLocalAdelicThetaOnClasses F S f (g * x.val) * (ω x : ℂ) ∂μ)
+    ?_ ?_
+  · exact tendsto_setIntegral_of_tendstoUniformlyOn (s := univ) htu
+      (fun g ↦ (integrableOn_univ).mpr (hint g)) (integrableOn_univ.mpr (hint g₀))
+  · filter_upwards with g
+    simp [Measure.restrict_univ]
 
 variable [Measure.IsHaarMeasure μ]
 
