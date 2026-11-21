@@ -2026,13 +2026,471 @@ theorem modulatedExponentialDecaySubmodule_translate (hm : IsModulation m) (hms 
     (g : G) (f : modulatedExponentialDecaySubmodule m I) :
     (fun x : G ↦ f.val (g⁻¹ * x)) ∈ modulatedExponentialDecaySubmodule m I := by sorry
 
+/-- An iterated derivative may be evaluated after transporting its order along an equality. -/
+private theorem iteratedFDeriv_cast_len {X Y : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
+    [NormedAddCommGroup Y] [NormedSpace ℝ Y] (P : X → Y) (x : X) {n k : ℕ} (h : n = k)
+    (w : Fin n → X) :
+    iteratedFDeriv ℝ n P x w = iteratedFDeriv ℝ k P x (w ∘ Fin.cast h.symm) := by
+  subst h; rfl
+
+/-- Differentiating along a list ending in `v` is differentiating `∂ᵥP` along the rest. -/
+private theorem iteratedFDeriv_list_concat {X : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
+    {P : X → ℂ} (hP : ContDiff ℝ ∞ P) (L : List X) (v x : X) :
+    iteratedFDeriv ℝ (L ++ [v]).length P x (L ++ [v]).get =
+      iteratedFDeriv ℝ L.length (fun y ↦ fderiv ℝ P y v) x L.get := by
+  rw [iteratedFDeriv_cast_len P x (by simp : (L ++ [v]).length = L.length + 1),
+    iteratedFDeriv_succ_apply_right,
+    iteratedFDeriv_clm_apply_const_apply (hP.fderiv_right (m := ∞) le_rfl) (mod_cast le_top)]
+  congr 2
+  · funext i
+    simp [Fin.init, List.getElem_append_left]
+  · simp [List.getElem_append_right]
+
+/-- Leibniz bound along an ordered list of directions: the derivative of `ψ * P` is
+controlled by the derivatives of `P` along the sublists of the list. -/
+private theorem norm_iteratedFDeriv_list_mul_le {X : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
+    (L : List X) : ∀ (ψ P : X → ℂ), ContDiff ℝ ∞ ψ → ContDiff ℝ ∞ P → ∀ (x : X) (C : ℝ),
+      (∀ k ≤ L.length, ‖iteratedFDeriv ℝ k ψ x‖ ≤ C) →
+      ‖iteratedFDeriv ℝ L.length (fun y ↦ ψ y * P y) x L.get‖ ≤
+        C * (L.map fun v ↦ 1 + ‖v‖).prod *
+          (L.sublists.map fun L' ↦ ‖iteratedFDeriv ℝ L'.length P x L'.get‖).sum := by
+  induction L using List.reverseRecOn with
+  | nil =>
+    intro ψ P _ _ x C hC
+    have h0 := hC 0 le_rfl
+    rw [norm_iteratedFDeriv_zero] at h0
+    simp only [List.length_nil, iteratedFDeriv_zero_apply, List.map_nil, List.prod_nil, mul_one,
+      List.sublists_nil, norm_mul]
+    simpa only [List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, add_zero,
+      List.length_nil, iteratedFDeriv_zero_apply] using
+      mul_le_mul_of_nonneg_right h0 (norm_nonneg (P x))
+  | append_singleton L v ih =>
+    intro ψ P hψ hP x C hC
+    rw [iteratedFDeriv_list_concat (hψ.mul hP)]
+    have hfd : (fun y ↦ fderiv ℝ (fun y ↦ ψ y * P y) y v) =
+        fun y ↦ fderiv ℝ ψ y v * P y + ψ y * fderiv ℝ P y v := by
+      funext y
+      rw [fderiv_fun_mul ((hψ.differentiable (by simp)) y) ((hP.differentiable (by simp)) y)]
+      simp only [add_apply, smul_apply, smul_eq_mul]
+      ring
+    have hψv : ContDiff ℝ ∞ (fun y ↦ fderiv ℝ ψ y v) :=
+      (hψ.fderiv_right (m := ∞) le_rfl).clm_apply contDiff_const
+    have hPv : ContDiff ℝ ∞ (fun y ↦ fderiv ℝ P y v) :=
+      (hP.fderiv_right (m := ∞) le_rfl).clm_apply contDiff_const
+    have hadd : iteratedFDeriv ℝ L.length
+        (fun y ↦ fderiv ℝ ψ y v * P y + ψ y * fderiv ℝ P y v) x =
+        iteratedFDeriv ℝ L.length (fun y ↦ fderiv ℝ ψ y v * P y) x +
+          iteratedFDeriv ℝ L.length (fun y ↦ ψ y * fderiv ℝ P y v) x :=
+      iteratedFDeriv_add_apply ((hψv.mul hP).contDiffAt.of_le (mod_cast le_top))
+        ((hψ.mul hPv).contDiffAt.of_le (mod_cast le_top))
+    rw [hfd, hadd]
+    rw [add_apply]
+    have hC1 : ∀ k ≤ L.length, ‖iteratedFDeriv ℝ k (fun y ↦ fderiv ℝ ψ y v) x‖ ≤ ‖v‖ * C := by
+      intro k hk
+      calc _ ≤ ‖v‖ * ‖iteratedFDeriv ℝ k (fderiv ℝ ψ) x‖ :=
+            norm_iteratedFDeriv_clm_apply_const
+              (hψ.fderiv_right (m := ∞) le_rfl).contDiffAt (mod_cast le_top)
+        _ ≤ ‖v‖ * C := by
+          rw [norm_iteratedFDeriv_fderiv]
+          exact mul_le_mul_of_nonneg_left (hC (k + 1) (by simp; omega)) (norm_nonneg _)
+    have hC2 : ∀ k ≤ L.length, ‖iteratedFDeriv ℝ k ψ x‖ ≤ C :=
+      fun k hk ↦ hC k (by simp; omega)
+    have h1 := ih _ P hψv hP x _ hC1
+    have h2 := ih ψ _ hψ hPv x C hC2
+    have hC0 : 0 ≤ C := (norm_nonneg _).trans (hC 0 (Nat.zero_le _))
+    set Pr := (L.map fun v ↦ 1 + ‖v‖).prod
+    have hPr : 0 ≤ Pr := List.prod_nonneg (by simp; intro a _; positivity)
+    set S₁ := (L.sublists.map fun L' ↦ ‖iteratedFDeriv ℝ L'.length P x L'.get‖).sum
+    set S₂ := (L.sublists.map fun L' ↦
+      ‖iteratedFDeriv ℝ L'.length (fun y ↦ fderiv ℝ P y v) x L'.get‖).sum
+    have hS₁ : 0 ≤ S₁ := List.sum_nonneg (by simp)
+    have hS₂ : 0 ≤ S₂ := List.sum_nonneg (by simp)
+    have hS : (((L ++ [v]).sublists).map fun L' ↦ ‖iteratedFDeriv ℝ L'.length P x L'.get‖).sum =
+        S₁ + S₂ := by
+      rw [List.sublists_concat, List.map_append, List.sum_append, List.map_map]
+      congr 1
+      congr 1
+      apply List.map_congr_left
+      intro L' _
+      simp only [Function.comp_apply]
+      rw [iteratedFDeriv_list_concat hP]
+    rw [hS, List.map_append, List.prod_append]
+    simp only [List.map_cons, List.map_nil, List.prod_cons, List.prod_nil, mul_one]
+    calc _ ≤ _ := norm_add_le _ _
+      _ ≤ ‖v‖ * C * Pr * S₁ + C * Pr * S₂ := add_le_add h1 h2
+      _ ≤ C * (Pr * (1 + ‖v‖)) * (S₁ + S₂) := by
+        have : 0 ≤ C * Pr := mul_nonneg hC0 hPr
+        nlinarith [mul_nonneg this hS₁, mul_nonneg this hS₂, mul_nonneg (mul_nonneg this hS₂) (norm_nonneg v),
+          mul_nonneg (mul_nonneg this hS₁) (norm_nonneg v)]
+
+/-- A sublist of a concatenation of constant blocks is again such a concatenation. -/
+private theorem sublist_flatten_ofFn_replicate {X : Type*} :
+    ∀ {k : ℕ} (u : Fin k → X) (β : Fin k → ℕ) {L' : List X},
+      List.Sublist L' (List.ofFn fun i ↦ List.replicate (β i) (u i)).flatten →
+        ∃ β' : Fin k → ℕ, L' = (List.ofFn fun i ↦ List.replicate (β' i) (u i)).flatten := by
+  intro k
+  induction k with
+  | zero =>
+    intro u β L' h
+    refine ⟨β, ?_⟩
+    simpa using h
+  | succ k ih =>
+    intro u β L' h
+    rw [List.ofFn_succ, List.flatten_cons, List.sublist_append_iff] at h
+    obtain ⟨r₁, r₂, rfl, h₁, h₂⟩ := h
+    obtain ⟨j, -, rfl⟩ := List.sublist_replicate_iff.mp h₁
+    obtain ⟨β'', rfl⟩ := ih (fun i ↦ u i.succ) (fun i ↦ β i.succ) h₂
+    refine ⟨Fin.cons j β'', ?_⟩
+    rw [List.ofFn_succ, List.flatten_cons]
+    simp
+
+/-- Derivatives of a function of an affine real functional. -/
+private theorem norm_iteratedFDeriv_comp_affine_le {X : Type*} [NormedAddCommGroup X] [NormedSpace ℝ X]
+    {φ : ℝ → ℂ} (hφ : ContDiff ℝ ∞ φ) (ℓ : X →L[ℝ] ℝ) (c : ℝ) (k : ℕ) (x : X) :
+    ‖iteratedFDeriv ℝ k (fun y ↦ φ (ℓ y + c)) x‖ ≤ ‖iteratedFDeriv ℝ k φ (ℓ x + c)‖ * ‖ℓ‖ ^ k := by
+  have hc : ContDiff ℝ ∞ (fun t ↦ φ (t + c)) := hφ.comp (contDiff_id.add contDiff_const)
+  have h := ℓ.iteratedFDeriv_comp_right hc x (i := k) (mod_cast le_top)
+  have h' : (fun y ↦ φ (ℓ y + c)) = (fun t ↦ φ (t + c)) ∘ ℓ := rfl
+  rw [h', h, iteratedFDeriv_comp_add_right]
+  refine (ContinuousMultilinearMap.norm_compContinuousLinearMap_le _ _).trans ?_
+  simp
+
+/-- Multiplying an elementary Schwartz function by `φ ∘ Λ` keeps it Schwartz, when `Λ` is
+affine on each fibre of the cover and `φ` has bounded derivatives of all orders. -/
+private theorem elementarySchwartz_mul_affine_mem {m n r : ℕ} {F : Type*} [AddCommGroup F]
+    [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    {s : ElementaryLieGroup m n r F → ℂ} (hs : s ∈ elementarySchwartzSubmodule m n r F)
+    (Λ : ElementaryLieGroup m n r F → ℝ)
+    (ℓ : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) →L[ℝ] ℝ)
+    (hΛ : ∀ xt a b, Λ (elementaryCover xt a b) = ℓ xt + Λ (elementaryCover 0 a b))
+    {φ : ℝ → ℂ} (hφ : ContDiff ℝ ∞ φ) (hφb : ∀ k, ∃ C, ∀ t, ‖iteratedFDeriv ℝ k φ t‖ ≤ C) :
+    (fun y ↦ φ (Λ y) * s y) ∈ elementarySchwartzSubmodule m n r F := by
+  classical
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  have hpull (a : Fin r → ℤ) (b : F) :
+      (fun xt ↦ φ (Λ (elementaryCover xt a b)) * s (elementaryCover xt a b)) =
+        fun xt ↦ φ (ℓ xt + Λ (elementaryCover 0 a b)) * s (elementaryCover xt a b) := by
+    funext xt
+    rw [hΛ]
+  have hψ (c : ℝ) : ContDiff ℝ ∞ (fun xt : X ↦ φ (ℓ xt + c)) :=
+    hφ.comp (ℓ.contDiff.add contDiff_const)
+  refine ⟨fun a b ↦ ?_, fun i ↦ ?_⟩
+  · change ContDiff ℝ ∞ (fun xt ↦ φ (Λ (elementaryCover xt a b)) * s (elementaryCover xt a b))
+    rw [hpull]
+    exact (hψ _).mul (hs.1 a b)
+  obtain ⟨α, β, γ, δ⟩ := i
+  let D (β : Fin m → ℕ) (γ : Fin n → ℕ) : List X :=
+    (List.ofFn (fun i : Fin m ↦ List.replicate (β i)
+      ((EuclideanSpace.single i 1 : EuclideanSpace ℝ (Fin m)), (0 : EuclideanSpace ℝ (Fin n))))).flatten ++
+    (List.ofFn (fun i : Fin n ↦ List.replicate (γ i)
+      ((0 : EuclideanSpace ℝ (Fin m)), (EuclideanSpace.single i 1 : EuclideanSpace ℝ (Fin n))))).flatten
+  have hpartial (f : ElementaryLieGroup m n r F → ℂ) (β : Fin m → ℕ) (γ : Fin n → ℕ) (xt : X)
+      (a : Fin r → ℤ) (b : F) : elementaryPartial f β γ xt a b =
+        iteratedFDeriv ℝ (D β γ).length (fun v ↦ f (elementaryCover v a b)) xt (D β γ).get := rfl
+  have hsub (L' : List X) (h : List.Sublist L' (D β γ)) : ∃ β' γ', L' = D β' γ' := by
+    obtain ⟨r₁, r₂, rfl, h₁, h₂⟩ := List.sublist_append_iff.mp h
+    obtain ⟨β', rfl⟩ := sublist_flatten_ofFn_replicate _ _ h₁
+    obtain ⟨γ', rfl⟩ := sublist_flatten_ofFn_replicate _ _ h₂
+    exact ⟨β', γ', rfl⟩
+  let mono (xt : X) (a : Fin r → ℤ) : ℂ :=
+    (∏ k, (xt.1 k : ℂ) ^ α k) * (∏ k, (a k : ℂ) ^ δ k)
+  let T (L' : List X) : ℝ≥0∞ := ⨆ (xt : X) (a : Fin r → ℤ) (b : F),
+    (‖mono xt a * iteratedFDeriv ℝ L'.length (fun v ↦ s (elementaryCover v a b)) xt L'.get‖₊ : ℝ≥0∞)
+  have hT (L' : List X) (h : L' ∈ (D β γ).sublists) : T L' < ⊤ := by
+    obtain ⟨β', γ', rfl⟩ := hsub L' (List.mem_sublists.mp h)
+    exact hs.2 (α, β', γ', δ)
+  have hTle (L' : List X) (h : L' ∈ (D β γ).sublists) (xt : X) (a : Fin r → ℤ) (b : F) :
+      ‖mono xt a * iteratedFDeriv ℝ L'.length (fun v ↦ s (elementaryCover v a b)) xt L'.get‖ ≤
+        (T L').toReal := by
+    have := ENNReal.toReal_mono (hT L' h).ne
+      (le_iSup_of_le xt (le_iSup_of_le a (le_iSup_of_le b le_rfl)) :
+        (‖mono xt a * iteratedFDeriv ℝ L'.length (fun v ↦ s (elementaryCover v a b)) xt L'.get‖₊ :
+          ℝ≥0∞) ≤ T L')
+    simpa using this
+  let N := (D β γ).length
+  choose B hB using hφb
+  let Cψ : ℝ := ∑ k ∈ Finset.range (N + 1), B k * ‖ℓ‖ ^ k
+  have hB0 (k : ℕ) : 0 ≤ B k := (norm_nonneg _).trans (hB k 0)
+  have hCψ (c : ℝ) (xt : X) : ∀ k ≤ N, ‖iteratedFDeriv ℝ k (fun xt : X ↦ φ (ℓ xt + c)) xt‖ ≤ Cψ := by
+    intro k hk
+    calc _ ≤ ‖iteratedFDeriv ℝ k φ (ℓ xt + c)‖ * ‖ℓ‖ ^ k :=
+          norm_iteratedFDeriv_comp_affine_le hφ ℓ c k xt
+      _ ≤ B k * ‖ℓ‖ ^ k := mul_le_mul_of_nonneg_right (hB k _) (by positivity)
+      _ ≤ Cψ := Finset.single_le_sum (f := fun k ↦ B k * ‖ℓ‖ ^ k)
+          (fun j _ ↦ mul_nonneg (hB0 j) (by positivity)) (Finset.mem_range.mpr (by omega))
+  let Pr := ((D β γ).map fun v ↦ 1 + ‖v‖).prod
+  have hPr : 0 ≤ Pr := List.prod_nonneg (by simp; intro a _; positivity)
+  have hCψ0 : 0 ≤ Cψ := Finset.sum_nonneg fun j _ ↦ mul_nonneg (hB0 j) (by positivity)
+  let K := Cψ * Pr * ((D β γ).sublists.map fun L' ↦ (T L').toReal).sum
+  refine lt_of_le_of_lt (?_ : _ ≤ ENNReal.ofReal K) ENNReal.ofReal_lt_top
+  refine iSup_le fun xt ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+  rw [← ENNReal.ofReal_coe_nnreal, coe_nnNorm]
+  apply ENNReal.ofReal_le_ofReal
+  change ‖mono xt a * elementaryPartial (fun y ↦ φ (Λ y) * s y) β γ xt a b‖ ≤ K
+  rw [hpartial]
+  change ‖mono xt a * iteratedFDeriv ℝ (D β γ).length
+    (fun xt ↦ φ (Λ (elementaryCover xt a b)) * s (elementaryCover xt a b)) xt (D β γ).get‖ ≤ K
+  rw [hpull, norm_mul]
+  have hL := norm_iteratedFDeriv_list_mul_le (D β γ) _ _ (hψ (Λ (elementaryCover 0 a b))) (hs.1 a b)
+    xt Cψ (hCψ _ xt)
+  calc _ ≤ ‖mono xt a‖ * (Cψ * Pr * ((D β γ).sublists.map fun L' ↦
+        ‖iteratedFDeriv ℝ L'.length (fun v ↦ s (elementaryCover v a b)) xt L'.get‖).sum) :=
+        mul_le_mul_of_nonneg_left hL (norm_nonneg _)
+    _ = Cψ * Pr * ((D β γ).sublists.map fun L' ↦
+        ‖mono xt a * iteratedFDeriv ℝ L'.length (fun v ↦ s (elementaryCover v a b)) xt L'.get‖).sum := by
+        rw [mul_left_comm, ← List.sum_map_mul_left]
+        simp only [norm_mul]
+    _ ≤ K := by
+        apply mul_le_mul_of_nonneg_left _ (mul_nonneg hCψ0 hPr)
+        exact List.sum_le_sum fun L' h ↦ hTle L' h xt a b
+
+/-- Real derivatives of the restriction to the real line of a function holomorphic near it. -/
+private theorem iteratedDeriv_comp_ofReal_of_differentiableOn {h : ℂ → ℂ} {U : Set ℂ} (hU : IsOpen U)
+    (hR : ∀ t : ℝ, (t : ℂ) ∈ U) (hh : DifferentiableOn ℂ h U) (k : ℕ) :
+    iteratedDeriv k (fun t : ℝ ↦ h t) = fun t : ℝ ↦ iteratedDeriv k h t := by
+  have han : ∀ j, AnalyticOnNhd ℂ (iteratedDeriv j h) U := by
+    intro j
+    induction j with
+    | zero => simpa using hh.analyticOnNhd hU
+    | succ j ih => rw [iteratedDeriv_succ]; exact fun z hz ↦ (ih z hz).deriv
+  induction k with
+  | zero => simp
+  | succ k ih =>
+    rw [iteratedDeriv_succ, ih]
+    funext t
+    rw [iteratedDeriv_succ]
+    exact ((han k t (hR t)).differentiableAt.hasDerivAt.comp_ofReal).deriv
+
+/-- The weight `(e^{-αt} + e^{βt})⁻¹` is smooth with bounded derivatives of all orders,
+by Cauchy estimates on a horizontal strip. -/
+private theorem twoSidedExpWeight_bounds {α β : ℝ} (hα : 0 < α) (hβ : 0 < β) :
+    ContDiff ℝ ∞ (fun t : ℝ ↦ (((Real.exp (-α * t) + Real.exp (β * t))⁻¹ : ℝ) : ℂ)) ∧
+      ∀ k, ∃ C, ∀ t, ‖iteratedFDeriv ℝ k
+        (fun t : ℝ ↦ (((Real.exp (-α * t) + Real.exp (β * t))⁻¹ : ℝ) : ℂ)) t‖ ≤ C := by
+  have hpos (t : ℝ) : 0 < Real.exp (-α * t) + Real.exp (β * t) := by positivity
+  refine ⟨?_, fun k ↦ ?_⟩
+  · have h1 : ContDiff ℝ ∞ (fun t : ℝ ↦ Real.exp (-α * t)) :=
+      Real.contDiff_exp.comp (contDiff_const.mul contDiff_id)
+    have h2 : ContDiff ℝ ∞ (fun t : ℝ ↦ Real.exp (β * t)) :=
+      Real.contDiff_exp.comp (contDiff_const.mul contDiff_id)
+    exact Complex.ofRealCLM.contDiff.comp ((h1.add h2).inv fun t ↦ (hpos t).ne')
+  set δ := 1 / (α + β) with hδdef
+  have hδ : 0 < δ := by positivity
+  let h : ℂ → ℂ := fun z ↦ (Complex.exp (-α * z) + Complex.exp (β * z))⁻¹
+  let U : Set ℂ := Complex.im ⁻¹' Ioo (-δ) δ
+  have hU : IsOpen U := isOpen_Ioo.preimage Complex.continuous_im
+  have hcos (c : ℝ) (hc : |c| ≤ 1) : 1 / 2 ≤ Real.cos c := by
+    have h1 := Real.one_sub_sq_div_two_le_cos (x := c)
+    have h2 : c ^ 2 ≤ 1 := by
+      rw [← sq_abs]; nlinarith [abs_nonneg c]
+    linarith
+  have hre (z : ℂ) (hz : |z.im| ≤ δ) :
+      1 / 2 ≤ (Complex.exp (-α * z) + Complex.exp (β * z)).re := by
+    rw [Complex.add_re, Complex.exp_re, Complex.exp_re]
+    have e1 : (-(α : ℂ) * z).re = -α * z.re := by simp
+    have e2 : (-(α : ℂ) * z).im = -α * z.im := by simp
+    have e3 : ((β : ℂ) * z).re = β * z.re := by simp
+    have e4 : ((β : ℂ) * z).im = β * z.im := by simp
+    rw [e1, e2, e3, e4]
+    have hαδ : α * δ ≤ 1 := by
+      rw [hδdef, mul_one_div, div_le_one (by positivity)]; linarith
+    have hβδ : β * δ ≤ 1 := by
+      rw [hδdef, mul_one_div, div_le_one (by positivity)]; linarith
+    have c1 : 1 / 2 ≤ Real.cos (-α * z.im) := hcos _ (by
+      rw [abs_mul, abs_neg, abs_of_pos hα]
+      exact (mul_le_mul_of_nonneg_left hz hα.le).trans hαδ)
+    have c2 : 1 / 2 ≤ Real.cos (β * z.im) := hcos _ (by
+      rw [abs_mul, abs_of_pos hβ]
+      exact (mul_le_mul_of_nonneg_left hz hβ.le).trans hβδ)
+    have hsum : 1 ≤ Real.exp (-α * z.re) + Real.exp (β * z.re) := by
+      rcases le_total 0 z.re with h0 | h0
+      · have := Real.one_le_exp (show 0 ≤ β * z.re by positivity)
+        linarith [Real.exp_pos (-α * z.re)]
+      · have := Real.one_le_exp (show 0 ≤ -α * z.re by nlinarith)
+        linarith [Real.exp_pos (β * z.re)]
+    nlinarith [Real.exp_pos (-α * z.re), Real.exp_pos (β * z.re)]
+  have hne (z : ℂ) (hz : |z.im| ≤ δ) : Complex.exp (-α * z) + Complex.exp (β * z) ≠ 0 := by
+    intro h0
+    have := hre z hz
+    rw [h0, Complex.zero_re] at this
+    linarith
+  have hbound (z : ℂ) (hz : |z.im| ≤ δ) : ‖h z‖ ≤ 2 := by
+    have h1 := (hre z hz).trans (Complex.re_le_norm _)
+    simp only [h, norm_inv]
+    rw [inv_le_comm₀ (by linarith) (by norm_num)]
+    linarith
+  have hh : DifferentiableOn ℂ h U := by
+    intro z hz
+    have hz' : |z.im| ≤ δ := (abs_lt.mpr hz).le
+    apply DifferentiableAt.differentiableWithinAt
+    exact (((differentiableAt_const _).mul differentiableAt_id).cexp.add
+      ((differentiableAt_const _).mul differentiableAt_id).cexp).inv (hne z hz')
+  have hφ : (fun t : ℝ ↦ (((Real.exp (-α * t) + Real.exp (β * t))⁻¹ : ℝ) : ℂ)) =
+      fun t : ℝ ↦ h t := by
+    funext t
+    simp only [h]
+    push_cast
+    rfl
+  refine ⟨k.factorial * 2 / (δ / 2) ^ k, fun t ↦ ?_⟩
+  rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv, hφ,
+    iteratedDeriv_comp_ofReal_of_differentiableOn hU (fun t ↦ by simp [U, hδ]) hh]
+  have hsub : Metric.closedBall (t : ℂ) (δ / 2) ⊆ U := by
+    intro z hz
+    have h1 := (Complex.abs_im_le_norm (z - t)).trans (mem_closedBall_iff_norm.mp hz)
+    simp only [Complex.sub_im, Complex.ofReal_im, sub_zero] at h1
+    exact abs_lt.mp (by linarith)
+  refine Complex.norm_iteratedDeriv_le_of_forall_mem_sphere_norm_le k (by positivity)
+    (hh.diffContOnCl_ball hsub) fun z hz ↦ hbound z ?_
+  have h1 := (Complex.abs_im_le_norm (z - t)).trans (mem_sphere_iff_norm.mp hz).le
+  simp only [Complex.sub_im, Complex.ofReal_im, sub_zero] at h1
+  linarith
+
+/-- A good subgroup is compact, being closed in its double annihilator. -/
+private theorem isCompact_of_isBruhatGoodSubgroup_aux (k : Subgroup G) (hk : IsBruhatGoodSubgroup k) :
+    IsCompact (k : Set G) := by
+  have hCompact := isCompact_lcaAnnihilator (lcaAnnihilator k) hk.2.1
+  have hD : IsCompact (lcaDualAnnihilator (lcaAnnihilator k) : Set G) := by
+    convert (isClosedEmbedding_pontryaginDual_eval (G := G)).isCompact_preimage hCompact using 1
+    ext x
+    exact (mem_lcaDualAnnihilator_iff _ x).trans
+      (mem_lcaAnnihilator_iff _ (pontryaginDual_eval x)).symm
+  refine hD.of_isClosed_subset hk.1 fun x hx ↦ ?_
+  rw [SetLike.mem_coe, mem_lcaDualAnnihilator_iff]
+  intro χ
+  exact (mem_lcaAnnihilator_iff k χ.val).mp χ.2 ⟨x, hx⟩
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- The modulation is trivial on each compact subgroup. -/
+private theorem compactSubgroup_le_ker_aux (k : Subgroup G) (hk : IsCompact (k : Set G)) :
+    k ≤ m.toMonoidHom.ker := by
+  obtain ⟨y, hy, hmax⟩ := hk.exists_isMaxOn ⟨1, k.one_mem⟩
+    (Units.continuous_val.comp m.continuous).continuousOn
+  have bound (x : G) (hx : x ∈ k) : (m x).val ≤ 1 := by
+    apply (mul_le_iff_le_one_right (Units.zero_lt (m y))).mp
+    have h : (m (y * x)).val ≤ (m y).val := hmax (k.mul_mem hy hx)
+    simpa only [map_mul, Units.val_mul] using h
+  intro x hx
+  apply Units.ext
+  exact le_antisymm (bound x hx) (by simpa using bound x⁻¹ (k.inv_mem hx))
+
+/-- Multiplying a stage realization by a function of `log m` with bounded derivatives
+is again the realization of a stage function on the same structural pair. -/
+private theorem stage_mul_logModulation (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage e)
+    {φ : ℝ → ℂ} (hφ : ContDiff ℝ ∞ φ) (hφb : ∀ k, ∃ C, ∀ t, ‖iteratedFDeriv ℝ k φ t‖ ≤ C) :
+    ∃ s' : SchwartzBruhatStage e, schwartzBruhatStageRealization a e s' =
+      fun g ↦ φ (Real.log ((m g : ℝ≥0) : ℝ)) * schwartzBruhatStageRealization a e s g := by
+  classical
+  let N := (OrderDual.ofDual a.val.2).comap a.val.1.subtype
+  have hN : N ≤ (m.toMonoidHom.comp a.val.1.subtype).ker := by
+    intro x hx
+    have := compactSubgroup_le_ker_aux m _ (isCompact_of_isBruhatGoodSubgroup_aux _ a.property.2.2.1) hx
+    simpa using this
+  let mbar : a.quotient →* ℝ≥0ˣ := QuotientGroup.lift N (m.toMonoidHom.comp a.val.1.subtype) hN
+  have hmbar : Continuous mbar :=
+    continuous_coinduced_dom.2 (m.continuous.comp continuous_subtype_val)
+  let Λ : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor → ℝ :=
+    fun y ↦ Real.log ((mbar (e.equiv.symm (Multiplicative.ofAdd y)) : ℝ≥0) : ℝ)
+  have hΛpos (y) : ((mbar (e.equiv.symm (Multiplicative.ofAdd y)) : ℝ≥0) : ℝ) ≠ 0 := by
+    have := Units.ne_zero (mbar (e.equiv.symm (Multiplicative.ofAdd y)))
+    exact_mod_cast this
+  have hΛadd (y z) : Λ (y + z) = Λ y + Λ z := by
+    simp only [Λ]
+    rw [← Real.log_mul (hΛpos y) (hΛpos z)]
+    congr 1
+    rw [ofAdd_add, map_mul, map_mul, Units.val_mul, NNReal.coe_mul]
+  have hΛcont : Continuous Λ := by
+    refine Continuous.log ?_ hΛpos
+    exact NNReal.continuous_coe.comp (Units.continuous_val.comp (hmbar.comp
+      (e.equiv.symm.continuous.comp continuous_ofAdd)))
+  have hcover_add (xt : EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim)) (u : Fin e.latticeRank → ℤ) (b : e.finiteFactor) :
+      (elementaryCover xt u b : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor) =
+        elementaryCover xt 0 0 + elementaryCover 0 u b := by
+    simp only [elementaryCover]
+    refine Prod.ext (by simp) (Prod.ext (funext fun i ↦ by simp) (Prod.ext (by simp) (by simp)))
+  have hcover_add' (xt xt' : EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim)) :
+      (elementaryCover (xt + xt') 0 0 :
+        ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor) =
+        elementaryCover xt 0 0 + elementaryCover xt' 0 0 := by
+    simp only [elementaryCover]
+    exact Prod.ext rfl (Prod.ext (funext fun i ↦ rfl) (Prod.ext (by simp) (by simp)))
+  have hcover_zero : (elementaryCover (0 : EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim)) 0 0 :
+      ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor) = 0 := by
+    simp only [elementaryCover]
+    refine Prod.ext (by simp) (Prod.ext (funext fun i ↦ by simp) (Prod.ext (by simp) (by simp)))
+  have hcover_cont : Continuous (fun xt : EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim) ↦ (elementaryCover xt 0 0 :
+      ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor)) := by
+    unfold elementaryCover
+    fun_prop
+  have hΛ0 : Λ 0 = 0 := by
+    have := hΛadd 0 0
+    simp only [add_zero] at this
+    linarith
+  let ℓ₀ : EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim) →+ ℝ :=
+    { toFun := fun xt ↦ Λ (elementaryCover xt 0 0)
+      map_zero' := by simp only [hcover_zero, hΛ0]
+      map_add' := fun xt xt' ↦ by simp only [hcover_add', hΛadd] }
+  let ℓ : EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim) →L[ℝ] ℝ := ℓ₀.toRealLinearMap (hΛcont.comp hcover_cont)
+  have hΛ (xt : EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim)) (u : Fin e.latticeRank → ℤ) (b : e.finiteFactor) :
+      Λ (elementaryCover xt u b) = ℓ xt + Λ (elementaryCover 0 u b) := by
+    rw [hcover_add, hΛadd]
+    rfl
+  have hs' := elementarySchwartz_mul_affine_mem
+    (show elementarySchwartzSubmodule _ _ _ _ from s).property Λ ℓ hΛ hφ hφb
+  refine ⟨(show SchwartzBruhatStage e from (⟨_, hs'⟩ : elementarySchwartzSubmodule _ _ _ _)), ?_⟩
+  funext g
+  rw [schwartzBruhatStageRealization_apply, schwartzBruhatStageRealization_apply]
+  split_ifs with hg
+  · change φ (Λ _) * _ = _
+    congr 2
+    simp only [Λ, ofAdd_toAdd, ContinuousMulEquiv.symm_apply_apply]
+    rfl
+  · simp
+
+/-- Schwartz–Bruhat functions are stable under multiplication by `φ (log m)` when `φ`
+is smooth with bounded derivatives of all orders. -/
+private theorem logModulation_mul_mem_schwartzBruhat {φ : ℝ → ℂ} (hφ : ContDiff ℝ ∞ φ)
+    (hφb : ∀ k, ∃ C, ∀ t, ‖iteratedFDeriv ℝ k φ t‖ ≤ C) {F : G → ℂ}
+    (hF : F ∈ schwartzBruhatSubmodule G) :
+    (fun g ↦ φ (Real.log ((m g : ℝ≥0) : ℝ)) * F g) ∈ schwartzBruhatSubmodule G := by
+  let M : (G → ℂ) →ₗ[ℂ] (G → ℂ) :=
+    LinearMap.mulLeft ℂ (fun g ↦ φ (Real.log ((m g : ℝ≥0) : ℝ)))
+  have hle : schwartzBruhatSubmodule G ≤ (schwartzBruhatSubmodule G).comap M := by
+    refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
+    rintro _ ⟨s, rfl⟩
+    obtain ⟨s', hs'⟩ := stage_mul_logModulation m a e s hφ hφb
+    rw [Submodule.mem_comap]
+    have : M (schwartzBruhatStageRealization a e s) = schwartzBruhatStageRealization a e s' := by
+      rw [hs']
+      rfl
+    rw [this]
+    exact Submodule.mem_iSup_of_mem a (Submodule.mem_iSup_of_mem e ⟨s', rfl⟩)
+  exact hle hF
+
 /-- Paper: Lemma D.3.3.2, p. 804. If two exponent twists are Schwartz–Bruhat,
 every intermediate exponent twist is Schwartz–Bruhat as well. -/
 theorem modulationWeight_mem_schwartzBruhat_between (hm : IsModulation m) (hms : Surjective m)
     (f : G → ℂ) (a c b : ℝ) (hac : a < c) (hcb : c < b)
     (ha : modulationWeight m a f ∈ schwartzBruhatSubmodule G)
     (hb : modulationWeight m b f ∈ schwartzBruhatSubmodule G) :
-    modulationWeight m c f ∈ schwartzBruhatSubmodule G := by sorry
+    modulationWeight m c f ∈ schwartzBruhatSubmodule G := by
+  -- `m^c = (m^(a-c) + m^(b-c))⁻¹ (m^a + m^b)`, and the prefactor has bounded derivatives in `log m`.
+  obtain ⟨hφ, hφb⟩ := twoSidedExpWeight_bounds (sub_pos.mpr hac) (sub_pos.mpr hcb)
+  convert logModulation_mul_mem_schwartzBruhat m hφ hφb (add_mem ha hb) using 1
+  funext g
+  simp only [modulationWeight, LinearMap.mulLeft_apply, Pi.add_apply, Pi.mul_apply]
+  have hr : 0 < ((m g : ℝ≥0) : ℝ) := by
+    have := Units.ne_zero (m g)
+    positivity
+  set r : ℝ := ((m g : ℝ≥0) : ℝ)
+  have key : r ^ c = (Real.exp (-(c - a) * Real.log r) + Real.exp ((b - c) * Real.log r))⁻¹ *
+      (r ^ a + r ^ b) := by
+    rw [Real.rpow_def_of_pos hr, Real.rpow_def_of_pos hr, Real.rpow_def_of_pos hr,
+      eq_inv_mul_iff_mul_eq₀ (by positivity), add_mul, ← Real.exp_add, ← Real.exp_add]
+    congr 2 <;> ring
+  rw [key]
+  push_cast
+  ring
 
 -- TODO(paper-gap): The finite-generation wording in Definition D.3.3.3
 -- refers to the annihilator in the dual of the norm-one subgroup. In
