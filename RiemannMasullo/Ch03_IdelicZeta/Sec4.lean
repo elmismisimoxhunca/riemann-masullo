@@ -276,7 +276,8 @@ def thetaPolarCutoff (ω : PontryaginDual C₁) (g : C_F) : ℂ :=
 
 /-- Paper: Equation (3.4.2.6), p. 146. The trivial-character cutoff equals
 one at the identity class. -/
-theorem thetaPolarCutoff_one : thetaPolarCutoff (1 : PontryaginDual C₁) 1 = 1 := by sorry
+theorem thetaPolarCutoff_one : thetaPolarCutoff (1 : PontryaginDual C₁) 1 = 1 := by
+  simp [thetaPolarCutoff]
 
 /-- Paper: Theorem 3.4.2.2(1), p. 146. At large norm homogeneous theta
 decays to every inverse power, uniformly over a bounded set of test functions.
