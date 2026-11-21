@@ -5,7 +5,12 @@ public import Mathlib.Analysis.Fourier.AddCircle
 public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Topology.Algebra.Equicontinuity
 public import Mathlib.Topology.Algebra.Module.Complement
+import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.PSeries
+import Mathlib.Topology.Baire.LocallyCompactRegular
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
+import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.NatInt
 
 /-!
 # Schauder bases
@@ -198,7 +203,18 @@ def IsSchauderBasis (x : ℕ → E) (f : ℕ → StrongDual ℂ E) : Prop :=
 predicate agrees with Mathlib's bundled sequence and its coefficient maps. -/
 theorem isSchauderBasis_iff_exists_mathlib {F : Type*} [NormedAddCommGroup F]
     [NormedSpace ℂ F] (x : ℕ → F) (f : ℕ → StrongDual ℂ F) :
-    IsSchauderBasis x f ↔ ∃ b : _root_.SchauderBasis ℂ F, b.basis = x ∧ b.coord = f := by sorry
+    IsSchauderBasis x f ↔ ∃ b : _root_.SchauderBasis ℂ F, b.basis = x ∧ b.coord = f := by
+  constructor
+  · intro h
+    -- Pack the biorthogonality and the convergence of the coordinate series into
+    -- Mathlib's bundled structure. The only mismatch is the decidability instance
+    -- for `Pi.single`, which is bridged by case-splitting on the index equality.
+    refine ⟨⟨x, f, fun i j => ?_, fun u => h.2 u⟩, rfl, rfl⟩
+    by_cases hij : i = j <;> simpa [hij, Pi.single_apply] using h.1 i j
+  · -- Conversely, unpack the bundled structure and read off the two conditions.
+    rintro ⟨b, rfl, rfl⟩
+    refine ⟨fun m n => ?_, fun u => b.expansion u⟩
+    by_cases hmn : m = n <;> simpa [hmn, Pi.single_apply] using b.ortho m n
 
 -- TODO(paper-gap): The individual block sums can converge even when the ordered
 -- series has no limit. The equivalent permutation description needs cumulative sums.
@@ -219,7 +235,15 @@ def partialProjection (k : ℕ) : E →L[ℂ] E :=
 /-- Paper: Definition 4.1.2.1(1), p. 158. The kth basic projection keeps exactly
 the basis vectors with index at most k. -/
 theorem partialProjection_apply_basis (h : IsSchauderBasis x f) (k n : ℕ) :
-    partialProjection x f k (x n) = if n ≤ k then x n else 0 := by sorry
+    partialProjection x f k (x n) = if n ≤ k then x n else 0 := by
+  have horth (m : ℕ) : (f m) (x n) = if m = n then (1 : ℂ) else 0 := by
+    simpa [ContinuousLinearMap.coe_coe] using h.1 m n
+  simp only [partialProjection, sum_apply, ContinuousLinearMap.smulRight_apply]
+  simp_rw [horth]
+  have hterm (m : ℕ) :
+      (if m = n then (1 : ℂ) else 0) • x m = if m = n then x n else 0 := by
+    split_ifs with hmn <;> simp [hmn]
+  simp_rw [hterm, Finset.sum_ite_eq', Finset.mem_Iic]
 
 /-- Paper: Definition 4.1.2.1(1), p. 158. The basic projections of an equicontinuous
 basis form an equicontinuous family. For linear maps it suffices to test at zero. -/
@@ -241,7 +265,14 @@ summation is equivalent to convergence of each permuted coordinate series. -/
 theorem isUnconditional_iff_forall_permutation [IsTopologicalAddGroup E] [T2Space E]
     (h : IsSchauderBasis x f) :
     IsUnconditional x f ↔ ∀ (u : E) (σ : ℕ ≃ ℕ),
-      Summable (fun m ↦ f (σ m) u • x (σ m)) (SummationFilter.conditional ℕ) := by sorry
+      Summable (fun m ↦ f (σ m) u • x (σ m)) (SummationFilter.conditional ℕ) := by
+  constructor
+  · intro hu u σ
+    exact (σ.hasSum_iff.mpr (hu u)).summable.mono_filter
+      (SummationFilter.conditional ℕ).le_atTop
+  · intro hperm u
+    exact hasSum_of_summable_conditional_permutations
+      ((show IsTopologicalBasis x (fun m ↦ (f m).toLinearMap) from h).2 u) (hperm u)
 
 /-- Paper: Definition 4.1.2.1(3), p. 158. For each continuous seminorm, one
 continuous seminorm bounds the sums of the seminorms of the coordinate terms
@@ -289,21 +320,101 @@ section Examples
 coordinate functionals give a topological basis of the complex sequence space
 with the product topology. -/
 theorem pi_isTopologicalBasis :
-    IsTopologicalBasis coordinateVector (fun n ↦ (coordinateFunctional n).toLinearMap) := by sorry
+    IsTopologicalBasis coordinateVector (fun n ↦ (coordinateFunctional n).toLinearMap) := by
+  refine ⟨fun m n ↦ ?_, fun u ↦ ?_⟩
+  · simp [ContinuousLinearMap.coe_proj, LinearMap.proj_apply, Pi.single_apply]
+  · rw [Pi.hasSum]
+    intro j
+    simp only [ContinuousLinearMap.coe_proj, LinearMap.proj_apply, Pi.smul_apply, smul_eq_mul,
+      Pi.single_apply, mul_ite, mul_one, mul_zero]
+    have : HasSum (fun b : ℕ ↦ if j = b then u b else 0) (u j)
+        (SummationFilter.conditional ℕ) := by
+      simpa using hasSum_sum_of_ne_finset_zero (L := SummationFilter.conditional ℕ) (s := {j})
+        (fun b hb ↦
+          ite_eq_right (Ne.symm (Finset.notMem_singleton.mp hb)))
+    exact this
 
 /-- Paper: Definition 4.1.2.1(1), p. 158. The basic projections of the coordinate
 basis of the complex sequence space are equicontinuous in the product topology. -/
 theorem pi_isEquicontinuous :
-    IsEquicontinuous coordinateVector coordinateFunctional := by sorry
+    IsEquicontinuous coordinateVector coordinateFunctional := by
+  have hproj (k : ℕ) (u : ℕ → ℂ) (j : ℕ) :
+      partialProjection coordinateVector coordinateFunctional k u j =
+        if j ≤ k then u j else 0 := by
+    simp only [partialProjection, sum_apply, ContinuousLinearMap.smulRight_apply,
+      Finset.sum_apply, ContinuousLinearMap.proj_apply, Pi.smul_apply, smul_eq_mul,
+      Pi.single_apply, mul_ite, mul_one, mul_zero, Finset.sum_ite_eq, Finset.mem_Iic]
+  unfold IsEquicontinuous EquicontinuousAt
+  intro U hU
+  rw [uniformity_eq_comap_nhds_zero'] at hU
+  obtain ⟨V, hV, hVU⟩ := Filter.mem_comap.mp hU
+  -- Every basic product neighborhood of zero is preserved by coordinate truncation.
+  rw [nhds_pi] at hV
+  obtain ⟨I, hI, s, hs, hsV⟩ := Filter.mem_pi.mp hV
+  filter_upwards [set_pi_mem_nhds (x := (0 : ℕ → ℂ)) hI (fun j _ ↦ hs j)] with u hu k
+  apply hVU
+  simp only [mem_preimage, map_zero, neg_zero, add_zero]
+  apply hsV
+  intro j hj
+  rw [hproj]
+  split_ifs
+  · exact hu j hj
+  · exact mem_of_mem_nhds (hs j)
 
 /-- Paper: Definition 4.1.2.1(3), p. 158. The coordinate basis of the complex
 sequence space with the product topology is absolute. -/
 theorem pi_isAbsolute :
-    IsAbsolute coordinateVector coordinateFunctional := by sorry
+    IsAbsolute coordinateVector coordinateFunctional := by
+  classical
+  intro q hq
+  let p (n : ℕ) : Seminorm ℂ (ℕ → ℂ) := (normSeminorm ℂ ℂ).comp (LinearMap.proj n)
+  let e := Equiv.sigmaEquivProd ℕ Unit
+  have hp : WithSeminorms p :=
+    (withSeminorms_pi fun _ : ℕ ↦ norm_withSeminorms ℂ ℂ).congr_equiv
+      (e.trans (Equiv.prodUnique ℕ Unit)).symm
+  obtain ⟨s, C, _, hC⟩ := Seminorm.bound_sum_of_continuous hp q hq
+  let term (m : ℕ) : (ℕ → ℂ) →L[ℂ] (ℕ → ℂ) :=
+    (coordinateFunctional m).smulRight ((coordinateVector : ℕ → ℕ → ℂ) m)
+  let r (m : ℕ) := q.comp (term m).toLinearMap
+  refine ⟨∑ m ∈ s, r m,
+    Seminorm.continuous_finsetSum (fun m _ ↦ hq.comp (term m).continuous), ?_⟩
+  intro u
+  -- Outside the controlling coordinates, the seminorm of each coordinate term is zero.
+  have hz (m : ℕ) (hm : m ∉ s) : q (term m u) = 0 := by
+    have h := hC (term m u)
+    rw [smul_apply] at h
+    change q _ ≤ C • (FunLike.coeAddMonoidHom _ _ _ (∑ i ∈ s, p i)) _ at h
+    rw [map_sum, Finset.sum_apply, Finset.sum_eq_zero (fun i hi ↦ ?_), smul_zero] at h
+    · exact le_antisymm h (apply_nonneg q _)
+    · have him : i ≠ m := fun him ↦ hm (him ▸ hi)
+      change ‖term m u i‖ = 0
+      simp [term, ContinuousLinearMap.smulRight_apply, Pi.smul_apply, Pi.single_eq_of_ne him]
+  change Summable (fun m ↦ q (term m u)) ∧ (∑' m, q (term m u)) ≤ (∑ m ∈ s, r m) u
+  have hs := hasSum_sum_of_ne_finset_zero (L := SummationFilter.unconditional ℕ) hz
+  refine ⟨hs.summable, le_of_eq ?_⟩
+  rw [hs.tsum_eq]
+  change _ = (FunLike.coeAddMonoidHom _ _ _ (∑ m ∈ s, r m)) u
+  rw [map_sum, Finset.sum_apply]
+  rfl
 
 /-- Paper: Definition 4.1.2.1(4), p. 158. The coordinate basis of the complex
 sequence space with the product topology is boundedly complete. -/
-theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by sorry
+theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by
+  intro a _
+  -- In the product topology every coordinate series is eventually constant, so the
+  -- ordered partial sums converge to the scalar sequence itself.
+  refine ⟨a, ?_⟩
+  rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff]
+  simp only [Function.comp_def]
+  rw [tendsto_pi_nhds]
+  intro n
+  refine tendsto_atTop_of_eventually_const (i₀ := n + 1) fun N hN ↦ ?_
+  rw [Finset.sum_apply]
+  have hn : n ∈ Finset.range N := Finset.mem_range.mpr (Nat.lt_of_succ_le hN)
+  rw [Finset.sum_eq_single_of_mem n hn]
+  · rw [Pi.smul_apply, Pi.single_eq_same, smul_eq_mul, mul_one]
+  · intro m _ hmn
+    rw [Pi.smul_apply, Pi.single_eq_of_ne hmn.symm, smul_zero]
 
 /-- Paper: Definition 4.1.2.1(5), p. 158. A countable orthonormal Hilbert basis is
 shrinking, with its coefficients given by the inner products against its vectors. -/
@@ -313,12 +424,28 @@ theorem hilbertBasis_isShrinking {H : Type*} [NormedAddCommGroup H] [InnerProduc
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. Every zero neighborhood in the complex
 sequence space with the product topology contains a coordinate basis vector. -/
-theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by sorry
+theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by
+  rintro ⟨U, hU, havoid⟩
+  have hzero : Tendsto coordinateVector atTop (𝓝 (0 : ℕ → ℂ)) := by
+    refine tendsto_pi_nhds.mpr fun j ↦ ?_
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [eventually_ne_atTop j] with n hn
+    simp only [Pi.single_eq_of_ne' hn, Pi.zero_apply]
+  obtain ⟨n, hn⟩ := (hzero.eventually hU).exists
+  exact havoid n hn
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. A countable orthonormal Hilbert basis is
 normalized in the paper's sense. -/
 theorem hilbertBasis_isNormalized {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
-    (b : HilbertBasis ℕ ℂ H) : IsNormalized (fun n ↦ b n) := by sorry
+    (b : HilbertBasis ℕ ℂ H) : IsNormalized (fun n ↦ b n) := by
+  have hnorm (n : ℕ) : ‖b n‖ = 1 := b.orthonormal.norm_eq_one n
+  constructor
+  · refine ⟨Metric.ball 0 1, Metric.ball_mem_nhds 0 zero_lt_one, fun n ↦ ?_⟩
+    rw [mem_ball_zero_iff, hnorm]
+    exact lt_irrefl 1
+  · refine (NormedSpace.isVonNBounded_iff' ℂ).mpr ⟨1, ?_⟩
+    rintro _ ⟨n, rfl⟩
+    exact (hnorm n).le
 
 end Examples
 
@@ -340,7 +467,28 @@ theorem tsum_seminorm_coordinates (q : Seminorm ℂ E) (u : E)
 space has equicontinuous basic projections and fails equicontinuity for its
 coefficient functionals. -/
 theorem pi_coeff_not_equicontinuousAt :
-    ¬ EquicontinuousAt (fun n (u : ℕ → ℂ) ↦ coordinateFunctional n u) 0 := by sorry
+    ¬ EquicontinuousAt (fun n (u : ℕ → ℂ) ↦ coordinateFunctional n u) 0 := by
+  rw [Metric.equicontinuousAt_iff_right]
+  push Not
+  refine ⟨1 / 2, by norm_num, ?_⟩
+  rw [Filter.frequently_iff]
+  intro t ht
+  rw [nhds_pi] at ht
+  obtain ⟨I, hIfin, q, hq, hqsub⟩ := Filter.mem_pi.mp ht
+  obtain ⟨j, hj⟩ := hIfin.exists_notMem
+  refine ⟨Pi.single j (1 : ℂ), ?_, j, ?_⟩
+  · refine hqsub ?_
+    rw [Set.mem_pi]
+    intro a ha
+    have haj : a ≠ j := by
+      intro haeq
+      subst haeq
+      exact hj ha
+    rw [Pi.single_eq_of_ne haj]
+    exact mem_of_mem_nhds (hq a)
+  · simp only [ContinuousLinearMap.proj_apply, Pi.zero_apply, Pi.single_eq_same,
+      dist_eq_norm, zero_sub, norm_neg, norm_one]
+    norm_num
 
 /-- Paper: Remark 4.1.2.2, p. 159. A Schauder basis with equicontinuous
 coefficient functionals is regular. -/
@@ -352,6 +500,292 @@ theorem isRegular_of_equicontinuous_coeff (hb : IsSchauderBasis x f)
   have hdiag : f n (x n) = 1 := by simpa using hb.1 n n
   simpa [hdiag] using hn n
 
+section RegularCoefficients
+
+open scoped ComplexOrder
+
+section
+
+variable [PolynormableSpace ℂ E] [T2Space E]
+
+omit [T2Space E] in
+/-- The coordinate scalars of a regular basis converge pointwise to zero. -/
+private theorem tendsto_coeff_zero_of_regular [IsTopologicalAddGroup E]
+    (hb : IsSchauderBasis x f) (hr : IsRegular x)
+    (u : E) : Tendsto (fun n ↦ f n u) atTop (𝓝 0) := by
+  obtain ⟨U, hU, hx⟩ := hr
+  obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+  have hpx (n : ℕ) : 1 ≤ p (x n) := le_of_not_gt fun hn ↦
+    hx n (hpU (p.mem_ball_zero.mpr hn))
+  have hs : Tendsto (fun n ↦ ∑ i ∈ Finset.range n, f i u • x i) atTop (𝓝 u) := by
+    have h := hb.2 u
+    rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff] at h
+    exact h
+  have ht : Tendsto (fun n ↦ f n u • x n) atTop (𝓝 0) := by
+    have hd := (hs.comp (tendsto_add_atTop_nat 1)).sub hs
+    simpa only [Function.comp_def, Finset.sum_range_succ_sub_sum, sub_self] using hd
+  rw [tendsto_zero_iff_norm_tendsto_zero]
+  have h := (hp.tendsto 0).comp ht
+  rw [map_zero] at h
+  refine squeeze_zero (fun _ ↦ norm_nonneg _) (fun n ↦ ?_) h
+  exact (le_mul_of_one_le_right (norm_nonneg _) (hpx n)).trans_eq
+    (map_smul_eq_mul p (f n u) (x n)).symm
+
+/-- A pointwise null sequence of continuous functionals is uniformly bounded
+on each weakly compact convex set. -/
+private theorem coeff_bounded_on_weakDisk
+    (hf : ∀ u, Tendsto (fun n ↦ f n u) atTop (𝓝 0))
+    {K : Set E} (hK : IsCompact (X := WeakSpace ℂ E) K) (hc : Convex ℂ K) :
+    ∃ C : ℝ, 0 < C ∧ ∀ u ∈ K, ∀ n, ‖f n u‖ ≤ C := by
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  rcases K.eq_empty_or_nonempty with rfl | hKn
+  · exact ⟨1, one_pos, by simp⟩
+  let K' : Set (WeakSpace ℂ E) := K
+  have : CompactSpace K' := isCompact_iff_compactSpace.mp hK
+  have : Nonempty K' := hKn.to_subtype
+  let F (M : ℕ) : Set K' := {u | ∀ n, ‖f n u.val‖ ≤ M}
+  have hFclosed (M : ℕ) : IsClosed (F M) := by
+    have heq : F M = ⋂ n, {u : K' | ‖f n u.val‖ ≤ M} := by
+      ext u
+      simp [F]
+    rw [heq]
+    exact isClosed_iInter fun n ↦ isClosed_le
+      ((WeakBilin.eval_continuous (topDualPairing ℂ E).flip (f n)).comp
+        continuous_subtype_val).norm continuous_const
+  have hcover : ⋃ M, F M = univ := by
+    apply eq_univ_of_forall
+    intro u
+    obtain ⟨r, hr⟩ := Metric.isBounded_iff_subset_closedBall (0 : ℂ) |>.mp
+      (Metric.isBounded_range_of_tendsto _ (hf u.val))
+    obtain ⟨M, hM⟩ := exists_nat_ge r
+    exact mem_iUnion.mpr ⟨M, fun n ↦ (mem_closedBall_zero_iff.mp (hr (mem_range_self n))).trans hM⟩
+  -- The Baire theorem gives a bound on a relatively open part of the compact set.
+  obtain ⟨M, a, ha⟩ := nonempty_interior_of_iUnion_of_closed hFclosed hcover
+  obtain ⟨V, hV, hsub⟩ := (mem_nhds_subtype K' a (F M)).mp (mem_interior_iff_mem_nhds.mp ha)
+  have ha' : a ∈ F M := interior_subset ha
+  -- One sufficiently small homothety sends the entire compact set into that part.
+  have hnear : ∀ᶠ t : ℝ in 𝓝 0,
+      ∀ y ∈ K', a.val + (t : ℂ) • (y - a.val) ∈ V := by
+    apply hK.eventually_forall_of_forall_eventually
+    intro y _
+    have hcont : Continuous (fun z : ℝ × WeakSpace ℂ E ↦
+        a.val + (z.1 : ℂ) • (z.2 - a.val)) :=
+      continuous_const.add ((Complex.continuous_ofReal.comp continuous_fst).smul
+        (continuous_snd.sub continuous_const))
+    exact hcont.continuousAt (x := (0, y)).preimage_mem_nhds
+      (by simpa using hV)
+  have hpos : ∀ᶠ t : ℝ in 𝓝[>] 0, 0 < t := self_mem_nhdsWithin
+  have hlt : ∀ᶠ t : ℝ in 𝓝[>] 0, t < 1 :=
+    mem_nhdsWithin_of_mem_nhds (Iio_mem_nhds zero_lt_one)
+  have : NeBot (𝓝[>] (0 : ℝ)) := nhdsGT_neBot 0
+  obtain ⟨t, ⟨ht, ht1⟩, htV⟩ := ((hpos.and hlt).and (hnear.filter_mono nhdsWithin_le_nhds)).exists
+  refine ⟨(M + M) / t + 1, by positivity, fun u hu n ↦ ?_⟩
+  let y : WeakSpace ℂ E := u
+  let w : WeakSpace ℂ E := a.val + (t : ℂ) • (y - a.val)
+  have hu' : w ∈ K' := by
+    have hc' : Convex ℝ K' := hc.lift ℝ
+    exact hc'.add_smul_sub_mem a.property hu ⟨ht.le, ht1.le⟩
+  let z : K' := ⟨w, hu'⟩
+  have hz : z ∈ F M := hsub (htV y hu)
+  have heq : f n z.val - (1 - (t : ℂ)) * f n a.val = (t : ℂ) * f n u := by
+    let a₀ : E := a.val
+    change f n (a₀ + (t : ℂ) • (u - a₀)) - (1 - (t : ℂ)) * f n a₀ = _
+    simp only [map_add, map_smul, map_sub, smul_eq_mul]
+    ring
+  have hbound : ‖(t : ℂ) * f n u‖ ≤ (M : ℝ) + M := by
+    rw [← heq]
+    refine (norm_sub_le _ _).trans (add_le_add (hz n) ?_)
+    rw [norm_mul, ← Complex.ofReal_one, ← Complex.ofReal_sub, Complex.norm_real,
+      Real.norm_of_nonneg (sub_nonneg.mpr ht1.le)]
+    exact (mul_le_of_le_one_left (norm_nonneg _) (by linarith)).trans (ha' n)
+  rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg ht.le] at hbound
+  exact ((le_div_iff₀' ht).mpr hbound).trans (le_add_of_nonneg_right zero_le_one)
+
+omit [PolynormableSpace ℂ E] [T2Space E] in
+/-- Convergence in the Mackey topology of the dual can be tested by uniform convergence
+of the evaluations on weakly compact absolutely convex subsets. -/
+private theorem tendsto_mackeyDual_iff {ι : Type*} {l : Filter ι}
+    {g : ι → StrongDual ℂ E} {φ : StrongDual ℂ E} :
+    Tendsto g l (@nhds _ (mackeyTopology (topDualPairing ℂ E)) φ) ↔
+      ∀ K : Set E, AbsConvex ℂ K → IsCompact (X := WeakSpace ℂ E) K →
+        TendstoUniformlyOn (fun i u ↦ g i u) φ l K := by
+  let S : Set (Set E) := {K | AbsConvex ℂ K ∧ IsCompact (X := WeakSpace ℂ E) K}
+  let ev (ψ : StrongDual ℂ E) := UniformOnFun.ofFun S (fun u ↦ ψ u)
+  change Tendsto g l (@nhds _ (TopologicalSpace.induced ev inferInstance) φ) ↔ _
+  rw [nhds_induced, tendsto_comap_iff, UniformOnFun.tendsto_iff_tendstoUniformlyOn]
+  simp only [S, ev, mem_ofPred_eq, and_imp, Function.comp_def, UniformOnFun.toFun_ofFun]
+
+/-- Sequential completeness of the Mackey dual makes every absolutely summable
+combination of a pointwise null sequence of functionals continuous. -/
+private theorem exists_dual_of_summable_coeff
+    (hf : ∀ u, Tendsto (fun n ↦ f n u) atTop (𝓝 0))
+    (hseq : let τ := mackeyTopology (topDualPairing ℂ E)
+      ∀ g : ℕ → StrongDual ℂ E,
+        (∀ U ∈ @nhds _ τ 0, ∃ N : ℕ, ∀ m n, N ≤ m → N ≤ n → g m - g n ∈ U) →
+        ∃ φ, Tendsto g atTop (@nhds _ τ φ))
+    (a : ℕ → ℂ) (ha : Summable (fun n ↦ ‖a n‖)) :
+    ∃ φ : StrongDual ℂ E, ∀ u, HasSum (fun n ↦ a n * f n u) (φ u) := by
+  let g (n : ℕ) : StrongDual ℂ E := ∑ i ∈ Finset.range n, a i • f i
+  have hg (n : ℕ) (u : E) : g n u = ∑ i ∈ Finset.range n, a i * f i u := by
+    simp [g, smul_eq_mul]
+  have hCauchy :
+      Tendsto (fun p : ℕ × ℕ ↦ g p.1 - g p.2) (atTop ×ˢ atTop)
+        (@nhds _ (mackeyTopology (topDualPairing ℂ E)) 0) := by
+    refine tendsto_mackeyDual_iff.mpr fun K hK hcomp ↦ ?_
+    obtain ⟨C, hC, hbound⟩ := coeff_bounded_on_weakDisk hf hcomp hK.2
+    rw [Metric.tendstoUniformlyOn_iff]
+    intro ε hε
+    obtain ⟨N, hN⟩ := Metric.cauchySeq_iff.mp ha.hasSum.tendsto_sum_nat.cauchySeq
+      (ε / C) (div_pos hε hC)
+    have hle (m n : ℕ) (hm : N ≤ m) (hn : N ≤ n) (hmn : n ≤ m) (u : E) (hu : u ∈ K) :
+        ‖g m u - g n u‖ < ε := by
+      have ht := hN m hm n hn
+      rw [Real.dist_eq, ← Finset.sum_Ico_eq_sub _ hmn, abs_of_nonneg
+        (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)] at ht
+      rw [hg, hg, ← Finset.sum_Ico_eq_sub _ hmn]
+      calc
+        ‖∑ i ∈ Finset.Ico n m, a i * f i u‖
+          ≤ ∑ i ∈ Finset.Ico n m, ‖a i‖ * C := by
+            refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun i _ ↦ ?_)
+            rw [norm_mul]
+            exact mul_le_mul_of_nonneg_left (hbound u hu i) (norm_nonneg _)
+        _ = (∑ i ∈ Finset.Ico n m, ‖a i‖) * C := by rw [Finset.sum_mul]
+        _ < ε := (lt_div_iff₀ hC).mp ht
+    refine eventually_prod_iff.mpr
+      ⟨fun m ↦ N ≤ m, eventually_ge_atTop N, fun n ↦ N ≤ n, eventually_ge_atTop N, ?_⟩
+    intro m hm n hn u hu
+    simp only [sub_apply, zero_apply, dist_zero_left]
+    rcases le_total n m with hmn | hnm
+    · exact hle m n hm hn hmn u hu
+    · rw [norm_sub_rev]
+      exact hle n m hn hm hnm u hu
+  obtain ⟨φ, hφ⟩ := hseq g fun U hU ↦ by
+    obtain ⟨_, hm, _, hn, hmem⟩ := eventually_prod_iff.mp (hCauchy.eventually hU)
+    obtain ⟨M, hM⟩ := eventually_atTop.mp hm
+    obtain ⟨N, hN⟩ := eventually_atTop.mp hn
+    exact ⟨max M N, fun m n hm hn ↦ hmem (hM m ((le_max_left _ _).trans hm))
+      (hN n ((le_max_right _ _).trans hn))⟩
+  refine ⟨φ, fun u ↦ ?_⟩
+  obtain ⟨C, _, hbound⟩ := coeff_bounded_on_weakDisk hf
+    (K := {u}) isCompact_singleton (convex_singleton _)
+  have hs : Summable (fun n ↦ a n * f n u) := (ha.mul_right C).of_norm_bounded fun n ↦ by
+    rw [norm_mul]
+    exact mul_le_mul_of_nonneg_left (hbound u (mem_singleton _) n) (norm_nonneg _)
+  let v : WeakSpace ℂ E := u
+  let L : ℂ →ₗ[ℂ] WeakSpace ℂ E := (LinearMap.id : ℂ →ₗ[ℂ] ℂ).smulRight v
+  let D := Metric.closedBall (0 : ℂ) 1
+  have hD : AbsConvex ℂ (L '' D) :=
+    ⟨(balanced_closedBall_zero (𝕜 := ℂ)).image L,
+      (convex_RCLike_iff_convex_real.mpr (convex_closedBall (0 : ℂ) 1)).linear_image L⟩
+  have hcompact : IsCompact (L '' D) := (isCompact_closedBall _ _).image
+    (continuous_id.smul continuous_const)
+  have hu : v ∈ L '' D := ⟨1, by simp [D], by change (1 : ℂ) • v = v; simp⟩
+  have hpoint : Tendsto (fun n ↦ g n u) atTop (𝓝 (φ u)) :=
+    (tendsto_mackeyDual_iff.mp hφ _ hD hcompact).tendsto_at hu
+  have heq := tendsto_nhds_unique hs.hasSum.tendsto_sum_nat (by simpa only [hg] using hpoint)
+  simpa only [heq] using hs.hasSum
+
+/-- A pointwise null sequence in a sequentially complete Mackey dual lies in
+an absolutely convex weakly compact set of continuous functionals. -/
+private theorem exists_weakly_compact_disk_of_coeff
+    (hf : ∀ u, Tendsto (fun n ↦ f n u) atTop (𝓝 0))
+    (hseq : let τ := mackeyTopology (topDualPairing ℂ E)
+      ∀ g : ℕ → StrongDual ℂ E,
+        (∀ U ∈ @nhds _ τ 0, ∃ N : ℕ, ∀ m n, N ≤ m → N ≤ n → g m - g n ∈ U) →
+        ∃ φ, Tendsto g atTop (@nhds _ τ φ)) :
+    ∃ D : Set (StrongDual ℂ E), AbsConvex ℂ D ∧
+      IsCompact (X := WeakBilin (topDualPairing ℂ E)) D ∧ range f ⊆ D := by
+  classical
+  let A : Set (ℕ → ℂ) := {a | ∀ k, ∑ i ∈ Finset.range k, ‖a i‖ ≤ 1}
+  let p (k : ℕ) : Seminorm ℂ (ℕ → ℂ) :=
+    ∑ i ∈ Finset.range k, (normSeminorm ℂ ℂ).comp (LinearMap.proj i)
+  have hp (k : ℕ) (a : ℕ → ℂ) : p k a = ∑ i ∈ Finset.range k, ‖a i‖ := by
+    simp [p, Seminorm.comp_apply]
+  have hAeq : A = ⋂ k, (p k).closedBall 0 1 := by
+    ext a
+    simp [A, hp]
+  have hA : AbsConvex ℂ A := by
+    rw [hAeq]
+    exact ⟨balanced_iInter fun k ↦ (p k).balanced_closedBall_zero 1,
+      convex_iInter fun k ↦ convex_RCLike_iff_convex_real.mpr ((p k).convex_closedBall 0 1)⟩
+  have hAcompact : IsCompact A := by
+    have hclosed : IsClosed A := by
+      rw [hAeq]
+      refine isClosed_iInter fun k ↦ ?_
+      rw [show (p k).closedBall 0 1 = {a | ∑ i ∈ Finset.range k, ‖a i‖ ≤ 1} by
+        ext a
+        simp [hp]]
+      exact isClosed_le (continuous_finsetSum _ fun i _ ↦ (continuous_apply i).norm)
+        continuous_const
+    refine (isCompact_univ_pi fun _ : ℕ ↦ isCompact_closedBall (0 : ℂ) 1).of_isClosed_subset
+      hclosed fun a ha i _ ↦ mem_closedBall_zero_iff.mpr ?_
+    exact (Finset.single_le_sum (fun j _ ↦ norm_nonneg (a j))
+      (Finset.mem_range.mpr (Nat.lt_succ_self i))).trans (ha (i + 1))
+  have hsum (a : A) : Summable (fun i ↦ ‖a.val i‖) :=
+    summable_of_sum_range_le (fun _ ↦ norm_nonneg _) a.property
+  -- Map the compact unit ball of absolutely summable weights into the weak dual.
+  choose φ hφ using fun a : A ↦ exists_dual_of_summable_coeff hf hseq a.val (hsum a)
+  have huniq (a : A) (ψ : StrongDual ℂ E) (hψ : ∀ u, HasSum (fun i ↦ a.val i * f i u) (ψ u)) :
+      φ a = ψ :=
+    ContinuousLinearMap.ext fun u ↦ (hφ a u).unique (hψ u)
+  have hcontinuous : @Continuous A (WeakBilin (topDualPairing ℂ E)) _
+      (WeakBilin.instTopologicalSpace _) φ := by
+    refine WeakBilin.continuous_of_continuous_eval _ fun u ↦ ?_
+    change Continuous (fun a ↦ φ a u)
+    -- The tails are uniformly small because the absolute weights sum to at most one.
+    let G (k : ℕ) (a : A) := ∑ i ∈ Finset.range k, a.val i * f i u
+    have hconv : TendstoUniformly G (fun a ↦ φ a u) atTop := by
+      rw [Metric.tendstoUniformly_iff]
+      intro ε hε
+      obtain ⟨N, hN⟩ := eventually_atTop.mp (Metric.tendsto_nhds.mp (hf u) (ε / 2) (half_pos hε))
+      filter_upwards [eventually_ge_atTop N] with k hk a
+      have htail : HasSum (fun j : ℕ ↦ a.val (j + k) * f (j + k) u) (φ a u - G k a) :=
+        (hasSum_nat_add_iff' k).mpr (hφ a u)
+      have hnormtail : Summable (fun j : ℕ ↦ ‖a.val (j + k)‖) :=
+        (summable_nat_add_iff k).mpr (hsum a)
+      have habs : (∑' j : ℕ, ‖a.val (j + k)‖) ≤ 1 := by
+        have h := (hsum a).sum_add_tsum_nat_add k
+        exact (le_add_of_nonneg_left (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)).trans
+          (h.trans_le ((hsum a).tsum_le_of_sum_range_le a.property))
+      have hestimate := htail.norm_le_of_bounded (hnormtail.hasSum.mul_right (ε / 2)) (fun j ↦ by
+        rw [norm_mul]
+        exact mul_le_mul_of_nonneg_left
+          (by simpa only [dist_zero_right] using
+            (hN (j + k) (hk.trans (Nat.le_add_left _ _))).le) (norm_nonneg _))
+      rw [dist_eq_norm]
+      exact (hestimate.trans (mul_le_mul_of_nonneg_right habs (half_pos hε).le)).trans_lt
+        (by simpa only [one_mul] using half_lt_self hε)
+    refine hconv.continuous (Eventually.of_forall fun k ↦ ?_).frequently
+    unfold G
+    exact continuous_finsetSum _ fun i _ ↦
+      ((continuous_apply i).comp continuous_subtype_val).mul continuous_const
+  refine ⟨range φ, ⟨?_, ?_⟩, ?_, ?_⟩
+  · rw [balanced_iff_smul_mem]
+    rintro c hc _ ⟨a, rfl⟩
+    refine ⟨⟨c • a.val, balanced_iff_smul_mem.mp hA.1 hc a.property⟩, huniq _ _ fun u ↦ ?_⟩
+    simpa only [Pi.smul_apply, smul_eq_mul, smul_apply, mul_assoc]
+      using (hφ a u).mul_left c
+  · rintro _ ⟨a, rfl⟩ _ ⟨b, rfl⟩ c d hc hd hcd
+    refine ⟨⟨c • a.val + d • b.val, hA.2 a.property b.property hc hd hcd⟩,
+      huniq _ _ fun u ↦ ?_⟩
+    simpa only [Pi.add_apply, Pi.smul_apply, smul_eq_mul, smul_apply,
+      add_apply, add_mul, mul_assoc]
+      using ((hφ a u).mul_left c).add ((hφ b u).mul_left d)
+  · let : CompactSpace A := isCompact_iff_compactSpace.mp hAcompact
+    exact isCompact_range hcontinuous
+  · rintro _ ⟨n, rfl⟩
+    let e (i : ℕ) : ℂ := if i = n then 1 else 0
+    have hn : e ∈ A := by
+      intro k
+      simp only [e, apply_ite (fun z : ℂ ↦ ‖z‖), norm_one, norm_zero, Finset.sum_ite_eq']
+      split_ifs <;> simp
+    refine ⟨⟨e, hn⟩, huniq _ _ fun u ↦ ?_⟩
+    convert hasSum_ite_eq n (f n u) using 1
+    funext i
+    by_cases hi : i = n <;> simp [e, hi]
+
+end
+
 /-- Paper: Remark 4.1.2.2, p. 159. A regular Schauder basis has equicontinuous
 coefficient functionals if the space has its Mackey topology and the Mackey
 topology on the dual is sequentially complete. -/
@@ -362,12 +796,232 @@ theorem equicontinuous_coeff_of_isRegular [IsTopologicalAddGroup E] [ContinuousS
       ∀ g : ℕ → StrongDual ℂ E,
         (∀ U ∈ @nhds _ τ 0, ∃ N : ℕ, ∀ m n, N ≤ m → N ≤ n → g m - g n ∈ U) →
         ∃ φ, Tendsto g atTop (@nhds _ τ φ)) :
-    EquicontinuousAt (fun m ↦ (f m : E → ℂ)) 0 := by sorry
+    EquicontinuousAt (fun m ↦ (f m : E → ℂ)) 0 := by
+  obtain ⟨D, hD, hcompact, hsub⟩ :=
+    exists_weakly_compact_disk_of_coeff (tendsto_coeff_zero_of_regular hb hr) hseq
+  let K : Set (Set (StrongDual ℂ E)) :=
+    {A | AbsConvex ℂ A ∧ IsCompact (X := WeakBilin (topDualPairing ℂ E)) A}
+  let ev (u : E) := UniformOnFun.ofFun K (fun φ : StrongDual ℂ E ↦ φ u)
+  rw [Metric.equicontinuousAt_iff_right]
+  intro ε hε
+  rw [show (𝓝 (0 : E)) = @nhds E (mackeyTopology (topDualPairing ℂ E).flip) 0 from
+    congrArg (fun t ↦ @nhds E t 0) hM]
+  change _ ∈ @nhds _ (TopologicalSpace.induced ev inferInstance) 0
+  rw [nhds_induced]
+  have hU := UniformOnFun.gen_mem_nhds ℂ K (ev 0) (s := D)
+    (show D ∈ K from ⟨hD, hcompact⟩) (Metric.uniformity_basis_dist.mem_of_mem hε)
+  filter_upwards [preimage_mem_comap hU] with u hu n
+  exact hu (f n) (hsub (mem_range_self n))
+
+end RegularCoefficients
 
 /-- Paper: Remark 4.1.2.3, p. 159. A Fréchet space with a regular Schauder basis
 has a continuous norm, represented by a continuous seminorm separating zero. -/
 theorem exists_continuous_norm_of_isRegular (hE : IsFrechetTVS E) (hb : IsSchauderBasis x f)
-    (hr : IsRegular x) : ∃ q : Seminorm ℂ E, Continuous q ∧ ∀ u, q u = 0 → u = 0 := by sorry
+    (hr : IsRegular x) : ∃ q : Seminorm ℂ E, Continuous q ∧ ∀ u, q u = 0 → u = 0 := by
+  let : BarrelledSpace ℂ E := isFrechetTVS_barrelled hE
+  obtain ⟨hadd, hpoly, hmetric, _⟩ := hE
+  let : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  obtain ⟨U, hU, hx⟩ := hr
+  obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+  have hpos (n : ℕ) : 0 < p (x n) := by
+    have hn : x n ∉ p.ball 0 1 := fun hn ↦ hx n (hpU hn)
+    rw [Seminorm.ball_zero_eq] at hn
+    exact zero_lt_one.trans_le (le_of_not_gt hn)
+  have hsum (u : E) : Tendsto (fun N : ℕ ↦ ∑ n ∈ Finset.range N, f n u • x n) atTop (𝓝 u) := by
+    simpa only [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff,
+      Function.comp_def, ContinuousLinearMap.coe_coe] using hb.2 u
+  let T (n : ℕ) := (f n).smulRight (x n)
+  let r (n : ℕ) := p.comp (T n).toLinearMap
+  -- Each coordinate term is the difference of two successive partial sums.
+  have hbdd : BddAbove (range r) := by
+    rw [Seminorm.bddAbove_range_iff]
+    intro u
+    have hs := hsum u
+    have hd : Tendsto (fun n ↦ f n u • x n) atTop (𝓝 0) := by
+      simpa only [Function.comp_def, Finset.sum_range_succ_sub_sum, sub_self] using
+        (hs.comp (tendsto_add_atTop_nat 1)).sub hs
+    have ht : Tendsto (fun n ↦ r n u) atTop (𝓝 (p 0)) := hp.continuousAt.tendsto.comp hd
+    exact (Metric.isBounded_range_of_tendsto _ ht).bddAbove
+  refine ⟨⨆ n, r n, ?_, ?_⟩
+  · rw [Seminorm.coe_iSup_eq hbdd]
+    exact Seminorm.continuous_iSup r (fun n ↦ hp.comp (T n).continuous) hbdd
+  · intro u hu
+    have hz (n : ℕ) : f n u = 0 := by
+      have hle : r n ≤ ⨆ m, r m := le_ciSup hbdd n
+      have hzero : r n u = 0 := le_antisymm ((hle u).trans_eq hu) (apply_nonneg _ _)
+      change p (f n u • x n) = 0 at hzero
+      rw [map_smul_eq_mul, mul_eq_zero] at hzero
+      exact norm_eq_zero.mp (hzero.resolve_right (hpos n).ne')
+    have hs := hsum u
+    simp only [hz, zero_smul, Finset.sum_const_zero] at hs
+    exact tendsto_nhds_unique hs tendsto_const_nhds
+
+/-- Helper for Remark 4.1.2.3, p. 159. A Hausdorff barrelled locally convex space with
+a regular Schauder basis has a continuous norm, represented by a continuous seminorm
+separating zero. By Banach–Steinhaus the basic projections are equicontinuous, so the
+supremum along them of a continuous seminorm that is at least `1` on every basis vector
+is continuous; it vanishes only at zero because it controls every coordinate term. -/
+theorem exists_continuous_norm_of_barrelled_of_isRegular [IsTopologicalAddGroup E]
+    [PolynormableSpace ℂ E] [BarrelledSpace ℂ E] [T2Space E] (hb : IsSchauderBasis x f)
+    (hr : IsRegular x) : ∃ q : Seminorm ℂ E, Continuous q ∧ ∀ u, q u = 0 → u = 0 := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  obtain ⟨U, hU, hxU⟩ := hr
+  obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+  have hpx (m : ℕ) : (1 : ℝ) ≤ p (x m) := by
+    by_contra hlt
+    exact hxU m (hpU ((p.mem_ball_zero).mpr (lt_of_not_ge hlt)))
+  have hproj (k : ℕ) (u : E) :
+      partialProjection x f k u = ∑ m ∈ Finset.range (k + 1), (f m u) • x m := by
+    rw [partialProjection, ← Nat.range_succ_eq_Iic]
+    simp [sum_apply, ContinuousLinearMap.smulRight_apply]
+  have hstep (n : ℕ) (u : E) :
+      partialProjection x f (n + 1) u =
+        partialProjection x f n u + (f (n + 1) u) • x (n + 1) := by
+    rw [hproj, hproj, Finset.sum_range_succ]
+  have hzero (u : E) : partialProjection x f 0 u = (f 0 u) • x 0 := by
+    rw [hproj]
+    simp
+  have htend (u : E) : Tendsto (fun k ↦ partialProjection x f k u) atTop (𝓝 u) := by
+    have hsum := hb.2 u
+    rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff] at hsum
+    have hcomp : Tendsto (fun k : ℕ ↦ k + 1) atTop atTop := tendsto_add_atTop_nat 1
+    refine (hsum.comp hcomp).congr fun k ↦ ?_
+    rw [hproj]
+    rfl
+  have hUE : UniformEquicontinuous ((↑) ∘ fun k : ℕ ↦ partialProjection x f k) :=
+    PolynormableSpace.banach_steinhaus fun u ↦ (htend u).isVonNBounded_range ℂ
+  obtain ⟨q, hq, hle⟩ :=
+    ((PolynormableSpace.withSeminorms ℂ E).uniformEquicontinuous_iff_exists_continuous_seminorm
+      (fun k ↦ (partialProjection x f k).toLinearMap)).mp hUE ⟨p, hp⟩
+  have hbound (k : ℕ) (u : E) : p (partialProjection x f k u) ≤ q u :=
+    Seminorm.le_def.mp (hle k) u
+  have hbdd (u : E) : BddAbove (range fun n : ℕ ↦ p (partialProjection x f n u)) :=
+    ⟨q u, by rintro _ ⟨n, rfl⟩; exact hbound n u⟩
+  let N : Seminorm ℂ E := Seminorm.of (fun u ↦ ⨆ n, p (partialProjection x f n u))
+    (fun u v ↦ by
+      refine ciSup_le fun n ↦ ?_
+      calc
+        p (partialProjection x f n (u + v))
+            = p (partialProjection x f n u + partialProjection x f n v) := by
+              rw [map_add]
+        _ ≤ p (partialProjection x f n u) + p (partialProjection x f n v) :=
+              map_add_le_add _ _ _
+        _ ≤ (⨆ k, p (partialProjection x f k u)) + ⨆ k, p (partialProjection x f k v) :=
+              add_le_add (le_ciSup (hbdd u) n) (le_ciSup (hbdd v) n))
+    (fun c u ↦ by
+      have hlin (n : ℕ) :
+          p (partialProjection x f n (c • u)) = ‖c‖ * p (partialProjection x f n u) := by
+        rw [map_smul, map_smul_eq_mul]
+      simp_rw [hlin]
+      exact (Real.mul_iSup_of_nonneg (norm_nonneg c) _).symm)
+  refine ⟨N, ?_, ?_⟩
+  · refine Seminorm.continuous_of_le hq ?_
+    rw [Seminorm.le_def]
+    intro u
+    change (⨆ n, p (partialProjection x f n u)) ≤ q u
+    exact ciSup_le fun n ↦ hbound n u
+  · intro u hu
+    have hPn (n : ℕ) : p (partialProjection x f n u) = 0 := by
+      apply le_antisymm
+      · calc
+          p (partialProjection x f n u) ≤ ⨆ k, p (partialProjection x f k u) :=
+            le_ciSup (hbdd u) n
+          _ = 0 := hu
+      · exact NonnegHomClass.apply_nonneg p _
+    have hfn (n : ℕ) : f n u = 0 := by
+      have hp0 : p ((f n u) • x n) = 0 := by
+        cases n with
+        | zero =>
+            rw [← hzero u]
+            exact hPn 0
+        | succ n =>
+            have hvec :
+                (f (n + 1) u) • x (n + 1) =
+                  partialProjection x f (n + 1) u - partialProjection x f n u := by
+              rw [hstep, add_sub_cancel_left]
+            rw [hvec]
+            apply le_antisymm
+            · calc
+                p (partialProjection x f (n + 1) u - partialProjection x f n u)
+                    = p (partialProjection x f (n + 1) u +
+                        -partialProjection x f n u) := by rw [sub_eq_add_neg]
+                _ ≤ p (partialProjection x f (n + 1) u) +
+                      p (-partialProjection x f n u) := map_add_le_add _ _ _
+                _ = p (partialProjection x f (n + 1) u) + p (partialProjection x f n u) := by
+                      rw [map_neg_eq_map]
+                _ = 0 := by simp [hPn]
+            · exact NonnegHomClass.apply_nonneg p _
+      rw [map_smul_eq_mul] at hp0
+      have hne : p (x n) ≠ 0 := by linarith [hpx n]
+      have : ‖f n u‖ = 0 := (mul_eq_zero.mp hp0).resolve_right hne
+      exact norm_eq_zero.mp this
+    have hsum := hb.2 u
+    have hfun : ∀ m, (f m).toLinearMap u • x m = (0 : E) := by
+      intro m
+      rw [ContinuousLinearMap.coe_coe, hfn m, zero_smul]
+    simp_rw [hfun] at hsum
+    exact hsum.unique (hasSum_zero (L := SummationFilter.conditional ℕ))
+
+/-- Helper for Remark 4.1.2.3, p. 159. Every continuous seminorm on the complex
+sequence space with the product topology vanishes at some nonzero vector: the
+continuity only controls finitely many coordinates, and rescaling a vector
+supported outside them stays inside the controlling neighborhood. -/
+theorem exists_ne_zero_seminorm_apply_pi (q : Seminorm ℂ (ℕ → ℂ)) (hq : Continuous q) :
+    ∃ v : ℕ → ℂ, v ≠ 0 ∧ q v = 0 := by
+  have hmem : {v : ℕ → ℂ | q v < 1} ∈ 𝓝 (0 : ℕ → ℂ) := by
+    have h0 : q (0 : ℕ → ℂ) = 0 := map_zero q
+    have h : Iio (1 : ℝ) ∈ 𝓝 (q (0 : ℕ → ℂ)) := by
+      rw [h0]
+      exact Iio_mem_nhds zero_lt_one
+    exact ContinuousAt.preimage_mem_nhds hq.continuousAt h
+  rw [nhds_pi] at hmem
+  obtain ⟨I, t, htmem, hsub⟩ := Filter.mem_pi'.mp hmem
+  obtain ⟨j₀, -, hj₀⟩ := (Set.Ioi_infinite (I.card : ℕ)).exists_notMem_finset I
+  refine ⟨fun j => if j = j₀ then (1 : ℂ) else 0, ?_, ?_⟩
+  · intro h
+    exact absurd (congrFun h j₀) (by simp)
+  · by_contra hv
+    obtain ⟨n, hn⟩ := exists_nat_gt (1 / q (fun j => if j = j₀ then (1 : ℂ) else 0))
+    have hjne : ∀ j ∈ I, j ≠ j₀ := fun j hj h => hj₀ (by rw [h] at hj; exact hj)
+    have hmem' : ∀ n : ℕ,
+        (n : ℂ) • (fun j => if j = j₀ then (1 : ℂ) else 0) ∈ Set.pi (I : Set ℕ) t := by
+      intro n j hj
+      have hz : ((n : ℂ) • (fun j => if j = j₀ then (1 : ℂ) else 0)) j = (0 : ℂ) := by
+        simp [hjne j hj]
+      rw [hz]
+      exact mem_of_mem_nhds (htmem j)
+    have hlt : ∀ n : ℕ,
+        (n : ℝ) * q (fun j => if j = j₀ then (1 : ℂ) else 0) < 1 := by
+      intro n
+      have h1 : q ((n : ℂ) • (fun j => if j = j₀ then (1 : ℂ) else 0)) < 1 :=
+        hsub (hmem' n)
+      rw [map_smul_eq_mul, Complex.norm_natCast] at h1
+      exact h1
+    have hge : (1 : ℝ) < (n : ℝ) * q (fun j => if j = j₀ then (1 : ℂ) else 0) :=
+      (div_lt_iff₀ (lt_of_le_of_ne (NonnegHomClass.apply_nonneg _ _) (Ne.symm hv))).mp hn
+    linarith [hlt n]
+
+/-- Helper for Remark 4.1.2.3, p. 159. If `E` carries a continuous seminorm that
+separates points, then no submodule of `E` is continuously linearly isomorphic to
+the complex sequence space with the product topology: pulling the seminorm back
+along the isomorphism would give an injective continuous seminorm there, and
+`exists_ne_zero_seminorm_apply_pi` forbids that. -/
+theorem not_nonempty_pi_equiv_of_continuous_norm {q : Seminorm ℂ E} (hq : Continuous q)
+    (hnorm : ∀ u, q u = 0 → u = 0) (S : Submodule ℂ E) :
+    ¬ Nonempty (S ≃L[ℂ] (ℕ → ℂ)) := by
+  rintro ⟨T⟩
+  have hq' : Continuous
+      (q.comp (S.subtypeL.comp T.symm.toContinuousLinearMap).toLinearMap) := by
+    have h1 : Continuous fun v : ℕ → ℂ => S.subtypeL (T.symm v) :=
+      S.subtypeL.continuous.comp' T.symm.continuous
+    exact hq.comp' h1
+  obtain ⟨v, hv0, hvq⟩ := exists_ne_zero_seminorm_apply_pi _ hq'
+  refine hv0 ?_
+  have hzero : (S.subtypeL (T.symm v) : E) = 0 := hnorm _ hvq
+  have hzero' : (T.symm v : S) = 0 := Submodule.coe_eq_zero.mp hzero
+  exact (T.apply_symm_apply v).symm.trans (by rw [hzero', map_zero])
 
 /-- Paper: Remark 4.1.2.3, p. 159. A Fréchet space with a regular Schauder basis
 has no complemented closed subspace isomorphic to the product of countably
@@ -375,7 +1029,12 @@ many copies of the complex field. -/
 theorem no_complemented_pi_of_isRegular (hE : IsFrechetTVS E) (hb : IsSchauderBasis x f)
     (hr : IsRegular x) :
     ¬ ∃ S : Submodule ℂ E, IsClosed (S : Set E) ∧ S.ClosedComplemented ∧
-      Nonempty (S ≃L[ℂ] (ℕ → ℂ)) := by sorry
+      Nonempty (S ≃L[ℂ] (ℕ → ℂ)) := by
+  rintro ⟨S, -, -, hS⟩
+  have : BarrelledSpace ℂ E := isFrechetTVS_barrelled hE
+  obtain ⟨_, _, _, -⟩ := hE
+  obtain ⟨q, hq, hnorm⟩ := exists_continuous_norm_of_barrelled_of_isRegular hb hr
+  exact not_nonempty_pi_equiv_of_continuous_norm hq hnorm S hS
 
 -- TODO(paper-gap): The printed proof does not address bounded completeness on either
 -- side and leaves the passage from unconditional convergence in the bidual to
@@ -391,22 +1050,169 @@ variable (hComplete : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace 
 
 include hLC hHausdorff hBarrelled hComplete hReflexive hb ha
 
-/-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
-barrelled reflexive space is shrinking. -/
-theorem isShrinking_of_isAbsolute : IsShrinking x f := by sorry
-
-/-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
-barrelled reflexive space is boundedly complete. -/
-theorem isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete x := by sorry
-
+-- Retain the section hypotheses in the theorem's signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma 4.1.2.4, p. 159. The coefficient basis of the strong dual is
 unconditional, with coefficients given by evaluation at the original basis vectors. -/
 theorem strongDual_isUnconditional_of_isAbsolute :
-    IsUnconditional f (fun m ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x m)) := by sorry
+    IsUnconditional f (fun m ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x m)) := by
+  intro g
+  have horth (m n : ℕ) : f m (x n) = if m = n then 1 else 0 := hb.1 m n
+  -- A continuous functional vanishing on the coefficient span is evaluation at zero.
+  let S := Submodule.span ℂ (range f)
+  have hdense : Dense (S : Set (StrongDual ℂ E)) := by
+    intro g
+    by_contra hg
+    obtain ⟨φ, hφ, hvanish⟩ := exists_dual_eq_zero_on_submodule_of_notMem
+      S.topologicalClosure S.isClosed_topologicalClosure hg
+    obtain ⟨u, rfl⟩ := hReflexive.surjective φ
+    have hzero (m : ℕ) : f m u = 0 :=
+      hvanish (f m) (S.le_topologicalClosure (Submodule.subset_span (mem_range_self m)))
+    have hsum : HasSum (fun _ : ℕ ↦ (0 : E)) u (SummationFilter.conditional ℕ) := by
+      simpa only [ContinuousLinearMap.coe_coe, hzero, zero_smul] using hb.2 u
+    have hu : u = 0 := hsum.unique (by simp)
+    apply hφ
+    change g u = 0
+    rw [hu, map_zero]
+  let P (s : Finset ℕ) (u : E) := ∑ m ∈ s, f m u • x m
+  let Q (s : Finset ℕ) : StrongDual ℂ E := ∑ m ∈ s, g (x m) • f m
+  have heval (s : Finset ℕ) (u : E) : (Q s - g) u = g (P s u - u) := by
+    simp only [P, Q, sub_apply, sum_apply, smul_apply, map_sub, map_sum, map_smul, smul_eq_mul,
+      mul_comm]
+  have hvanish (ψ : StrongDual ℂ E) (hψ : ψ ∈ S) :
+      ∀ᶠ s : Finset ℕ in atTop, ∀ u, ψ (P s u - u) = 0 := by
+    induction hψ using Submodule.span_induction with
+    | mem ψ hψ =>
+      obtain ⟨m, rfl⟩ := hψ
+      filter_upwards [eventually_ge_atTop ({m} : Finset ℕ)] with s hs u
+      have hm := Finset.singleton_subset_iff.mp hs
+      simp only [P, map_sub, map_sum, map_smul, horth, smul_eq_mul, mul_ite, mul_one,
+        mul_zero, Finset.sum_ite_eq, hm, ite_true, sub_self]
+    | zero => simp
+    | add ψ χ _ _ hψ hχ =>
+      filter_upwards [hψ, hχ] with s hs ht u
+      simp [hs u, ht u]
+    | smul c ψ _ hψ =>
+      filter_upwards [hψ] with s hs u
+      simp [hs u]
+  change Tendsto Q atTop (𝓝 g)
+  apply tendsto_sub_nhds_zero_iff.mp
+  apply (ContinuousLinearMap.hasBasis_nhds_zero_of_basis Metric.nhds_basis_ball).tendsto_right_iff.mpr
+  rintro ⟨B, ε⟩ ⟨hB, hε⟩
+  -- Absoluteness bounds all truncation errors on a bounded set by continuous seminorms.
+  let T := {v : E | ∃ (s : Finset ℕ) (u : E), u ∈ B ∧ P s u - u = v}
+  have hT : IsVonNBounded ℂ T := by
+    let hp := PolynormableSpace.withSeminorms ℂ E
+    apply hp.isVonNBounded_iff_seminorm_bounded.mpr
+    rintro ⟨q, hq⟩
+    obtain ⟨q', hq', habs⟩ := ha q hq
+    obtain ⟨C, hC, hqB⟩ := hp.isVonNBounded_iff_seminorm_bounded.mp hB ⟨q, hq⟩
+    obtain ⟨C', hC', hq'B⟩ := hp.isVonNBounded_iff_seminorm_bounded.mp hB ⟨q', hq'⟩
+    refine ⟨C' + C, add_pos hC' hC, ?_⟩
+    rintro _ ⟨s, u, hu, rfl⟩
+    have hP : q (P s u) ≤ q' u := calc
+      q (P s u) ≤ ∑ m ∈ s, q (f m u • x m) :=
+        Finset.le_sum_of_subadditive q (map_zero q).le (map_add_le_add q) _ _
+      _ ≤ ∑' m, q (f m u • x m) :=
+        (habs u).1.sum_le_tsum s (fun _ _ ↦ apply_nonneg _ _)
+      _ ≤ q' u := (habs u).2
+    exact (map_sub_le_add q _ _).trans_lt (add_lt_add (hP.trans_lt (hq'B u hu)) (hqB u hu))
+  -- Approximate g on the entire error set by a finite linear combination of coefficients.
+  have hnear : ∀ᶠ ψ : StrongDual ℂ E in 𝓝 g, MapsTo (ψ - g) T (Metric.ball 0 ε) := by
+    have ht : Tendsto (fun ψ ↦ ψ - g) (𝓝 g) (𝓝 0) :=
+      tendsto_sub_nhds_zero_iff.mpr tendsto_id
+    exact ht.eventually (ContinuousLinearMap.eventually_nhds_zero_mapsTo hT
+      (Metric.ball_mem_nhds _ hε))
+  obtain ⟨ψ, hψ, hclose⟩ := ((mem_closure_iff_frequently.mp (hdense g)).and_eventually hnear).exists
+  filter_upwards [hvanish ψ hψ] with s hs u hu
+  have h := hclose (show P s u - u ∈ T from ⟨s, u, hu, rfl⟩)
+  change (Q s - g) u ∈ Metric.ball 0 ε
+  rw [heval]
+  simpa only [Metric.mem_ball, dist_zero_right, sub_apply, hs u, zero_sub, norm_neg] using h
+
+/-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
+barrelled reflexive space is shrinking. -/
+theorem isShrinking_of_isAbsolute : IsShrinking x f := by
+  have horth (m n : ℕ) : f m (x n) = if m = n then 1 else 0 := hb.1 m n
+  refine ⟨fun m n ↦ ?_, fun g ↦ ?_⟩
+  · change f n (x m) = _
+    by_cases h : m = n
+    · simp [horth, h]
+    · simp [horth, h, Ne.symm h]
+  · exact Tendsto.mono_left (strongDual_isUnconditional_of_isAbsolute hComplete hReflexive hb ha g)
+      (SummationFilter.conditional ℕ).le_atTop
+
+-- Retain the section hypotheses in the theorem's signature.
+set_option linter.unusedSectionVars false in
+/-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
+barrelled reflexive space is boundedly complete. -/
+theorem isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete x := by
+  intro a haBounded
+  let s (k : ℕ) : E := ∑ m ∈ Finset.Iic k, a m • x m
+  let S : ℕ → WeakDual ℂ (StrongDual ℂ E) := fun k ↦
+    StrongDual.toWeakDual (ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (s k))
+  -- Boundedness puts the evaluated partial sums in a weak-star compact polar.
+  let U : Set (StrongDual ℂ E) := {g | MapsTo g (range s) (Metric.ball 0 1)}
+  have hU : U ∈ 𝓝 (0 : StrongDual ℂ E) :=
+    ContinuousLinearMap.eventually_nhds_zero_mapsTo haBounded (Metric.ball_mem_nhds _ zero_lt_one)
+  have hS (k : ℕ) : S k ∈ WeakDual.polar ℂ U := fun g hg ↦
+    (mem_ball_zero_iff.mp (hg (mem_range_self k))).le
+  have hfilter : Filter.map S atTop ≤ 𝓟 (WeakDual.polar ℂ U) := by
+    rw [Filter.le_principal_iff, Filter.mem_map]
+    exact Eventually.of_forall hS
+  obtain ⟨φ, _, hφ⟩ := (isCompact_weakDual_polar hU).exists_mapClusterPt hfilter
+  obtain ⟨u, hu⟩ := hReflexive.surjective φ.toStrongDual
+  -- Each coordinate stabilizes, so the vector representing the cluster point has coefficients a.
+  have hcoeff (m : ℕ) : f m u = a m := by
+    have hcl := hφ.continuousAt_comp (WeakDual.eval_continuous (f m)).continuousAt
+    have heq : ∀ᶠ k : ℕ in atTop, S k (f m) = a m := by
+      filter_upwards [eventually_ge_atTop m] with k hk
+      change f m (s k) = a m
+      have horth (n : ℕ) : f m (x n) = if m = n then 1 else 0 := hb.1 m n
+      simp [s, map_sum, map_smul, horth, smul_eq_mul, mul_ite, Finset.mem_Iic, hk]
+    have hval : φ (f m) ∈ ({a m} : Set ℂ) :=
+      isClosed_singleton.mem_of_mapClusterPt hcl heq
+    exact (congrArg (fun g : StrongDual ℂ (StrongDual ℂ E) ↦ g (f m)) hu).trans hval
+  exact ⟨u, by simpa only [ContinuousLinearMap.coe_coe, hcoeff] using hb.2 u⟩
 
 /-- Paper: Lemma 4.1.2.4, p. 159. The coefficient basis of the strong dual is
 boundedly complete. -/
-theorem strongDual_isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete f := by sorry
+theorem strongDual_isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete f := by
+  intro a hs
+  let s (k : ℕ) : StrongDual ℂ E := ∑ m ∈ Finset.Iic k, a m • f m
+  let S (k : ℕ) : WeakDual ℂ E := StrongDual.toWeakDual (s k)
+  -- Banach–Steinhaus puts the partial sums in the polar of a zero neighborhood.
+  have hpoint (u : E) : IsVonNBounded ℂ (range fun k ↦ s k u) := by
+    let ev := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) u
+    change IsVonNBounded ℂ (range (ev ∘ s))
+    rw [range_comp]
+    exact hs.image ev
+  have hequi : EquicontinuousAt (fun k u ↦ s k u) (0 : E) := by
+    let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+    let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+    exact (PolynormableSpace.banach_steinhaus hpoint).equicontinuous 0
+  let U : Set E := {u | ∀ k, dist (s k 0) (s k u) < 1}
+  have hU : U ∈ 𝓝 (0 : E) := Metric.equicontinuousAt_iff_right.mp hequi 1 zero_lt_one
+  have hS (k : ℕ) : S k ∈ WeakDual.polar ℂ U := by
+    intro u hu
+    have hk : dist (s k 0) (s k u) < 1 := hu k
+    simpa [S, dist_eq_norm] using hk.le
+  have hfilter : Filter.map S atTop ≤ 𝓟 (WeakDual.polar ℂ U) := by
+    rw [Filter.le_principal_iff, Filter.mem_map]
+    exact Eventually.of_forall hS
+  obtain ⟨φ, _, hφ⟩ := (isCompact_weakDual_polar hU).exists_mapClusterPt hfilter
+  -- The stabilized evaluations give the coefficients of the cluster point.
+  have hcoeff (m : ℕ) : φ (x m) = a m := by
+    have hcl := hφ.continuousAt_comp (WeakDual.eval_continuous (x m)).continuousAt
+    have heq : ∀ᶠ k : ℕ in atTop, S k (x m) = a m := by
+      filter_upwards [eventually_ge_atTop m] with k hk
+      change s k (x m) = a m
+      have horth (n : ℕ) : f n (x m) = if n = m then 1 else 0 := hb.1 n m
+      simp [s, sum_apply, smul_apply, horth, smul_eq_mul, mul_ite, Finset.mem_Iic, hk]
+    exact isClosed_singleton.mem_of_mapClusterPt hcl heq
+  have hsum := (isShrinking_of_isAbsolute hComplete hReflexive hb ha).2 φ.toStrongDual
+  change HasSum (fun m ↦ φ (x m) • f m) φ.toStrongDual (SummationFilter.conditional ℕ) at hsum
+  exact ⟨φ.toStrongDual, by simpa only [hcoeff] using hsum⟩
 
 /-- Paper: Lemma 4.1.2.4, p. 159. If the original space is also nuclear, the
 coefficient basis of the strong dual is shrinking. -/

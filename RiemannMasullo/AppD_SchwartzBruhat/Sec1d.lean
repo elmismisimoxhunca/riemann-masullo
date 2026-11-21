@@ -65,7 +65,19 @@ theorem mem_range_integralIdeleInsertion (g : 𝕀[F]) :
 /-- Paper: Lemma D.1.10.1(1), p. 784. Insertion from the full S-stage is a continuous
 injective open map. -/
 theorem integralIdeleInsertion_isOpenEmbedding :
-    IsOpenEmbedding (integralIdeleInsertion F S) := by sorry
+    IsOpenEmbedding (integralIdeleInsertion F S) := by
+  have hopen : IsOpen (integralAdelesOutside F S : Set 𝔸[F]) := by
+    simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred]
+    exact (RestrictedProduct.isOpen_forall_imp_mem
+      (R := fun v : HeightOneSpectrum (𝓞 F) ↦ v.adicCompletion F)
+      (A := fun v ↦ v.adicCompletionIntegers F)
+      (fun v ↦ Valued.isOpen_valuationSubring (v.adicCompletion F))
+      (p := fun v ↦ v ∉ S)).preimage continuous_snd
+  have h := hopen.isOpenEmbedding_subtypeVal
+  have he : IsEmbedding (integralIdeleInsertion F S) := h.isEmbedding.units_map
+  have ho : IsOpenMap (integralIdeleInsertion F S) :=
+    Units.isOpenMap_map h.injective h.isOpenMap
+  exact ⟨he, ho.isOpen_range⟩
 
 /-- Paper: Lemma D.1.10.1(1), p. 784. The diagonal S-unit actions on the stage and
 on the global ideles are continuous, and insertion intertwines left translation.
@@ -78,7 +90,17 @@ theorem integralIdeleInsertion_equivariant :
     Continuous (fun x : SUnits × (integralAdelesOutside F S)ˣ ↦ d x.1 * x.2) ∧
     Continuous (fun x : SUnits × 𝕀[F] ↦ e x.1 * x.2) ∧
     ∀ u g, integralIdeleInsertion F S (d u * g) =
-      e u * integralIdeleInsertion F S g := by sorry
+      e u * integralIdeleInsertion F S g := by
+  let : TopologicalSpace SUnits := ⊥
+  let : DiscreteTopology SUnits := discreteTopology_bot _
+  intro d e
+  have hd : Continuous d := continuous_of_discreteTopology
+  have he : Continuous e := continuous_of_discreteTopology
+  refine ⟨(hd.comp continuous_fst).mul continuous_snd,
+    (he.comp continuous_fst).mul continuous_snd, ?_⟩
+  intro u g
+  rw [map_mul]
+  exact congrArg (· * integralIdeleInsertion F S g) (Units.ext rfl)
 
 -- TODO(paper-gap): D.1.10.1(2) names only GL₁(A_{F,S}). With the finite-product
 -- convention of (A.1.5.1), inserting 1 off S misses ideles with infinitely many
@@ -90,7 +112,19 @@ Deviation: The source is the full stage in (D.1.10.1), with the outside local un
 theorem integralIdeleInsertion_exhaustive :
     Monotone (fun T : Finset (HeightOneSpectrum (𝓞 F)) ↦
       range (integralIdeleInsertion F T)) ∧
-    ∀ g : 𝕀[F], ∃ T, g ∈ range (integralIdeleInsertion F T) := by sorry
+    ∀ g : 𝕀[F], ∃ T, g ∈ range (integralIdeleInsertion F T) := by
+  constructor
+  · intro U T hUT g hg
+    apply (mem_range_integralIdeleInsertion F T g).2
+    intro v hv
+    exact (mem_range_integralIdeleInsertion F U g).1 hg v (fun h ↦ hv (hUT h))
+  · intro g
+    have hfinite := Filter.eventually_cofinite.mp
+      (g.val.2.cofinite_mem_adicCompletionIntegers.and
+        g.inv.2.cofinite_mem_adicCompletionIntegers)
+    refine ⟨hfinite.toFinset, (mem_range_integralIdeleInsertion F _ g).2 ?_⟩
+    intro v hv
+    exact not_not.mp (fun h ↦ hv (hfinite.mem_toFinset.mpr h))
 
 /-- Paper: Lemma D.1.10.1(2), p. 784. The topology on the union of the full S-stages
 is final for their insertions. Their transition maps are the inclusions of the images.
@@ -104,7 +138,11 @@ kills the diagonal S-units. -/
 theorem integralIdeleInsertion_descends :
     (Units.map (integralAdeleDiagonal F S).toMonoidHom).range ≤
       ((QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)).comp
-        (integralIdeleInsertion F S)).ker := by sorry
+        (integralIdeleInsertion F S)).ker := by
+  rw [← MonoidHom.comap_ker, QuotientGroup.ker_mk']
+  rintro _ ⟨u, rfl⟩
+  exact ⟨Units.map (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F).val.toRingHom.toMonoidHom u,
+    Units.ext rfl⟩
 
 /-- Paper: (D.1.10.2), p. 784. Insert an S-idele representative and take its global
 idele class. The source is Appendix A's S-idele class group. -/
@@ -291,7 +329,12 @@ the original function on the torus.
 Deviation: Sanity check for the chosen lift. -/
 theorem torusSchwartzPartial_zero {n : ℕ}
     (f : ElementarySchwartz 0 n 0 PUnit) (z : Fin n → AddCircle (1 : ℝ)) :
-    torusSchwartzPartial 0 f z = f (0, z, 0, PUnit.unit) := by sorry
+    torusSchwartzPartial 0 f z = f (0, z, 0, PUnit.unit) := by
+  rw [torusSchwartzPartial, elementaryPartial_zero]
+  have hz : (fun i ↦ (((AddCircle.equivIco (1 : ℝ) 0 (z i)).val : ℝ) : AddCircle (1 : ℝ))) = z :=
+    funext fun i ↦ (AddCircle.equivIco (1 : ℝ) 0).symm_apply_apply (z i)
+  simp only [elementaryCover]
+  rw [hz]
 
 /-- Paper: Example D.1.10.4, p. 785. Supremum norms of the torus partials
 generate the smooth topology. -/
@@ -348,7 +391,22 @@ def bruhatDiffMonomial {d : ℕ} (a : Fin d → LCATopologicalLie G) (α : Fin d
 one direction gives the corresponding first-order operator.
 Deviation: Sanity check on repetition of directions. -/
 theorem bruhatDiffMonomial_single {d : ℕ} (a : Fin d → LCATopologicalLie G) (j : Fin d) :
-    bruhatDiffMonomial a (Pi.single j 1) = bruhatDiffGenerator (a j) := by sorry
+    bruhatDiffMonomial a (Pi.single j 1) = bruhatDiffGenerator (a j) := by
+  rw [bruhatDiffMonomial, ← bruhatDiffWord_singleton]
+  congr 1
+  rw [← List.replicate_one, List.eq_replicate_iff]
+  constructor
+  · rw [List.length_flatMap]
+    simp only [List.length_replicate]
+    rw [← Fin.sum_univ_def]
+    simp
+  · intro x hx
+    obtain ⟨i, -, hi⟩ := List.mem_flatMap.1 hx
+    have hij : i = j := by
+      by_contra h
+      simp [Pi.single_eq_of_ne h] at hi
+    subst hij
+    exact List.eq_of_mem_replicate hi
 
 /-- Paper: Proposition D.1.10.6(1)–(2), p. 787. Differentiate a Schwartz–Bruhat
 function and multiply it by the symbol of the dual operator through biduality. -/
@@ -363,7 +421,9 @@ operators returns the original function.
 Deviation: Sanity check on the symbol and application conventions. -/
 theorem bruhatDiffSymbolWeightedApply_one
     (b : G ≃ₜ* PontryaginDual (PontryaginDual G)) (f : SchwartzBruhat G) :
-    bruhatDiffSymbolWeightedApply b 1 1 f = (f : G → ℂ) := by sorry
+    bruhatDiffSymbolWeightedApply b 1 1 f = (f : G → ℂ) := by
+  funext x
+  simp [bruhatDiffSymbolWeightedApply, bruhatDiffSymbol_one]
 
 variable (e : ElementaryLCAPresentation G)
 variable (b : G ≃ₜ* PontryaginDual (PontryaginDual G)) (hb : ∀ x χ, b x χ = χ x)
@@ -458,6 +518,14 @@ def ideleClassWeightedDeriv {d : ℕ} (n : G →* ℝ≥0ˣ) (τ : ℝ≥0ˣ →
       Df.val (τ (Units.mk0 (Real.exp s).toNNReal
         (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos s)))) * x)) 0
 
+/-- The monomial of multi-index zero is the identity operator. -/
+theorem bruhatDiffMonomial_zero {d : ℕ} (a : Fin d → LCATopologicalLie G) :
+    bruhatDiffMonomial a 0 = 1 := by
+  have h : (List.finRange d).flatMap (fun j ↦ List.replicate ((0 : Fin d → ℕ) j) (a j)) = [] :=
+    List.flatMap_eq_nil_iff.2 (by simp)
+  rw [bruhatDiffMonomial, h]
+  rfl
+
 /-- Paper: (D.1.10.15), p. 789. At zero differential orders the result is the
 value of the original function multiplied by the weight in the absolute log norm.
 Deviation: Sanity check on the derivatives and the argument of the weight. -/
@@ -465,7 +533,14 @@ theorem ideleClassWeightedDeriv_zero {d : ℕ} (n : G →* ℝ≥0ˣ) (τ : ℝ�
     (γ : Fin d → LCATopologicalLie n.ker) (weight : ℝ → ℝ) (f : SchwartzBruhat G)
     (t : ℝ≥0ˣ) (x : G) :
     ideleClassWeightedDeriv n τ γ 0 0 weight f t x =
-      (weight |Real.log (t.val : ℝ)| : ℂ) * f x := by sorry
+      (weight |Real.log (t.val : ℝ)| : ℂ) * f x := by
+  simp only [ideleClassWeightedDeriv, iteratedDeriv_zero, bruhatDiffMonomial_zero]
+  congr 1
+  have h1 : Units.mk0 (Real.exp 0).toNNReal
+      (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos 0))) = (1 : ℝ≥0ˣ) :=
+    Units.ext (by simp)
+  rw [h1, map_one, one_mul]
+  rfl
 
 universe u
 
@@ -523,7 +598,9 @@ and unit weight evaluation is at the idele class represented by the product char
 Deviation: Sanity check on the section and kernel factors. -/
 theorem ideleClassProductWeightedDeriv_zero {d : ℕ} (n : G →* ℝ≥0ˣ) (τ : ℝ≥0ˣ →ₜ* G)
     (γ : Fin d → LCATopologicalLie n.ker) (f : SchwartzBruhat G) (z : ℝ≥0ˣ × n.ker) :
-    ideleClassProductWeightedDeriv n τ γ 0 0 (fun _ ↦ 1) f z = f (τ z.1 * z.2.val) := by sorry
+    ideleClassProductWeightedDeriv n τ γ 0 0 (fun _ ↦ 1) f z = f (τ z.1 * z.2.val) := by
+  rw [ideleClassProductWeightedDeriv, ideleClassWeightedDeriv_zero]
+  simp
 
 section Global
 local instance : MeasurableSpace C[F] := borel _

@@ -3,7 +3,14 @@ module
 public import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 import Mathlib.Algebra.Order.Group.Cyclic
+import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.Topology.Algebra.Order.ArchimedeanDiscrete
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
+import Mathlib.Algebra.Category.Grp.Injective
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Pi
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
+import RiemannMasullo.Ch03_IdelicZeta.Sec1
 
 /-! # Modulated groups and their canonical Haar measures -/
 
@@ -35,7 +42,13 @@ theorem IsModulation.normTwistHypotheses {m : G →ₜ* ℝ≥0ˣ} (hm : IsModul
 modulation of the global idele class group. -/
 theorem exists_ideleClassModulation (F : Type*) [Field F] [NumberField F] :
     ∃ m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ,
-      m.toMonoidHom = ideleClassNorm F ∧ IsModulation m ∧ Surjective m := by sorry
+      m.toMonoidHom = ideleClassNorm F ∧ IsModulation m ∧ Surjective m := by
+  have hproper := isProperMap_ideleClassNorm F
+  let m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, hproper.continuous⟩
+  obtain ⟨_, _, _, _, _, _, _, _, _, hsurj, _⟩ := ideleGroup_quotient.{_, 0} F
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  obtain ⟨g, hg⟩ := hsurj t
+  exact ⟨m, rfl, ⟨hproper, ⟨g, fun h ↦ ht (hg.symm.trans h)⟩⟩, hsurj⟩
 
 /-- Paper: Definition D.2.1.1(1), p. 793. The norm-one subgroup is compact. -/
 theorem IsModulation.isCompact_ker {m : G →ₜ* ℝ≥0ˣ} (hm : IsModulation m) :
@@ -78,10 +91,190 @@ theorem IsModulation.range_eq_zpowers {m : G →ₜ* ℝ≥0ˣ}
       (by simpa only [Subgroup.zpowers_inv] using he.symm)
     exact inv_injective (by simpa using hgen)
 
+omit [SecondCountableTopology G] in
+/-- A surjective proper modulation admits a continuous homomorphic right inverse.
+Extend the real frequency on characters pulled back along the modulation to all characters
+of the group, then use character separation to lift the resulting one-parameter subgroup. -/
+private theorem exists_section_of_surjective {m : G →ₜ* ℝ≥0ˣ}
+    (hm : IsProperMap m) (hs : Surjective m) :
+    ∃ τ : ℝ≥0ˣ →ₜ* G, RightInverse τ m := by
+  classical
+  let logVal (t : ℝ≥0ˣ) : ℝ := Real.log ((t : ℝ≥0) : ℝ)
+  have hpos (t : ℝ≥0ˣ) : 0 < ((t : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  have hlog : Continuous logVal :=
+    (NNReal.continuous_coe.comp Units.continuous_val).log fun t ↦ (hpos t).ne'
+  let freq : Multiplicative ℝ →* PontryaginDual ℝ≥0ˣ :=
+    { toFun := fun a ↦
+        { toFun := fun t ↦ Circle.exp (a.toAdd * logVal t)
+          map_one' := by simp [logVal]
+          map_mul' := fun t u ↦ by
+            change Circle.exp (a.toAdd * Real.log (((t : ℝ≥0) : ℝ) * ((u : ℝ≥0) : ℝ))) = _
+            rw [Real.log_mul (hpos t).ne' (hpos u).ne', mul_add, Circle.exp_add]
+          continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul hlog) }
+      map_one' := PontryaginDual.ext fun t ↦ by change Circle.exp (0 * logVal t) = 1; simp
+      map_mul' := fun a b ↦ PontryaginDual.ext fun t ↦ by
+        change Circle.exp ((a.toAdd + b.toAdd) * logVal t) = _
+        rw [add_mul, Circle.exp_add]
+        rfl }
+  let coe : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  have hfreq (a : Multiplicative ℝ) (t : ℝ≥0ˣ) :
+      (freq a t : ℂ) = (((t : ℝ≥0) : ℝ) : ℂ) ^ ((a.toAdd : ℂ) * Complex.I) := by
+    change (Circle.exp (a.toAdd * logVal t) : ℂ) = _
+    rw [Circle.coe_exp, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (hpos t).ne'),
+      ← Complex.ofReal_log (hpos t).le]
+    congr 1
+    simp only [logVal, Complex.ofReal_mul]
+    ring
+  have hfInj : Injective freq := by
+    intro a b hab
+    obtain ⟨z, hz, hu⟩ := existsUnique_complexPower (coe.comp (freq a))
+    have he : (a.toAdd : ℂ) * Complex.I = (b.toAdd : ℂ) * Complex.I :=
+      (hu _ (hfreq a)).trans (hu _ (hab ▸ hfreq b)).symm
+    exact Complex.ofReal_injective (mul_right_cancel₀ Complex.I_ne_zero he)
+  have hfSurj : Surjective freq := by
+    intro χ
+    obtain ⟨z, ⟨hz, hχ⟩, _⟩ :=
+      existsUnique_unitaryComplexPower (coe.comp χ) (fun t ↦ Circle.norm_coe (χ t))
+    have hz' : (z.im : ℂ) * Complex.I = z := by
+      apply Complex.ext <;> simp [hz]
+    refine ⟨Multiplicative.ofAdd z.im, PontryaginDual.ext fun t ↦ Circle.ext ?_⟩
+    rw [hfreq]
+    change (((t : ℝ≥0) : ℝ) : ℂ) ^ ((z.im : ℂ) * Complex.I) = _
+    rw [hz']
+    exact (hχ t).symm
+  let X := PontryaginDual G
+  let f := PontryaginDual.map m
+  have hf : Injective f := fun a b h ↦
+    PontryaginDual.ext fun t ↦ by
+      obtain ⟨g, rfl⟩ := hs t
+      exact congrArg (fun χ : X ↦ χ g) h
+  let pull := f.toMonoidHom.comp freq
+  let i : ℝ →+ Additive X := AddMonoidHom.toMultiplicativeLeft.symm pull
+  let R := ULift.{_} ℝ
+  let down : R ≃ₗ[ℤ] ℝ := ULift.moduleEquiv
+  let iLift := i.toIntLinearMap.comp down.toLinearMap
+  let : DivisibleBy (R) ℤ := divisibleByOfSMulRightSurj _ ℤ fun {n} hn y ↦ by
+    obtain ⟨x, hx⟩ := DivisibleBy.surjective_smul ℝ ℤ hn (down y)
+    refine ⟨down.symm x, down.injective ?_⟩
+    rw [map_smul, down.apply_symm_apply]
+    exact hx
+  have := (Module.Baer.of_divisible (R)).injective
+  have hiLift : Injective iLift := (hf.comp hfInj).comp down.injective
+  obtain ⟨L, hL⟩ := Module.Injective.out iLift hiLift (LinearMap.id : R →ₗ[ℤ] _)
+  let fretract : X →* Multiplicative ℝ :=
+    AddMonoidHom.toMultiplicativeRight (down.toLinearMap.comp L).toAddMonoidHom
+  let r := freq.comp fretract
+  have hr (χ : PontryaginDual ℝ≥0ˣ) : r (f χ) = χ := by
+    obtain ⟨a, rfl⟩ := hfSurj χ
+    exact congrArg freq (congrArg down (hL (down.symm a.toAdd)))
+      |>.trans (congrArg (fun x : ℝ ↦ freq (Multiplicative.ofAdd x)) (down.apply_symm_apply _))
+
+  -- Properness makes the character evaluation map with first coordinate m a closed embedding.
+  let P := X → Circle
+  let e : G →ₜ* (ℝ≥0ˣ × P) :=
+    m.prod { toFun := fun g χ ↦ χ g
+             map_one' := funext fun χ ↦ map_one χ
+             map_mul' := fun g h ↦ funext fun χ ↦ map_mul χ g h
+             continuous_toFun := continuous_pi fun χ ↦ χ.continuous }
+  have heInj : Injective e := fun _ _ h ↦
+    pontryaginDual_pairing_separates.1 (congrArg Prod.snd h)
+  have heProper : IsProperMap e :=
+    isProperMap_of_comp_of_t2 e.continuous continuous_fst hm
+  have he : Topology.IsClosedEmbedding e :=
+    Topology.IsClosedEmbedding.of_continuous_injective_isClosedMap
+      e.continuous heInj heProper.isClosedMap
+  let H := e.toMonoidHom.range
+  let : IsClosed (H : Set (ℝ≥0ˣ × P)) := he.isClosed_range
+  let q : (ℝ≥0ˣ × P) →ₜ* ((ℝ≥0ˣ × P) ⧸ H) :=
+    ⟨QuotientGroup.mk' H, QuotientGroup.continuous_mk⟩
+  let s : ℝ≥0ˣ →ₜ* (ℝ≥0ˣ × P) :=
+    (ContinuousMonoidHom.id _).prod
+      { toFun := fun t χ ↦ r χ t
+        map_one' := funext fun χ ↦ map_one (r χ)
+        map_mul' := fun t u ↦ funext fun χ ↦ map_mul (r χ) t u
+        continuous_toFun := continuous_pi fun χ ↦ (r χ).continuous }
+
+  -- A character trivial on the embedded group is also trivial on the proposed section.
+  have hmem (t : ℝ≥0ˣ) : s t ∈ H := by
+    apply (QuotientGroup.eq_one_iff (s t)).mp
+    by_contra hne
+    obtain ⟨ψ, hψ⟩ := exists_pontryaginDual_apply_ne_one (show q (s t) ≠ 1 from hne)
+    let ψ₁ := (ψ.comp q).comp (ContinuousMonoidHom.inl ℝ≥0ˣ P)
+    let ψ₂ := (ψ.comp q).comp (ContinuousMonoidHom.inr ℝ≥0ˣ P)
+    have hψProd (a : ℝ≥0ˣ) (p : P) : ψ (q (a, p)) = ψ₁ a * ψ₂ p := by
+      change (ψ.comp q) (a, p) = (ψ.comp q) (a, 1) * (ψ.comp q) (1, p)
+      rw [← map_mul]
+      simp
+    obtain ⟨I, n, hn⟩ := exists_finset_circleCharacter_eq_prod_zpow ψ₂
+    let χ : X := ∏ j ∈ I, j ^ n j
+    have hχ (g : G) : χ g = (ψ₁ (m g))⁻¹ := by
+      have hg : q (e g) = 1 := (QuotientGroup.eq_one_iff (e g)).mpr ⟨g, rfl⟩
+      have hh : ψ (q (e g)) = ψ₁ (m g) * χ g := by
+        change ψ (q (m g, fun j : X ↦ j g)) = _
+        rw [hψProd]
+        congr 1
+        refine (hn _).trans ?_
+        change _ = pontryaginDual_eval g χ
+        simp only [χ, map_prod, map_zpow]
+        rfl
+      rw [hg, map_one] at hh
+      exact eq_inv_of_mul_eq_one_right hh.symm
+    have hχPull : χ = f ψ₁⁻¹ := PontryaginDual.ext fun g ↦ hχ g
+    have hψS : ψ (q (s t)) = ψ₁ t * r χ t := by
+      change ψ (q (t, fun j : X ↦ r j t)) = _
+      rw [hψProd]
+      congr 1
+      refine (hn _).trans ?_
+      change _ = pontryaginDual_eval t (r χ)
+      simp only [χ, map_prod, map_zpow]
+      rfl
+    apply hψ
+    rw [hψS, hχPull, hr]
+    exact mul_inv_cancel _
+  let eRange : G ≃* H := MulEquiv.ofBijective e.toMonoidHom.rangeRestrict
+    ⟨fun _ _ h ↦ heInj (congrArg Subtype.val h), e.toMonoidHom.rangeRestrict_surjective⟩
+  have hInd : Topology.IsInducing eRange :=
+    Topology.IsEmbedding.subtypeVal.isInducing.of_comp_iff.mp he.isInducing
+  let sRange : ℝ≥0ˣ →* H := s.toMonoidHom.codRestrict H hmem
+  refine ⟨⟨eRange.symm.toMonoidHom.comp sRange, hInd.continuous_iff.mpr ?_⟩, fun t ↦ ?_⟩
+  · have hComp : eRange ∘ (eRange.symm.toMonoidHom.comp sRange) = sRange :=
+      funext fun t ↦ eRange.apply_symm_apply (sRange t)
+    change Continuous (eRange ∘ ⇑(eRange.symm.toMonoidHom.comp sRange))
+    rw [hComp]
+    exact s.continuous.subtype_mk _
+  · exact congrArg (fun x : H ↦ x.val.1) (eRange.apply_symm_apply (sRange t))
+
 /-- Paper: Remark D.2.1.2, p. 793. A module has a continuous homomorphic section
 on its image. -/
 theorem IsModulation.exists_section {m : G →ₜ* ℝ≥0ˣ} (hm : IsModulation m) :
-    ∃ τ : m.toMonoidHom.range →ₜ* G, ∀ t, m (τ t) = (t : ℝ≥0ˣ) := by sorry
+    ∃ τ : m.toMonoidHom.range →ₜ* G, ∀ t, m (τ t) = (t : ℝ≥0ˣ) := by
+  by_cases hs : Surjective m
+  · obtain ⟨τ, hτ⟩ := exists_section_of_surjective hm.1 hs
+    exact ⟨τ.comp ⟨m.toMonoidHom.range.subtype, continuous_subtype_val⟩, fun t ↦ hτ t⟩
+  · obtain ⟨a, ⟨ha, hr⟩, _⟩ := hm.range_eq_zpowers hs
+    have : OrderTopology ℝ≥0ˣ := by
+      let e : ℝ≥0ˣ ≃ₜ Set.Ioi (0 : ℝ) := Nonneg.unitsHomeomorphPos ℝ
+      exact ⟨e.isInducing.eq_induced.trans
+        ((show StrictMono e from fun _ _ h ↦ h).induced_topology_eq_preorder
+          (e.surjective.range_eq ▸ Set.ordConnected_univ))⟩
+    let : DiscreteTopology m.toMonoidHom.range := hr ▸ inferInstanceAs
+      (DiscreteTopology (Subgroup.zpowers a))
+    let t : m.toMonoidHom.range := ⟨a, hr.symm ▸ Subgroup.mem_zpowers a⟩
+    obtain ⟨g, hg⟩ := t.property
+    let f := (zpowersHom ℝ≥0ˣ a).codRestrict m.toMonoidHom.range fun n ↦
+      hr.symm ▸ Subgroup.zpow_mem_zpowers a n.toAdd
+    let e : Multiplicative ℤ ≃* m.toMonoidHom.range := MulEquiv.ofBijective f
+      ⟨fun _ _ h ↦ IsMulTorsionFree.zpow_right_injective
+          (ne_of_gt (show (1 : ℝ≥0ˣ) < a from ha)) (congrArg Subtype.val h),
+        fun x ↦ by
+          have hx : (x : ℝ≥0ˣ) ∈ Subgroup.zpowers a := hr ▸ x.property
+          obtain ⟨n, hn⟩ := Subgroup.mem_zpowers_iff.mp hx
+          exact ⟨Multiplicative.ofAdd n, Subtype.ext hn⟩⟩
+    refine ⟨⟨(zpowersHom G g).comp e.symm.toMonoidHom, continuous_of_discreteTopology⟩,
+      fun x ↦ ?_⟩
+    change m (g ^ (e.symm x).toAdd) = (x : ℝ≥0ˣ)
+    rw [map_zpow, show m g = a from hg]
+    exact congrArg Subtype.val (e.apply_symm_apply x)
 
 /-- Paper: Remark D.2.1.2, p. 793. Each section identifies the product of the
 norm-one subgroup and the image of the module with the original group. -/
@@ -124,21 +317,485 @@ end Modulation
 
 section CanonicalHaar
 
+open scoped ENNReal
+
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
   [MeasurableSpace G] [BorelSpace G]
+
+/-- Paper: Definition A.3.2.1, p. 559. The measure `dt/t` is a Haar measure on the
+positive reals: it is the image of Lebesgue measure under the exponential isomorphism. -/
+private theorem positiveRealHaar_isHaarMeasure_aux : positiveRealHaar.IsHaarMeasure := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let μ : Measure (Multiplicative ℝ) := (volume : Measure ℝ)
+  have : μ.IsHaarMeasure := by
+    have : IsFiniteMeasureOnCompacts μ :=
+      inferInstanceAs (IsFiniteMeasureOnCompacts (volume : Measure ℝ))
+    have : Measure.IsOpenPosMeasure μ :=
+      inferInstanceAs (Measure.IsOpenPosMeasure (volume : Measure ℝ))
+    have : μ.IsMulLeftInvariant :=
+      ⟨fun t ↦ (measurePreserving_add_left (volume : Measure ℝ) t.toAdd).map_eq⟩
+    constructor
+  let h := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let e : Multiplicative ℝ ≃ₜ* ℝ≥0ˣ :=
+    { h with
+      map_mul' := fun x y ↦ by
+        apply Units.ext
+        apply NNReal.eq
+        change Real.exp (x.toAdd + y.toAdd) = Real.exp x.toAdd * Real.exp y.toAdd
+        exact Real.exp_add _ _ }
+  have he (x : ℝ) :
+      e (Multiplicative.ofAdd x) = Units.mk0 (Real.exp x).toNNReal (by positivity) := by
+    apply Units.ext
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).symm
+  convert e.isHaarMeasure_map μ using 1
+  unfold positiveRealHaar
+  congr 1
+  funext x
+  exact (he x).symm
+
+/-- Paper: Definition D.2.1.1(2), p. 793. The symmetric interval from `Λ⁻¹` to `Λ` has
+mass exactly `2 log Λ` for `dt/t`. -/
+private theorem positiveRealHaar_symmInterval (Λ : ℝ) (hΛ : 1 ≤ Λ) :
+    positiveRealHaar {t | (t.val : ℝ) ∈ Icc Λ⁻¹ Λ} = ENNReal.ofReal (2 * Real.log Λ) := by
+  have hpos : 0 < Λ := zero_lt_one.trans_le hΛ
+  let e (x : ℝ) := Units.mk0 (Real.exp x).toNNReal (by positivity)
+  have he : Measurable e :=
+    measurable_comap_iff.mpr (continuous_real_toNNReal.comp Real.continuous_exp).measurable
+  have hset : MeasurableSet {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Icc Λ⁻¹ Λ} :=
+    measurableSet_Icc.preimage (NNReal.continuous_coe.measurable.comp MeasurableSpace.le_map_comap)
+  change (volume.map e) _ = _
+  rw [Measure.map_apply he hset]
+  have hpre : e ⁻¹' {t | (t.val : ℝ) ∈ Icc Λ⁻¹ Λ} = Icc (-Real.log Λ) (Real.log Λ) := by
+    ext x
+    change (Λ⁻¹ ≤ ((Real.exp x).toNNReal : ℝ) ∧ ((Real.exp x).toNNReal : ℝ) ≤ Λ) ↔ _
+    rw [Real.coe_toNNReal _ (Real.exp_pos x).le, ← Real.le_log_iff_exp_le hpos,
+      ← Real.log_le_iff_le_exp (inv_pos.mpr hpos), Real.log_inv]
+    rfl
+  rw [hpre, Real.volume_Icc]
+  congr 1
+  ring
+
+omit [T2Space G] in
+/-- Paper: Definition D.2.1.1(2), p. 793. Two Haar measures with mass `2 log Λ + O(1)` on
+the inverse images of the closed intervals from `Λ⁻¹` to `Λ` are equal: they differ by a
+scalar, and the logarithm is unbounded. -/
+private theorem haar_eq_of_logGrowth (m : G →ₜ* ℝ≥0ˣ)
+    (μ μ' : Measure G) [μ.IsHaarMeasure] [μ'.IsHaarMeasure]
+    (h : (fun Λ : ℝ ↦ (μ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}).toReal - 2 * Real.log Λ)
+        =O[atTop] (fun _ ↦ (1 : ℝ)))
+    (h' : (fun Λ : ℝ ↦ (μ' {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}).toReal - 2 * Real.log Λ)
+        =O[atTop] (fun _ ↦ (1 : ℝ))) : μ' = μ := by
+  obtain ⟨c, hc⟩ : ∃ c : ℝ≥0, μ' = c • μ := ⟨_, Measure.isMulLeftInvariant_eq_smul μ' μ⟩
+  subst hc
+  have key : (fun Λ : ℝ ↦ (1 - (c : ℝ)) * (2 * Real.log Λ)) =O[atTop] (fun _ ↦ (1 : ℝ)) := by
+    refine ((h.const_mul_left (c : ℝ)).sub h').congr_left fun Λ ↦ ?_
+    rw [Measure.coe_nnreal_smul_apply, ENNReal.toReal_mul, ENNReal.coe_toReal]
+    ring
+  by_cases hc1 : (c : ℝ) = 1
+  · have : c = 1 := by exact_mod_cast hc1
+    rw [this, one_smul]
+  · exfalso
+    obtain ⟨C, hC⟩ := key.bound
+    have hpos : 0 < |1 - (c : ℝ)| := abs_pos.mpr (sub_ne_zero.mpr (Ne.symm hc1))
+    have hlog := Real.tendsto_log_atTop.eventually_gt_atTop (C / (2 * |1 - (c : ℝ)|))
+    obtain ⟨Λ, hΛ1, hΛ2⟩ := (hC.and hlog).exists
+    rw [Real.norm_eq_abs, abs_mul, norm_one, mul_one] at hΛ1
+    rw [div_lt_iff₀ (by positivity)] at hΛ2
+    have h2 := mul_le_mul_of_nonneg_left (le_abs_self (2 * Real.log Λ)) hpos.le
+    linarith
+
+omit [T2Space G] [SecondCountableTopology G] in
+/-- Paper: Definition D.2.1.1(2), p. 793. For a surjective module, the Haar measure whose
+image under the module is `dt/t` has mass exactly `2 log Λ` on the inverse image of the
+closed interval from `Λ⁻¹` to `Λ`. -/
+private theorem exists_haar_symmInterval_of_surjective (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m)
+    (hs : Surjective m) :
+    ∃ μ : Measure G, μ.IsHaarMeasure ∧ ∀ Λ : ℝ, 1 ≤ Λ →
+      μ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ} = ENNReal.ofReal (2 * Real.log Λ) := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure_aux
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let logHomeo := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.toHomeomorph.symm
+  have : LocallyCompactSpace ℝ≥0ˣ := logHomeo.isOpenEmbedding.locallyCompactSpace
+  let μ₀ : Measure G := Measure.haar
+  have hν : (μ₀.map m).IsHaarMeasure :=
+    Measure.isHaarMeasure_map μ₀ m.toMonoidHom m.continuous hs
+      (isProperMap_iff_tendsto_cocompact.mp hm.1).2
+  obtain ⟨c, hc0, hc⟩ : ∃ c : ℝ≥0, 0 < c ∧ μ₀.map m = c • positiveRealHaar :=
+    ⟨_, Measure.haarScalarFactor_pos_of_isHaarMeasure _ _,
+      Measure.isMulLeftInvariant_eq_smul (μ₀.map m) positiveRealHaar⟩
+  have hc' : (c : ENNReal) ≠ 0 := by exact_mod_cast hc0.ne'
+  refine ⟨(c : ENNReal)⁻¹ • μ₀, Measure.IsHaarMeasure.smul μ₀ (by simp) (by simpa using hc0.ne'),
+    fun Λ hΛ ↦ ?_⟩
+  have hI : MeasurableSet {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Icc Λ⁻¹ Λ} :=
+    (isClosed_Icc.preimage (by fun_prop)).measurableSet
+  have h1 : μ₀ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ} =
+      (c : ENNReal) * ENNReal.ofReal (2 * Real.log Λ) := by
+    rw [← positiveRealHaar_symmInterval Λ hΛ, ← Measure.coe_nnreal_smul_apply, ← hc,
+      Measure.map_apply (map_continuous m).measurable hI]
+    rfl
+  rw [smul_apply, h1, smul_eq_mul, ← mul_assoc, ENNReal.inv_mul_cancel hc' (by simp),
+    one_mul]
+
+/-- Paper: Definition D.2.1.1(2), p. 793. For a module with image generated by `a > 1`,
+the Haar measure giving the norm-one subgroup mass `log a` has mass `2 log Λ + O(1)` on
+the inverse image of the closed interval from `Λ⁻¹` to `Λ`. -/
+private theorem exists_haar_logGrowth_of_not_surjective (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m)
+    (hns : ¬ Surjective m) :
+    ∃ μ : Measure G, μ.IsHaarMeasure ∧
+      (fun Λ : ℝ ↦ (μ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}).toReal - 2 * Real.log Λ)
+        =O[atTop] (fun _ ↦ (1 : ℝ)) := by
+  obtain ⟨t₀, ⟨ht₀, hrange⟩, -⟩ := hm.range_eq_zpowers hns
+  set a : ℝ := (t₀.val : ℝ) with ha
+  have ha0 : 0 < a := zero_lt_one.trans ht₀
+  have hloga : 0 < Real.log a := Real.log_pos ht₀
+  let φ : G → ℝ := fun g ↦ ((m g).val : ℝ)
+  have hφc : Continuous φ := by fun_prop
+  have hφmul (g h : G) : φ (g * h) = φ g * φ h := by simp [φ]
+  have hφrange (g : G) : ∃ n : ℤ, φ g = a ^ n := by
+    have hg : m g ∈ m.toMonoidHom.range := ⟨g, rfl⟩
+    rw [hrange] at hg
+    obtain ⟨n, hn⟩ := Subgroup.mem_zpowers_iff.mp hg
+    exact ⟨n, by simp [φ, ← hn, ha]⟩
+  obtain ⟨g₀, hg₀⟩ : ∃ g₀, m g₀ = t₀ := by
+    have ht : t₀ ∈ m.toMonoidHom.range := hrange ▸ Subgroup.mem_zpowers t₀
+    exact ht
+  have hφg₀ (n : ℤ) : φ (g₀ ^ n) = a ^ n := by simp [φ, hg₀, ha]
+  let F : ℤ → Set G := fun n ↦ {g | φ g = a ^ n}
+  have hFmeas (n : ℤ) : MeasurableSet (F n) :=
+    (isClosed_singleton.preimage hφc).measurableSet
+  have hFdisj : Pairwise (Disjoint on F) := by
+    intro n k hnk
+    refine Set.disjoint_left.mpr fun g hgn hgk ↦ hnk ?_
+    exact zpow_right_injective₀ ha0 ht₀.ne' (hgn.symm.trans hgk)
+  let μ₀ : Measure G := Measure.haar
+  have hFμ (n : ℤ) : μ₀ (F n) = μ₀ (F 0) := by
+    have hpre : F n = (fun g ↦ g₀ ^ (-n) * g) ⁻¹' F 0 := by
+      ext g
+      change φ g = a ^ n ↔ φ (g₀ ^ (-n) * g) = a ^ (0 : ℤ)
+      rw [hφmul, hφg₀, zpow_neg, zpow_zero, inv_mul_eq_one₀ (zpow_pos ha0 n).ne', eq_comm]
+    rw [hpre, measure_preimage_mul]
+  have hF0 : F 0 = (m.toMonoidHom.ker : Set G) := by
+    ext g
+    change ((m g).val : ℝ) = a ^ (0 : ℤ) ↔ m g = 1
+    simp
+  have hF0open : IsOpen (F 0) := by
+    have hEq : F 0 = φ ⁻¹' Ioo a⁻¹ a := by
+      ext g
+      obtain ⟨n, hn⟩ := hφrange g
+      change φ g = a ^ (0 : ℤ) ↔ φ g ∈ Ioo a⁻¹ a
+      rw [hn, mem_Ioo]
+      constructor
+      · intro h0
+        have : n = 0 := zpow_right_injective₀ ha0 ht₀.ne' h0
+        subst this
+        rw [zpow_zero]
+        exact ⟨inv_lt_one_of_one_lt₀ ht₀, ht₀⟩
+      · rintro ⟨h1, h2⟩
+        have h1' : a ^ (-1 : ℤ) < a ^ n := by simpa using h1
+        have h2' : a ^ n < a ^ (1 : ℤ) := by simpa using h2
+        rw [zpow_lt_zpow_iff_right₀ ht₀] at h1' h2'
+        have : n = 0 := by omega
+        rw [this]
+    rw [hEq]
+    exact isOpen_Ioo.preimage hφc
+  have hc0 : μ₀ (F 0) ≠ 0 :=
+    (hF0open.measure_pos μ₀ ⟨1, by change φ 1 = a ^ (0 : ℤ); simp [φ]⟩).ne'
+  have hctop : μ₀ (F 0) ≠ ⊤ := by
+    rw [hF0]
+    exact hm.isCompact_ker.measure_lt_top.ne
+  set c := μ₀ (F 0) with hc
+  have hcr : c.toReal ≠ 0 := (ENNReal.toReal_pos hc0 hctop).ne'
+  have hS (Λ : ℝ) (hΛ : 1 ≤ Λ) :
+      (μ₀ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}).toReal =
+        (2 * (⌊Real.log Λ / Real.log a⌋ : ℝ) + 1) * c.toReal := by
+    have hΛ0 : 0 < Λ := zero_lt_one.trans_le hΛ
+    set N : ℤ := ⌊Real.log Λ / Real.log a⌋ with hN
+    have hN0 : 0 ≤ N := Int.floor_nonneg.mpr (div_nonneg (Real.log_nonneg hΛ) hloga.le)
+    have hP (n : ℤ) : a ^ n ≤ Λ ↔ n ≤ N := by
+      rw [hN, Int.le_floor, le_div_iff₀ hloga, ← Real.log_zpow,
+        Real.log_le_log_iff (zpow_pos ha0 n) hΛ0]
+    have hQ (n : ℤ) : Λ⁻¹ ≤ a ^ n ↔ -N ≤ n := by
+      rw [inv_le_comm₀ hΛ0 (zpow_pos ha0 n), ← zpow_neg, hP]
+      omega
+    have hSeq : {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ} = ⋃ n ∈ Finset.Icc (-N) N, F n := by
+      ext g
+      obtain ⟨n, hn⟩ := hφrange g
+      simp only [mem_iUnion, Finset.mem_Icc, exists_prop]
+      change (Λ⁻¹ ≤ φ g ∧ φ g ≤ Λ) ↔ ∃ k, (-N ≤ k ∧ k ≤ N) ∧ φ g = a ^ k
+      constructor
+      · rintro ⟨h1, h2⟩
+        rw [hn] at h1 h2
+        exact ⟨n, ⟨(hQ n).mp h1, (hP n).mp h2⟩, hn⟩
+      · rintro ⟨k, ⟨hk1, hk2⟩, hk⟩
+        rw [hk]
+        exact ⟨(hQ k).mpr hk1, (hP k).mpr hk2⟩
+    rw [hSeq, measure_biUnion_finset (fun n _ k _ hnk ↦ hFdisj hnk) (fun n _ ↦ hFmeas n)]
+    simp only [hFμ, Finset.sum_const, Int.card_Icc, nsmul_eq_mul, ENNReal.toReal_mul,
+      ENNReal.toReal_natCast]
+    have hcard : (((N + 1 - -N).toNat : ℕ) : ℝ) = 2 * (N : ℝ) + 1 := by
+      have : (((N + 1 - -N).toNat : ℕ) : ℤ) = 2 * N + 1 := by omega
+      exact_mod_cast this
+    rw [hcard]
+  refine ⟨(ENNReal.ofReal (Real.log a) * c⁻¹) • μ₀, Measure.IsHaarMeasure.smul μ₀ ?_ ?_, ?_⟩
+  · exact mul_ne_zero (by simpa using hloga) (ENNReal.inv_ne_zero.mpr hctop)
+  · exact ENNReal.mul_ne_top ENNReal.ofReal_ne_top (ENNReal.inv_ne_top.mpr hc0)
+  · refine Asymptotics.IsBigO.of_bound (Real.log a) ?_
+    filter_upwards [eventually_ge_atTop (1 : ℝ)] with Λ hΛ
+    rw [smul_apply, smul_eq_mul, ENNReal.toReal_mul, hS Λ hΛ, ENNReal.toReal_mul,
+      ENNReal.toReal_ofReal hloga.le, ENNReal.toReal_inv, norm_one, mul_one, Real.norm_eq_abs]
+    have h1 := Int.floor_le (Real.log Λ / Real.log a)
+    have h2 := Int.lt_floor_add_one (Real.log Λ / Real.log a)
+    rw [le_div_iff₀ hloga] at h1
+    rw [div_lt_iff₀ hloga] at h2
+    have hsimp : Real.log a * c.toReal⁻¹ *
+        ((2 * (⌊Real.log Λ / Real.log a⌋ : ℝ) + 1) * c.toReal) =
+        Real.log a * (2 * (⌊Real.log Λ / Real.log a⌋ : ℝ) + 1) := by
+      field_simp
+    rw [hsimp, abs_le]
+    constructor <;> nlinarith
+
+omit [T2Space G] [SecondCountableTopology G] in
+/-- Paper: Definition D.2.1.1(2), p. 793. A Haar measure normalized on a half-open
+logarithmic band has the required growth on symmetric modulation intervals. -/
+private theorem exists_canonicalModulatedHaar (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) :
+    ∃ μ : Measure G, μ.IsHaarMeasure ∧
+      (fun Λ : ℝ ↦ (μ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}).toReal - 2 * Real.log Λ)
+        =O[atTop] (fun _ ↦ (1 : ℝ)) := by
+  let f (g : G) := Real.log ((m g).val : ℝ)
+  have hpos (g : G) : 0 < ((m g).val : ℝ) :=
+    NNReal.coe_pos.mpr (pos_of_ne_zero (m g).ne_zero)
+  have hmul (g h : G) : f (g * h) = f g + f h := by
+    simp only [f, map_mul, Units.val_mul, NNReal.coe_mul]
+    exact Real.log_mul (hpos g).ne' (hpos h).ne'
+  have hone : f 1 = 0 := by simp [f]
+  have hproper : IsProperMap f := by
+    let e : ℝ≥0ˣ ≃ₜ ℝ :=
+      (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+    have he : (e ∘ m) = f := funext fun g ↦ (Real.log_of_pos (hpos g)).symm
+    exact he ▸ e.isProperMap.comp hm.1
+  obtain ⟨u, hu⟩ : ∃ u : G, 0 < f u := by
+    obtain ⟨g, hg⟩ := hm.2
+    have hn : f g ≠ 0 := by
+      intro hz
+      apply hg
+      apply Units.ext
+      apply NNReal.eq
+      change ((m g).val : ℝ) = 1
+      calc
+        ((m g).val : ℝ) = Real.exp (f g) := (Real.exp_log (hpos g)).symm
+        _ = 1 := by rw [hz, Real.exp_zero]
+    rcases hn.lt_or_gt with h | h
+    · refine ⟨g⁻¹, ?_⟩
+      have hsum := hmul g⁻¹ g
+      rw [inv_mul_cancel, hone] at hsum
+      linarith
+    · exact ⟨g, h⟩
+  let a := f u
+  have ha : 0 < a := hu
+  have hpow (k : ℤ) : f (u ^ k) = (k : ℝ) * a := by
+    simp [f, a, map_zpow, Units.val_zpow_eq_zpow_val, NNReal.coe_zpow, Real.log_zpow]
+  let band (b c : ℝ) := f ⁻¹' Ico b c
+  have hfinite (μ : Measure G) [μ.IsHaarMeasure] (b c : ℝ) :
+      μ (f ⁻¹' Icc b c) ≠ ∞ :=
+    (hproper.isCompact_preimage isCompact_Icc).measure_lt_top.ne
+  have hbandFinite (μ : Measure G) [μ.IsHaarMeasure] (b c : ℝ) : μ (band b c) ≠ ∞ :=
+    ne_top_of_le_ne_top (hfinite μ b c) (measure_mono (preimage_mono Ico_subset_Icc_self))
+  have hadd (μ : Measure G) [μ.IsHaarMeasure] {b c d : ℝ} (hbc : b ≤ c) (hcd : c ≤ d) :
+      μ.real (band b d) = μ.real (band b c) + μ.real (band c d) := by
+    have hdisj : Disjoint (Ico b c) (Ico c d) :=
+      disjoint_left.mpr fun _ hx hy ↦ (hx.2.not_ge hy.1)
+    have hmeas : MeasurableSet (band c d) :=
+      measurableSet_Ico.preimage hproper.continuous.measurable
+    rw [← measureReal_union (hdisj.preimage f) hmeas (hbandFinite μ b c) (hbandFinite μ c d)]
+    simp only [band, ← preimage_union, Ico_union_Ico_eq_Ico hbc hcd]
+  -- Powers of u translate the first band to each successive band.
+  have htile (μ : Measure G) [μ.IsHaarMeasure] (k : ℤ) :
+      μ.real (band ((k : ℝ) * a) ((k : ℝ) * a + a)) = μ.real (band 0 a) := by
+    have hpre : (fun g : G ↦ u ^ k * g) ⁻¹' band ((k : ℝ) * a) ((k : ℝ) * a + a) =
+        band 0 a := by
+      ext g
+      change ((k : ℝ) * a ≤ f (u ^ k * g) ∧ f (u ^ k * g) < (k : ℝ) * a + a) ↔
+        (0 ≤ f g ∧ f g < a)
+      rw [hmul, hpow]
+      constructor <;> rintro ⟨h₁, h₂⟩ <;> exact ⟨by linarith, by linarith⟩
+    simpa only [hpre, measureReal_def] using
+      (congrArg ENNReal.toReal (measure_preimage_mul μ (u ^ k)
+        (band ((k : ℝ) * a) ((k : ℝ) * a + a)))).symm
+  have hcount (μ : Measure G) [μ.IsHaarMeasure] (k : ℤ) (n : ℕ) :
+      μ.real (band ((k : ℝ) * a) (((k : ℝ) + n) * a)) = n * μ.real (band 0 a) := by
+    induction n with
+    | zero => simp [band]
+    | succ n ih =>
+      have hleft : (k : ℝ) * a ≤ ((k : ℝ) + n) * a :=
+        mul_le_mul_of_nonneg_right (le_add_of_nonneg_right (Nat.cast_nonneg n)) ha.le
+      have hright : ((k : ℝ) + n) * a ≤ ((k : ℝ) + (n + 1)) * a := by
+        gcongr
+        exact le_add_of_nonneg_right zero_le_one
+      rw [Nat.cast_succ, hadd μ hleft hright, ih]
+      have hlast := htile μ (k + (n : ℤ))
+      push_cast at hlast
+      rw [← add_assoc (k : ℝ) n 1, add_mul ((k : ℝ) + n) 1 a, one_mul, hlast]
+      ring
+  have hcenter (μ : Measure G) [μ.IsHaarMeasure] (n : ℕ) :
+      μ.real (band (-(n * a)) (n * a)) = 2 * n * μ.real (band 0 a) := by
+    have h := hcount μ (-(n : ℤ)) (n + n)
+    push_cast at h
+    rw [neg_mul, neg_add_cancel_left] at h
+    rw [h]
+    ring
+  -- The open band around the identity gives the first band positive mass.
+  let ν : Measure G := Measure.haar
+  have hν : ν.IsHaarMeasure := by dsimp [ν]; infer_instance
+  have hνpos : 0 < ν.real (band 0 a) := by
+    have hOpen : IsOpen (f ⁻¹' Ioo (-a) a) := isOpen_Ioo.preimage hproper.continuous
+    have hne : (f ⁻¹' Ioo (-a) a).Nonempty := ⟨1, by
+      change -a < f 1 ∧ f 1 < a
+      rw [hone]
+      exact ⟨neg_lt_zero.mpr ha, ha⟩⟩
+    have hsub : f ⁻¹' Ioo (-a) a ⊆ band (-a) a := preimage_mono Ioo_subset_Ico_self
+    have hfin := hbandFinite ν (-a) a
+    have hmass : 0 < ν.real (band (-a) a) :=
+      ENNReal.toReal_pos (mt (measure_mono_null hsub) (hOpen.measure_pos ν hne).ne') hfin
+    have h₁ := hcenter ν 1
+    simp only [Nat.cast_one, one_mul, mul_one] at h₁
+    linarith
+  let c := ENNReal.ofReal (a / ν.real (band 0 a))
+  let μ := c • ν
+  have hc : 0 < a / ν.real (band 0 a) := div_pos ha hνpos
+  have hμ : μ.IsHaarMeasure :=
+    Measure.IsHaarMeasure.smul ν (ENNReal.ofReal_pos.mpr hc).ne' ENNReal.ofReal_ne_top
+  have hnorm : μ.real (band 0 a) = a := by
+    change (c • ν).real (band 0 a) = a
+    rw [measureReal_ennreal_smul_apply, ENNReal.toReal_ofReal hc.le,
+      div_mul_cancel₀ _ hνpos.ne']
+  refine ⟨μ, hμ, Asymptotics.isBigO_iff.mpr ⟨2 * a, ?_⟩⟩
+  filter_upwards [eventually_ge_atTop (1 : ℝ)] with Λ hΛ
+  have hΛpos : 0 < Λ := zero_lt_one.trans_le hΛ
+  have hwindow : {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ} = f ⁻¹' Icc (-Real.log Λ) (Real.log Λ) := by
+    ext g
+    change (Λ⁻¹ ≤ ((m g).val : ℝ) ∧ ((m g).val : ℝ) ≤ Λ) ↔
+      (-Real.log Λ ≤ f g ∧ f g ≤ Real.log Λ)
+    dsimp [f]
+    rw [← Real.log_inv, Real.log_le_log_iff (inv_pos.mpr hΛpos) (hpos g),
+      Real.log_le_log_iff (hpos g) hΛpos]
+  -- Enclose the closed window between half-open bands at successive integer radii.
+  let n := ⌊Real.log Λ / a⌋₊
+  have hlo : (n : ℝ) * a ≤ Real.log Λ :=
+    (le_div_iff₀ ha).mp (Nat.floor_le (div_nonneg (Real.log_nonneg hΛ) ha.le))
+  have hhi : Real.log Λ < ((n : ℝ) + 1) * a :=
+    (div_lt_iff₀ ha).mp (Nat.lt_floor_add_one _)
+  have hlow : band (-(n * a)) (n * a) ⊆ f ⁻¹' Icc (-Real.log Λ) (Real.log Λ) := by
+    apply preimage_mono
+    intro x hx
+    exact ⟨(neg_le_neg hlo).trans hx.1, hx.2.le.trans hlo⟩
+  have hupp : f ⁻¹' Icc (-Real.log Λ) (Real.log Λ) ⊆
+      band (-(((n : ℝ) + 1) * a)) (((n : ℝ) + 1) * a) := by
+    apply preimage_mono
+    intro x hx
+    exact ⟨(neg_le_neg hhi.le).trans hx.1, hx.2.trans_lt hhi⟩
+  have h₁ := measureReal_mono (μ := μ) hlow (hfinite μ _ _)
+  have h₂ := measureReal_mono (μ := μ) hupp (hbandFinite μ _ _)
+  rw [hcenter μ n, hnorm] at h₁
+  rw [← Nat.cast_succ, hcenter μ (n + 1), hnorm, Nat.cast_succ] at h₂
+  rw [hwindow, ← measureReal_def, Real.norm_eq_abs, norm_one, mul_one, abs_le]
+  constructor <;> linarith
 
 /-- Paper: Definition D.2.1.1(2), p. 793. Exactly one Haar measure has mass
 `2 log Λ + O(1)` on the inverse image of the closed interval from `Λ⁻¹` to `Λ`. -/
 theorem existsUnique_canonicalModulatedHaar (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) :
     ∃! μ : Measure G, μ.IsHaarMeasure ∧
       (fun Λ : ℝ ↦ (μ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}).toReal - 2 * Real.log Λ)
-        =O[atTop] (fun _ ↦ (1 : ℝ)) := by sorry
+        =O[atTop] (fun _ ↦ (1 : ℝ)) := by
+  obtain ⟨μ, hμ, hgrowth⟩ := exists_canonicalModulatedHaar m hm
+  refine ⟨μ, ⟨hμ, hgrowth⟩, ?_⟩
+  rintro ν ⟨hν, hgrowth'⟩
+  let c := ν.haarScalarFactor μ
+  have hscale : ν = c • μ := Measure.isMulLeftInvariant_eq_smul ν μ
+  suffices hc : c = 1 by simpa [hc] using hscale
+  by_contra hne
+  have hdiff : (fun Λ : ℝ ↦ (2 * ((c : ℝ) - 1)) * Real.log Λ)
+      =O[atTop] (fun _ ↦ (1 : ℝ)) := by
+    apply (hgrowth'.sub (hgrowth.const_mul_left (c : ℝ))).congr_left
+    intro Λ
+    simp only [← measureReal_def, hscale, measureReal_nnreal_smul_apply]
+    ring
+  have hcoef : 2 * ((c : ℝ) - 1) ≠ 0 :=
+    mul_ne_zero two_ne_zero (sub_ne_zero.mpr (by exact_mod_cast hne))
+  exact Real.isLittleO_const_log_atTop.not_isBigO (Frequently.of_forall fun _ ↦ one_ne_zero)
+    ((Asymptotics.isBigO_const_mul_left_iff hcoef).mp hdiff)
 
 /-- Paper: Definition D.2.1.1(2), p. 793. The canonical Haar measure is selected
 by the logarithmic growth condition on symmetric module intervals. -/
 def canonicalModulatedHaar (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) : Measure G :=
   Classical.choose (existsUnique_canonicalModulatedHaar m hm).exists
+
+omit [MeasurableSpace G] [BorelSpace G] in
+/-- Paper: Remark D.2.1.3, p. 793. A section of a surjective module identifies the
+product of the norm-one subgroup and the positive reals with the group. -/
+private theorem IsModulation.exists_sectionEquiv {m : G →ₜ* ℝ≥0ˣ} (hm : IsModulation m)
+    (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m) :
+    ∃ j : (m.toMonoidHom.ker × ℝ≥0ˣ) ≃ₜ* G, ∀ p, j p = (p.1 : G) * τ p.2 := by
+  let r : ℝ≥0ˣ ≃ₜ m.toMonoidHom.range :=
+    { toFun := fun t ↦ ⟨t, τ t, hτ t⟩
+      invFun := Subtype.val
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl
+      continuous_toFun := continuous_id.subtype_mk _
+      continuous_invFun := continuous_subtype_val }
+  let h : (m.toMonoidHom.ker × ℝ≥0ˣ) ≃ₜ* (m.toMonoidHom.ker × m.toMonoidHom.range) :=
+    { (Homeomorph.refl m.toMonoidHom.ker).prodCongr r with
+      map_mul' := fun a b ↦ Prod.ext rfl rfl }
+  let i : m.toMonoidHom.range →ₜ* ℝ≥0ˣ := ⟨m.toMonoidHom.range.subtype, continuous_subtype_val⟩
+  let τr := τ.comp i
+  obtain ⟨e, he⟩ := hm.exists_prod_equiv τr (fun t ↦ hτ t)
+  exact ⟨h.trans e, fun p ↦ he p.1 (r p.2)⟩
+
+/-- Paper: Remark D.2.1.3, p. 793. The pushforward of a Haar measure on the kernel
+times `dt/t` along the product decomposition of a section is a Haar measure. -/
+private theorem IsModulation.isHaarMeasure_map_prod {m : G →ₜ* ℝ≥0ˣ} (hm : IsModulation m)
+    (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure] :
+    ((μ₁.prod positiveRealHaar).map
+        (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2)).IsHaarMeasure := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure_aux
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  obtain ⟨j, hj⟩ := hm.exists_sectionEquiv τ hτ
+  have hfun : (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = j :=
+    funext fun p ↦ (hj p).symm
+  rw [hfun]
+  exact j.isHaarMeasure_map (μ₁.prod positiveRealHaar)
+
+omit [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G] in
+/-- Paper: Remark D.2.1.3, p. 793. The pushforward of probability Haar measure on the
+kernel times `dt/t` gives mass exactly `2 log Λ` to the inverse image of the closed
+interval from `Λ⁻¹` to `Λ`. -/
+private theorem map_prod_symmInterval (m : G →ₜ* ℝ≥0ˣ)
+    (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure] (hμ₁ : μ₁ univ = 1)
+    (Λ : ℝ) (hΛ : 1 ≤ Λ) :
+    (μ₁.prod positiveRealHaar).map
+        (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2)
+        {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ} = ENNReal.ofReal (2 * Real.log Λ) := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure_aux
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have hf : Measurable (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) :=
+    Continuous.measurable (by fun_prop)
+  have hS : MeasurableSet {g : G | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ} :=
+    (isClosed_Icc.preimage (by fun_prop)).measurableSet
+  rw [Measure.map_apply hf hS]
+  have hpre : (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) ⁻¹'
+      {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ} = univ ×ˢ {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Icc Λ⁻¹ Λ} := by
+    ext ⟨k, t⟩
+    have hk : m (k : G) = 1 := k.property
+    change ((m ((k : G) * τ t)).val : ℝ) ∈ Icc Λ⁻¹ Λ ↔ _
+    rw [map_mul, hk, one_mul, hτ t]
+    simp
+  rw [hpre, Measure.prod_prod, hμ₁, one_mul, positiveRealHaar_symmInterval Λ hΛ]
 
 /-- Paper: Remark D.2.1.3, p. 793. Under a section of a surjective module,
 the canonical measure is the pushforward of probability Haar measure on the
@@ -148,7 +805,14 @@ theorem canonicalModulatedHaar_eq_map_prod (m : G →ₜ* ℝ≥0ˣ) (hm : IsMod
     (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure] (hμ₁ : μ₁ univ = 1) :
     canonicalModulatedHaar m hm =
       (μ₁.prod positiveRealHaar).map
-        (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) := by sorry
+        (fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) := by
+  refine (existsUnique_canonicalModulatedHaar m hm).unique
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists)
+    ⟨hm.isHaarMeasure_map_prod τ hτ μ₁, ?_⟩
+  refine (Asymptotics.isBigO_zero _ _).congr' ?_ EventuallyEq.rfl
+  filter_upwards [eventually_ge_atTop (1 : ℝ)] with Λ hΛ
+  rw [map_prod_symmInterval m τ hτ μ₁ hμ₁ Λ hΛ,
+    ENNReal.toReal_ofReal (mul_nonneg zero_le_two (Real.log_nonneg hΛ)), sub_self]
 
 end CanonicalHaar
 

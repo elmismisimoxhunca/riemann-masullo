@@ -472,7 +472,18 @@ theorem regulator_closed : IsClosed (Set.range (Units.logEmbedding F)) := by
 /-- Paper: Lemma A.2.3.4(1), p. 548. The quotient of the hyperplane by the regulator
 image is compact. -/
 theorem regulator_cocompact : CompactSpace (logSpace F ⧸ (Units.logEmbedding F).range) := by
-  sorry
+  let q := QuotientAddGroup.mk' (Units.logEmbedding F).range
+  have hq : IsCompact (Set.range q) := by
+    refine IsZLattice.isCompact_range_of_periodic (Units.unitLattice F) q
+      QuotientAddGroup.continuous_mk ?_
+    intro z w hw
+    have hw' : w ∈ (Units.logEmbedding F).range := by
+      simpa only [Units.unitLattice, Submodule.map_top, LinearMap.mem_range,
+        AddMonoidHom.mem_range, AddMonoidHom.coe_toIntLinearMap] using hw
+    have hqw : q w = 0 := (QuotientAddGroup.eq_zero_iff w).mpr hw'
+    rw [map_add, hqw, add_zero]
+  rw [(QuotientAddGroup.mk'_surjective _).range_eq] at hq
+  exact ⟨hq⟩
 
 /-- Paper: Lemma A.2.3.4(2), p. 548. The regulator kernel is exactly the torsion subgroup. -/
 theorem regulator_kernel : (Units.logEmbedding F).ker = (Units.torsion F).toAddSubgroup :=
@@ -507,7 +518,19 @@ real coordinates in the logarithms of the chosen basis of units modulo torsion. 
 theorem regulator_coordinates_unique (g : N∞) :
     ∃! t : Fin (Units.rank F) → ℝ, ∀ w : {w : InfinitePlace F // w ≠ w₀},
       infiniteIdeleLog F g.val w.val = ∑ i, t i * Units.logEmbeddingQuot F (b i) w := by
-  sorry
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  have hB (j : Fin (Units.rank F)) : Units.logEmbeddingQuot F (b j) = B j := by
+    rw [Module.Basis.ofZLatticeBasis_apply]
+    rfl
+  let v : logSpace F := fun w ↦ infiniteIdeleLog F g.val w.val
+  have hsum (t : Fin (Units.rank F) → ℝ) (w : {w : InfinitePlace F // w ≠ w₀}) :
+      (∑ i, t i • B i) w = ∑ i, t i * Units.logEmbeddingQuot F (b i) w := by
+    simp [Finset.sum_apply, hB]
+  refine ⟨fun i ↦ B.repr v i, fun w ↦ ?_, fun t ht ↦ ?_⟩
+  · rw [← hsum, B.sum_repr v]
+  · have hv : v = ∑ i, t i • B i := funext fun w ↦ (ht w).trans (hsum t w).symm
+    funext i
+    rw [hv, B.repr_sum_self]
 
 /-- Paper: Equation (A.2.3.9), p. 549. The regulator parallelotope is the half-open
 fundamental parallelepiped of the image of the chosen basis of units modulo torsion. -/
@@ -518,7 +541,20 @@ def regulatorParallelotope : Set (logSpace F) :=
 multiple belongs to the regulator parallelotope exactly for coefficients in [0,1). -/
 theorem regulatorParallelotope_basis_line (i : Fin (Units.rank F)) (t : ℝ) :
     t • Units.logEmbeddingQuot F (b i) ∈ regulatorParallelotope F b ↔ t ∈ Set.Ico 0 1 := by
-  sorry
+  have hB : ((b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)) i =
+      Units.logEmbeddingQuot F (b i) := by
+    rw [Module.Basis.ofZLatticeBasis_apply]
+    rfl
+  rw [regulatorParallelotope, ZSpan.mem_fundamentalDomain, ← hB]
+  simp only [map_smul, Module.Basis.repr_self, Finsupp.smul_single, smul_eq_mul, mul_one]
+  constructor
+  · intro h
+    simpa using h i
+  · intro ht j
+    rw [Finsupp.single_apply]
+    split_ifs
+    · exact ht
+    · simp
 
 -- TODO(paper-gap): Lemma A.2.3.5 calls F a hyperplane. Equations (A.2.3.5) and (A.2.3.9)
 -- define the hyperplane and parallelotope for the number field F.
@@ -527,21 +563,62 @@ theorem regulatorParallelotope_basis_line (i : Fin (Units.rank F)) (t : ℝ) :
 logarithmic hyperplane is compact.
 Deviation: We take F to be the number field of (A.2.3.5). -/
 theorem regulatorParallelotope_precompact : IsCompact (closure (regulatorParallelotope F b)) := by
-  sorry
+  rw [regulatorParallelotope]
+  exact (ZSpan.fundamentalDomain_isBounded _).isCompact_closure
 
 /-- Paper: Lemma A.2.3.5(1), p. 549. The parallelotope has nonempty relative interior. -/
 theorem regulatorParallelotope_interior : (interior (regulatorParallelotope F b)).Nonempty := by
-  sorry
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  let U : Set (Fin (Units.rank F) → ℝ) := Set.pi Set.univ fun _ ↦ Set.Ioo 0 1
+  have hOpen : IsOpen (B.equivFun ⁻¹' U) :=
+    (isOpen_set_pi Set.finite_univ fun _ _ ↦ isOpen_Ioo).preimage
+      B.equivFun.toLinearMap.continuous_of_finiteDimensional
+  have hSubset : B.equivFun ⁻¹' U ⊆ regulatorParallelotope F b := by
+    intro x hx
+    change x ∈ ZSpan.fundamentalDomain B
+    rw [ZSpan.mem_fundamentalDomain, ← Module.Basis.equivFun_apply]
+    exact fun i ↦ Set.Ioo_subset_Ico_self (hx i (Set.mem_univ i))
+  refine ⟨B.equivFun.symm (fun _ ↦ 1 / 2), interior_maximal hSubset hOpen ?_⟩
+  change B.equivFun (B.equivFun.symm (fun _ ↦ 1 / 2)) ∈ U
+  rw [LinearEquiv.apply_symm_apply]
+  intro i _
+  change (1 / 2 : ℝ) ∈ Set.Ioo 0 1
+  norm_num
+
+/-- The integer span of the parallelotope's basis is the image of the logarithmic embedding. -/
+private theorem mem_span_regulatorBasis_iff (y : logSpace F) :
+    y ∈ Submodule.span ℤ (Set.range
+      ((b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F))) ↔
+      y ∈ (Units.logEmbedding F).range := by
+  rw [Module.Basis.ofZLatticeBasis_span, Units.unitLattice, Submodule.map_top]
+  rfl
 
 /-- Paper: Lemma A.2.3.5(2), p. 549. Regulator translates cover the hyperplane. -/
 theorem regulatorParallelotope_cover :
     (⋃ x : (Units.logEmbedding F).range, x.val +ᵥ regulatorParallelotope F b) = Set.univ := by
-  sorry
+  refine Set.eq_univ_of_forall fun y ↦ Set.mem_iUnion.mpr ?_
+  obtain ⟨v, hv, -⟩ := ZSpan.exist_unique_vadd_mem_fundamentalDomain
+    ((b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)) y
+  refine ⟨⟨-v.val, (mem_span_regulatorBasis_iff F b _).mp (neg_mem v.prop)⟩,
+    Set.mem_vadd_set.mpr ⟨v +ᵥ y, hv, ?_⟩⟩
+  change -v.val + (v.val + y) = y
+  abel
 
 /-- Paper: Lemma A.2.3.5(2), p. 549. Every nonzero regulator translate misses the parallelotope. -/
 theorem regulatorParallelotope_disjoint (x : (Units.logEmbedding F).range) (hx : x ≠ 0) :
     Disjoint (x.val +ᵥ regulatorParallelotope F b) (regulatorParallelotope F b) := by
-  sorry
+  rw [Set.disjoint_left]
+  rintro _ ⟨z, hz, rfl⟩ hxz
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  let x' : Submodule.span ℤ (Set.range B) :=
+    ⟨x.val, (mem_span_regulatorBasis_iff F b _).mpr x.prop⟩
+  obtain ⟨v, -, hv⟩ := ZSpan.exist_unique_vadd_mem_fundamentalDomain B z
+  have h₁ : x' = v := hv x' hxz
+  have h₀ : (0 : Submodule.span ℤ (Set.range B)) = v := hv 0 (by
+    change ((0 : Submodule.span ℤ (Set.range B)) : logSpace F) + z ∈ _
+    rw [ZeroMemClass.coe_zero, zero_add]
+    exact hz)
+  exact hx (Subtype.ext (congrArg Subtype.val (h₁.trans h₀.symm) :))
 
 /-- Paper: Equation (A.2.3.12), p. 549. The natural ideal class of an idele is the
 product of its finite local contributions, with the valuation convention of §A.1. -/
@@ -556,19 +633,52 @@ theorem ideleIdealClass_finite_support (g : 𝕀[F]) :
     (fun v : Primes(F) ↦ localIdealClass F v (Units.map
       ((RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
         (RingHom.snd _ _)).toMonoidHom g)).HasFiniteMulSupport := by
-  sorry
+  refine Set.Finite.subset (FiniteAdeleRing.hasFiniteMulSupport_valued
+    (Units.map (RingHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F)).toMonoidHom g))
+    fun v hv ↦ ?_
+  simp only [Function.mem_mulSupport] at hv ⊢
+  intro h
+  apply hv
+  simp only [localIdealClass]
+  convert zpow_zero _
+  convert neg_zero
+  convert WithZero.log_one
+  exact h
 
 /-- Paper: Equation (A.2.3.12), p. 549. An idele supported at one finite place
 has exactly the local ideal class from §A.1. -/
 theorem ideleIdealClass_ofAdicCompletion (v : Primes(F)) (x : (v.adicCompletion F)ˣ) :
     ideleIdealClass F (IdeleGroup.ofAdicCompletion (𝓞 F) F v x) = localIdealClass F v x := by
-  sorry
+  classical
+  unfold ideleIdealClass
+  rw [finprod_eq_single _ v]
+  · congr 1
+    refine Units.ext ?_
+    exact Pi.mulSingle_eq_same (M := fun w : Primes(F) ↦ w.adicCompletion F) v x.val
+  · intro w hw
+    refine (localIdealClass_normalization F w _).1 ?_
+    have h1 : (Units.map ((RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F)
+        w).comp (RingHom.snd _ _)).toMonoidHom (IdeleGroup.ofAdicCompletion (𝓞 F) F v x)) = 1 := by
+      refine Units.ext ?_
+      exact Pi.mulSingle_eq_of_ne (M := fun w : Primes(F) ↦ w.adicCompletion F) hw x.val
+    rw [h1]
+    exact one_mem _
 
 /-- Paper: Equation (A.2.3.12), p. 549. Every ideal class has a norm-one representative,
 and the representative of the trivial class can be chosen to be one. -/
 theorem exists_normOne_class_representatives :
     ∃ r : CommRing.Pic (𝓞 F) → N₁, r 1 = 1 ∧ ∀ c, ideleIdealClass F (r c).val = c := by
-  sorry
+  obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+  let p := e.toMonoidHom.comp (QuotientGroup.mk' _)
+  have hp : Surjective p := e.surjective.comp QuotientGroup.mk_surjective
+  obtain ⟨r, hr⟩ := hp.hasRightInverse
+  refine ⟨Function.update r 1 1, Function.update_self .., fun c ↦ ?_⟩
+  refine (he (Function.update r 1 1 c)).symm.trans ?_
+  change p (Function.update r 1 1 c) = c
+  by_cases hc : c = 1
+  · subst c
+    rw [Function.update_self, map_one]
+  · rw [Function.update_of_ne hc, hr c]
 
 variable (v₀ : InfinitePlace F) (σ : ℂ ≃ₐ[ℝ] ℂ)
 
@@ -582,7 +692,24 @@ def inTorsionSector (x : v₀.Completionˣ) : Prop :=
 exactly the positive component. -/
 theorem inTorsionSector_real (hv : v₀.IsReal) (x : v₀.Completionˣ) :
     inTorsionSector F v₀ σ x ↔ 0 < extensionEmbeddingOfIsReal hv x.val := by
-  sorry
+  have hn : (2 : ℝ) ≤ Units.torsionOrder F := by
+    obtain ⟨m, hm⟩ := Units.even_torsionOrder F
+    have := Units.torsionOrder_pos F
+    exact_mod_cast (by omega : 2 ≤ Units.torsionOrder F)
+  have hr : extensionEmbeddingOfIsReal hv x.val ≠ 0 := (x.isUnit.map _).ne_zero
+  have hσ : σ (extensionEmbedding v₀ x.val) = (extensionEmbeddingOfIsReal hv x.val : ℂ) := by
+    rw [← extensionEmbeddingOfIsReal_apply hv]
+    exact σ.commutes _
+  unfold inTorsionSector
+  rw [hσ]
+  rcases hr.lt_or_gt with h | h
+  · rw [Complex.arg_ofReal_of_neg h]
+    have hle : 2 * Real.pi / Units.torsionOrder F ≤ Real.pi := by
+      rw [div_le_iff₀ (by linarith)]
+      nlinarith [Real.pi_pos]
+    exact iff_of_false (fun h' ↦ absurd h'.2 (not_lt.mpr hle)) (not_lt.mpr h.le)
+  · rw [Complex.arg_ofReal_of_nonneg h.le]
+    exact iff_of_true ⟨le_rfl, by positivity⟩ h
 
 local notation "atPlace" => Units.map (RingHom.toMonoidHom (Pi.evalRingHom InfinitePlace.Completion v₀))
 local notation "inLogBox" => fun g : N∞ ↦
@@ -593,12 +720,6 @@ local notation "inLogBox" => fun g : N∞ ↦
 ideles with logarithm in the parallelotope and chosen coordinate in the torsion sector. -/
 def infiniteIdeleFundamentalDomain : Set N∞ :=
   {g | inLogBox g ∧ inTorsionSector F v₀ σ (atPlace g.val)}
-
-/-- Paper: Definition A.2.3.6, p. 549. The only diagonal unit in the archimedean
-domain is the identity. -/
-theorem unit_mem_infiniteIdeleFundamentalDomain (u : (𝓞 F)ˣ) :
-    unitAtInfinity u ∈ (N∞).subtype '' infiniteIdeleFundamentalDomain F b v₀ σ ↔ u = 1 := by
-  sorry
 
 variable (r : CommRing.Pic (𝓞 F) → (ideleNorm F).ker)
 local notation "E∞" => infiniteIdeleFundamentalDomain F b v₀ σ
@@ -663,6 +784,37 @@ private theorem torsionUnit_eq_one_of_inTorsionSector (u : (𝓞 F)ˣ) (hu : u �
   have hz₁ : z = 1 := Complex.ext_norm_arg (by simpa using hnorm)
     (by simpa using (mul_eq_zero.mp harg).resolve_left hn.ne')
   simpa only [Units.val_one, map_one] using hz₁
+
+/-- Paper: Definition A.2.3.6, p. 549. The only diagonal unit in the archimedean
+domain is the identity. -/
+theorem unit_mem_infiniteIdeleFundamentalDomain (u : (𝓞 F)ˣ) :
+    unitAtInfinity u ∈ (N∞).subtype '' infiniteIdeleFundamentalDomain F b v₀ σ ↔ u = 1 := by
+  constructor
+  · rintro ⟨g, ⟨hlog, hsector⟩, hg⟩
+    change g.val = unitAtInfinity u at hg
+    change (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+      infiniteIdeleLog F g.val w.val) ∈ regulatorParallelotope F b at hlog
+    change inTorsionSector F v₀ σ (atPlace g.val) at hsector
+    rw [hg] at hlog hsector
+    simp_rw [← regulator_eq_infiniteIdeleLog] at hlog
+    have htors := logEmbedding_eq_zero_iff.mp
+      (logEmbedding_eq_zero_of_mem_regulatorParallelotope F b u hlog)
+    exact torsionUnit_eq_one_of_inTorsionSector F v₀ σ u htors hsector
+  · rintro rfl
+    rw [map_one]
+    refine ⟨1, ⟨?_, ?_⟩, rfl⟩
+    · have hzero : (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+          infiniteIdeleLog F (1 : 𝕀∞) w.val) = 0 := by
+        funext w
+        change (w.val.mult : ℝ) * Real.log ‖(1 : w.val.Completion)‖ = 0
+        simp
+      change (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+        infiniteIdeleLog F (1 : 𝕀∞) w.val) ∈ regulatorParallelotope F b
+      rw [hzero, regulatorParallelotope, ZSpan.mem_fundamentalDomain]
+      simp
+    · change inTorsionSector F v₀ σ (atPlace (1 : 𝕀∞))
+      simp [inTorsionSector, Set.mem_Ico, div_pos Real.two_pi_pos
+        (Nat.cast_pos.mpr (Units.torsionOrder_pos F))]
 
 /-- A diagonal idele that is a unit in the integral adele ring comes from a global unit. -/
 private theorem exists_globalUnit_of_principal_mem_integralUnits (x : Fˣ)
@@ -752,18 +904,145 @@ theorem principal_mem_ideleFundamentalDomain (x : Fˣ) :
 /-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain has compact closure in
 the norm-one group. -/
 theorem infiniteIdeleFundamentalDomain_precompact : IsCompact (closure E∞) := by
-  sorry
+  -- Restore the omitted logarithmic coordinate using the sum-zero equation.
+  let extend (x : logSpace F) (w : InfinitePlace F) :=
+    if hw : w = w₀ then -∑ v, x v else x ⟨w, hw⟩
+  have hExtend : Continuous extend := by
+    apply continuous_pi
+    intro w
+    by_cases hw : w = w₀
+    · simp only [extend, dite_eq_left hw]
+      exact (continuous_finsetSum Finset.univ fun v _ ↦ continuous_apply v).neg
+    · simp only [extend, dite_eq_right hw]
+      exact continuous_apply (⟨w, hw⟩ : {v : InfinitePlace F // v ≠ w₀})
+  have hCompact := (infiniteIdeleLog_proper F).isCompact_preimage
+    ((regulatorParallelotope_precompact F b).image hExtend)
+  refine ((infiniteIdeleNorm_ker_closed F).isClosedEmbedding_subtypeVal.isCompact_preimage
+    hCompact).closure_of_subset ?_
+  intro g hg
+  refine ⟨fun w ↦ infiniteIdeleLog F g.val w.val, subset_closure hg.1, ?_⟩
+  funext w
+  by_cases hw : w = w₀
+  · subst w
+    have hsum := infiniteIdeleLog_sum_zero F g
+    rw [Fintype.sum_eq_add_sum_subtype_ne _ w₀, add_eq_zero_iff_eq_neg] at hsum
+    simpa only [extend, dite_true] using hsum.symm
+  · simp only [extend, dite_eq_right hw]
 
-/-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain also has compact closure
-in the full archimedean idele group. -/
-theorem infiniteIdeleFundamentalDomain_precompact_ambient :
-    IsCompact (closure ((N∞).subtype '' E∞)) := by
-  sorry
+/-- At every positive radius there is a point in an open subset of the local torsion sector. -/
+private theorem exists_open_torsionSector_at_radius {a : ℝ} (ha : 0 < a) :
+    ∃ U : Set v₀.Completion, IsOpen U ∧
+      (∀ x : v₀.Completionˣ, x.val ∈ U → inTorsionSector F v₀ σ x) ∧
+      ∃ z ∈ U, ‖z‖ = a := by
+  by_cases hv : v₀.IsReal
+  · let U := extensionEmbeddingOfIsReal hv ⁻¹' Set.Ioi (0 : ℝ)
+    obtain ⟨z, hz⟩ := surjective_extensionEmbeddingOfIsReal hv a
+    refine ⟨U, isOpen_Ioi.preimage (isometry_extensionEmbeddingOfIsReal hv).continuous,
+      fun x hx ↦ (inTorsionSector_real F v₀ σ hv x).mpr hx, z, ?_, ?_⟩
+    · change 0 < extensionEmbeddingOfIsReal hv z
+      rwa [hz]
+    · rw [← (isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero (map_zero _) z,
+        hz, Real.norm_of_nonneg ha.le]
+  · let f (z : v₀.Completion) := σ (extensionEmbedding v₀ z)
+    have hσ : Isometry σ := by
+      change Isometry (σ.toAlgHom : ℂ → ℂ)
+      rcases Complex.real_algHom_eq_id_or_conj σ.toAlgHom with h | h
+      · rw [h]
+        exact isometry_id
+      · rw [h]
+        exact Complex.isometry_conj
+    have hf : Isometry f := hσ.comp (isometry_extensionEmbedding v₀)
+    let bound := 2 * Real.pi / (Units.torsionOrder F : ℝ)
+    have hbound : 0 < bound := div_pos Real.two_pi_pos (by exact_mod_cast Units.torsionOrder_pos F)
+    let θ := min bound Real.pi / 2
+    have hθ : 0 < θ := half_pos (lt_min hbound Real.pi_pos)
+    have hθb : θ < bound := (half_lt_self (lt_min hbound Real.pi_pos)).trans_le (min_le_left _ _)
+    have hθπ : θ < Real.pi := (half_lt_self (lt_min hbound Real.pi_pos)).trans_le (min_le_right _ _)
+    let w : ℂ := (a : ℂ) * Complex.exp (θ * Complex.I)
+    have harg : w.arg = θ := by
+      change Complex.arg ((a : ℂ) * Complex.exp (θ * Complex.I)) = θ
+      rw [Complex.arg_real_mul _ ha, Complex.arg_exp_mul_I]
+      apply (toIocMod_eq_self Real.two_pi_pos).mpr
+      exact ⟨by linarith [Real.pi_pos], by linarith⟩
+    have hwnorm : ‖w‖ = a := by
+      change ‖(a : ℂ) * Complex.exp (θ * Complex.I)‖ = a
+      rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg ha.le,
+        Complex.norm_exp_ofReal_mul_I, mul_one]
+    obtain ⟨z, hz⟩ := (σ.surjective.comp (surjective_extensionEmbedding_of_isComplex
+      (InfinitePlace.not_isReal_iff_isComplex.mp hv))) w
+    change f z = w at hz
+    let V : Set ℂ := Complex.slitPlane ∩ Complex.arg ⁻¹' Set.Ioo 0 bound
+    refine ⟨f ⁻¹' V, (Complex.continuousOn_arg.isOpen_inter_preimage Complex.isOpen_slitPlane
+      isOpen_Ioo).preimage hf.continuous, ?_, z, ?_, ?_⟩
+    · intro x hx
+      exact Set.Ioo_subset_Ico_self hx.2
+    · change f z ∈ V
+      rw [hz]
+      refine ⟨Complex.mem_slitPlane_iff_arg.mpr
+        ⟨harg.trans_ne hθπ.ne, norm_ne_zero_iff.mp (hwnorm.trans_ne ha.ne')⟩, ?_⟩
+      change w.arg ∈ Set.Ioo 0 bound
+      rw [harg]
+      exact ⟨hθ, hθb⟩
+    · rw [← hf.norm_map_of_map_zero (by simp [f]) z, hz, hwnorm]
 
 /-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain has nonempty interior
 relative to the norm-one group. -/
 theorem infiniteIdeleFundamentalDomain_interior : (interior E∞).Nonempty := by
-  sorry
+  obtain ⟨x, hx⟩ := regulatorParallelotope_interior F b
+  -- Restore the omitted coordinate so that the full logarithm sums to zero.
+  let y (v : InfinitePlace F) := if hv : v = w₀ then -∑ w, x w else x ⟨v, hv⟩
+  have hy (v : {w : InfinitePlace F // w ≠ w₀}) : y v.val = x v := dif_neg v.property
+  obtain ⟨a, ha⟩ := infiniteIdeleLog_surjective F y
+  obtain ⟨U, hU, hsector, z, hz, hznorm⟩ :=
+    exists_open_torsionSector_at_radius F v₀ σ (Real.exp_pos (y v₀ / v₀.mult))
+  have hzne : z ≠ 0 := norm_ne_zero_iff.mp (hznorm.trans_ne (Real.exp_pos _).ne')
+  -- Replace the chosen component with a point of the same logarithmic radius.
+  let localUnits := Function.update (MulEquiv.piUnits a) v₀ (Units.mk0 z hzne)
+  let g : 𝕀∞ := MulEquiv.piUnits.symm localUnits
+  have hg₀ : g.val v₀ = z := by
+    change (localUnits v₀).val = z
+    simp [localUnits]
+  have hlog : infiniteIdeleLog F g = y := by
+    funext v
+    by_cases hv : v = v₀
+    · subst v
+      rw [infiniteIdeleLog, hg₀, hznorm, Real.log_exp, mul_div_cancel₀ _ v₀.mult_coe_ne_zero]
+    · change (v.mult : ℝ) * Real.log
+        ‖(Function.update (MulEquiv.piUnits a) v₀ (Units.mk0 z hzne) v).val‖ = y v
+      rw [Function.update_of_ne hv]
+      exact congrFun ha v
+  have hsum : ∑ v, infiniteIdeleLog F g v = 0 := by
+    rw [hlog, Fintype.sum_eq_add_sum_subtype_ne _ w₀]
+    simp only [hy]
+    simp [y]
+  have hnorm : infiniteIdeleNorm F g = 1 := by
+    apply Units.ext
+    apply NNReal.coe_injective
+    simp [infiniteIdeleNorm, Units.coe_prod]
+    change ∏ v : InfinitePlace F, ‖g.val v‖ ^ v.mult = 1
+    have hne (v : InfinitePlace F) : g.val v ≠ 0 :=
+      (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom g).ne_zero
+    calc
+      ∏ v : InfinitePlace F, ‖g.val v‖ ^ v.mult = ∏ v, Real.exp (infiniteIdeleLog F g v) := by
+        apply Finset.prod_congr rfl
+        intro v _
+        rw [infiniteIdeleLog, Real.exp_nat_mul, Real.exp_log (norm_pos_iff.mpr (hne v))]
+      _ = 1 := by rw [← Real.exp_sum, hsum, Real.exp_zero]
+  let p (u : N∞) : logSpace F := fun v ↦ infiniteIdeleLog F u.val v.val
+  let q (u : N∞) : v₀.Completion := u.val.val v₀
+  have hp : Continuous p := continuous_pi fun v ↦
+    (continuous_apply v.val).comp ((infiniteIdeleLog_continuous F).comp continuous_subtype_val)
+  have hq : Continuous q := (continuous_apply v₀).comp
+    (Units.continuous_val.comp continuous_subtype_val)
+  have hSubset : (p ⁻¹' interior (regulatorParallelotope F b)) ∩ (q ⁻¹' U) ⊆ E∞ :=
+    fun u hu ↦ ⟨interior_subset hu.1, hsector (atPlace u.val) hu.2⟩
+  refine ⟨⟨g, hnorm⟩, interior_maximal hSubset
+    ((isOpen_interior.preimage hp).inter (hU.preimage hq)) ⟨?_, ?_⟩⟩
+  · change (fun v : {w : InfinitePlace F // w ≠ w₀} ↦ infiniteIdeleLog F g v.val) ∈
+      interior (regulatorParallelotope F b)
+    simpa only [hlog, hy] using hx
+  · change g.val v₀ ∈ U
+    rwa [hg₀]
 
 local notation "archDomain" => (Subgroup.subtype N∞ '' E∞)
 
@@ -777,14 +1056,145 @@ theorem infiniteIdeleFundamentalDomain_cover :
 domain disjointly from itself. -/
 theorem infiniteIdeleFundamentalDomain_disjoint (u : (𝓞 F)ˣ) (hu : u ≠ 1) :
     Disjoint (unitAtInfinity u • archDomain) archDomain := by
-  sorry
+  rw [Set.disjoint_left]
+  intro x hx hy
+  obtain ⟨_, ⟨g, hg, rfl⟩, hx⟩ := Set.mem_smul_set.mp hx
+  obtain ⟨h, hh, hhx⟩ := hy
+  have hmul : unitAtInfinity u * g.val = h.val := hx.trans hhx.symm
+  -- An intersection forces the unit's logarithm to vanish.
+  let L (a : 𝕀∞) : logSpace F := fun w ↦ infiniteIdeleLog F a w.val
+  let k : (Units.logEmbedding F).range :=
+    ⟨Units.logEmbedding F (Additive.ofMul u), ⟨Additive.ofMul u, rfl⟩⟩
+  have hshift : k.val + L g.val = L h.val := by
+    funext w
+    change Units.logEmbedding F (Additive.ofMul u) w + infiniteIdeleLog F g.val w.val =
+      infiniteIdeleLog F h.val w.val
+    rw [regulator_eq_infiniteIdeleLog, ← Pi.add_apply, ← infiniteIdeleLog_mul, hmul]
+  have hk : k = 0 := by
+    by_contra hk
+    exact (Set.disjoint_left.mp (regulatorParallelotope_disjoint F b k hk))
+      (Set.mem_vadd_set.mpr ⟨L g.val, hg.1, hshift⟩) hh.1
+  have ht : u ∈ Units.torsion F := logEmbedding_eq_zero_iff.mp (congrArg Subtype.val hk)
+  -- Scaled arguments of points in the sector belong to one full turn.
+  let coord : 𝕀∞ →* ℂˣ :=
+    (Units.map (σ.toRingHom.comp (extensionEmbedding v₀)).toMonoidHom).comp atPlace
+  let z : ℂ := (coord (unitAtInfinity u)).val
+  let a : ℂ := (coord g.val).val
+  let c : ℂ := (coord h.val).val
+  let n := Units.torsionOrder F
+  have hcoord : z * a = c :=
+    (congrArg Units.val (map_mul coord _ _).symm).trans (congrArg (fun y ↦ (coord y).val) hmul)
+  have hz : z ^ n = 1 := by
+    have hup := congrArg (coord.comp unitAtInfinity) (Units.pow_torsionOrder_eq_one F ht)
+    rw [map_pow, map_one] at hup
+    exact congrArg Units.val hup
+  have hp : a ^ n = c ^ n := by rw [← hcoord, mul_pow, hz, one_mul]
+  have hang : (((n : ℝ) * a.arg : ℝ) : Real.Angle) = (((n : ℝ) * c.arg : ℝ) : Real.Angle) := by
+    rw [Real.Angle.natCast_mul_eq_nsmul, Real.Angle.natCast_mul_eq_nsmul,
+      ← Complex.arg_pow_coe_angle, ← Complex.arg_pow_coe_angle, hp]
+  have hn : 0 < (n : ℝ) := Nat.cast_pos.mpr (Units.torsionOrder_pos F)
+  have hmem (t : ℝ) (ht : t ∈ Set.Ico 0 (2 * Real.pi / n)) :
+      (n : ℝ) * t ∈ Set.Ico 0 (2 * Real.pi) :=
+    ⟨mul_nonneg hn.le ht.1, by simpa only [mul_comm (n : ℝ) t] using (lt_div_iff₀ hn).mp ht.2⟩
+  have hinj := AddCircle.injOn_coe_Ico (2 * Real.pi) (0 : ℝ)
+  rw [zero_add] at hinj
+  have hargs : a.arg = c.arg :=
+    mul_left_cancel₀ hn.ne' (hinj (hmem a.arg hg.2) (hmem c.arg hh.2) hang)
+  have hzArg : (z.arg : Real.Angle) = 0 := by
+    have hadd := Complex.arg_mul_coe_angle (coord (unitAtInfinity u)).ne_zero (coord g.val).ne_zero
+    change ((z * a).arg : Real.Angle) = (z.arg : Real.Angle) + (a.arg : Real.Angle) at hadd
+    rw [hcoord, ← hargs] at hadd
+    exact add_right_cancel (hadd.symm.trans (zero_add _).symm)
+  have hzArgReal : z.arg = 0 := by
+    simpa using congrArg Real.Angle.toReal hzArg
+  apply hu (torsionUnit_eq_one_of_inTorsionSector F v₀ σ u ht ?_)
+  change z.arg ∈ Set.Ico 0 (2 * Real.pi / n)
+  exact ⟨hzArgReal.ge, hzArgReal ▸ by positivity⟩
+
+/-- A diagonal torsion unit moves an archimedean idele into the chosen angular sector. -/
+private theorem exists_torsionUnit_mul_mem_inTorsionSector (g : 𝕀∞) :
+    ∃ u : Units.torsion F, inTorsionSector F v₀ σ (atPlace (unitAtInfinity u.val * g)) := by
+  let f : 𝕀∞ →* ℂˣ :=
+    (Units.map (σ.toRingHom.comp (extensionEmbedding v₀)).toMonoidHom).comp atPlace
+  let φ : F →+* ℂ := σ.toRingHom.comp ((extensionEmbedding v₀).comp
+    ((Pi.evalRingHom InfinitePlace.Completion v₀).comp (algebraMap F (InfiniteAdeleRing F))))
+  let z : ℂ := (f g).val
+  let n := Units.torsionOrder F
+  let p := 2 * Real.pi / (n : ℝ)
+  have hn : 0 < (n : ℝ) := by exact_mod_cast Units.torsionOrder_pos F
+  have hp : 0 < p := div_pos Real.two_pi_pos hn
+  have hn₂ : (2 : ℝ) ≤ n := by
+    obtain ⟨m, hm⟩ := Units.even_torsionOrder F
+    have := Units.torsionOrder_pos F
+    exact_mod_cast (by omega : 2 ≤ Units.torsionOrder F)
+  have hpπ : p ≤ Real.pi := (div_le_iff₀ hn).mpr (by
+    simpa only [mul_comm Real.pi] using mul_le_mul_of_nonneg_right hn₂ Real.pi_pos.le)
+  obtain ⟨k, hk, -⟩ := existsUnique_add_zsmul_mem_Ico hp z.arg 0
+  rw [zero_add] at hk
+  let w := Complex.exp ((p : ℂ) * Complex.I)
+  have hw : w ^ n = 1 := by
+    simpa [w, p, div_mul_eq_mul_div] using
+      (Complex.isPrimitiveRoot_exp n (Units.torsionOrder_ne_zero F)).pow_eq_one
+  let ζ : ℂˣ := Units.mk0 w (Complex.exp_ne_zero _)
+  have hζ : ζ ∈ rootsOfUnity n ℂ := (mem_rootsOfUnity' n ζ).mpr hw
+  rw [← Units.map_complexEmbedding_torsion F φ] at hζ
+  obtain ⟨u, hu, hmap⟩ := hζ
+  let u₀ : Units.torsion F := ⟨u, hu⟩
+  have hunit : f (unitAtInfinity u) = ζ := hmap
+  have hrotate : w ^ k * z =
+      (‖z‖ : ℂ) * Complex.exp (((z.arg + k • p : ℝ) : ℂ) * Complex.I) := by
+    calc
+      _ = w ^ k * ((‖z‖ : ℂ) * Complex.exp ((z.arg : ℂ) * Complex.I)) :=
+        congrArg (w ^ k * ·) (Complex.norm_mul_exp_arg_mul_I z).symm
+      _ = _ := by
+        dsimp only [w]
+        rw [← Complex.exp_int_mul, zsmul_eq_mul]
+        push_cast
+        rw [add_mul, Complex.exp_add, mul_assoc (k : ℂ) (p : ℂ) Complex.I]
+        ring
+  refine ⟨u₀ ^ k, ?_⟩
+  change (f (unitAtInfinity (u ^ k) * g)).val.arg ∈ Set.Ico 0 p
+  rw [map_mul, map_zpow, map_zpow, hunit, Units.val_mul, Units.val_zpow_eq_zpow_val]
+  change (w ^ k * z).arg ∈ Set.Ico 0 p
+  rw [hrotate, Complex.arg_real_mul _ (norm_pos_iff.mpr (f g).ne_zero),
+    Complex.arg_exp_mul_I, (toIocMod_eq_self Real.two_pi_pos).mpr]
+  · exact hk
+  · refine ⟨(neg_lt_zero.mpr Real.pi_pos).trans_le hk.1, ?_⟩
+    rw [show -Real.pi + 2 * Real.pi = Real.pi by ring]
+    exact hk.2.le.trans hpπ
 
 /-- Paper: Lemma A.2.3.8(2), p. 550. The torsion translates recover the whole
 preimage of the logarithmic parallelotope in the norm-one group. -/
 theorem infiniteIdeleFundamentalDomain_torsion_cover :
     (⋃ u : Units.torsion F, unitAtInfinity u.val • archDomain) =
       (N∞).subtype '' {g : N∞ | inLogBox g} := by
-  sorry
+  let diag : Units.torsion F →* 𝕀∞ := (unitAtInfinity).comp (Units.torsion F).subtype
+  let logHom : 𝕀∞ →* Multiplicative (InfinitePlace F → ℝ) :=
+    MonoidHom.mk' (fun g ↦ Multiplicative.ofAdd (infiniteIdeleLog F g)) (infiniteIdeleLog_mul F)
+  -- The norm and logarithm kill torsion because their targets are torsion-free.
+  have hNorm (u : Units.torsion F) : unitAtInfinity u.val ∈ N∞ :=
+    (((infiniteIdeleNorm F).comp diag).isOfFinOrder (isOfFinOrder_of_finite u)).eq_one'
+  have hLog (u : Units.torsion F) (g : 𝕀∞) :
+      infiniteIdeleLog F (unitAtInfinity u.val * g) = infiniteIdeleLog F g := by
+    have hu : infiniteIdeleLog F (unitAtInfinity u.val) = 0 :=
+      ((logHom.comp diag).isOfFinOrder (isOfFinOrder_of_finite u)).eq_one'
+    rw [infiniteIdeleLog_mul, hu, zero_add]
+  let shift (u : Units.torsion F) (g : N∞) : N∞ :=
+    ⟨unitAtInfinity u.val * g.val, (N∞).mul_mem (hNorm u) g.property⟩
+  have hBox (u : Units.torsion F) (g : N∞) : inLogBox (shift u g) ↔ inLogBox g := by
+    simp only [shift, hLog]
+  ext x
+  constructor
+  · intro hx
+    obtain ⟨u, hu⟩ := Set.mem_iUnion.mp hx
+    obtain ⟨_, ⟨g, hg, rfl⟩, rfl⟩ := Set.mem_smul_set.mp hu
+    exact ⟨shift u g, (hBox u g).mpr hg.1, rfl⟩
+  · rintro ⟨g, hg, rfl⟩
+    obtain ⟨u, hu⟩ := exists_torsionUnit_mul_mem_inTorsionSector F v₀ σ g.val
+    refine Set.mem_iUnion.mpr ⟨u⁻¹, Set.mem_smul_set.mpr
+      ⟨(shift u g).val, ⟨shift u g, ⟨(hBox u g).mpr hg, hu⟩, rfl⟩, ?_⟩⟩
+    change unitAtInfinity (u.val⁻¹) * (unitAtInfinity u.val * g.val) = g.val
+    rw [map_inv, inv_mul_cancel_left]
 
 -- TODO(paper-gap): (A.2.3.18) repeats the closure where the preceding sentence specifies K.
 -- The proof on p. 551 reduces the general compact K to the case K equal to the closure.
@@ -795,7 +1205,42 @@ Deviation: We use K as in the preceding sentence and the proof on p. 551. -/
 theorem infiniteIdeleFundamentalDomain_finite_translates (K : Set N∞) (hK : IsCompact K) :
     {u : (𝓞 F)ˣ | ((unitAtInfinity u • ((N∞).subtype '' closure E∞)) ∩
       ((N∞).subtype '' K)).Nonempty}.Finite := by
-  sorry
+  let m := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let D : Set (𝕀∞ × 𝕀∞) := ((N∞).subtype '' K) ×ˢ ((N∞).subtype '' closure E∞)
+  let q : 𝕀∞ × 𝕀∞ → mixedEmbedding.mixedSpace F := fun p ↦ m (p.1 / p.2).val
+  have hm : Continuous m := by
+    change Continuous (fun x ↦ InfiniteAdeleRing.ringEquiv_mixedSpace F x)
+    simp only [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact (continuous_pi fun v ↦ (isometry_extensionEmbeddingOfIsReal v.2).continuous.comp
+      (continuous_apply v.val)).prodMk
+      (continuous_pi fun v ↦ (isometry_extensionEmbedding v.val).continuous.comp
+        (continuous_apply v.val))
+  have hD : IsCompact D :=
+    (hK.image continuous_subtype_val).prod
+      ((infiniteIdeleFundamentalDomain_precompact F b v₀ σ).image continuous_subtype_val)
+  have hC : IsCompact (q '' D) :=
+    hD.image (hm.comp (Units.continuous_val.comp (continuous_fst.div' continuous_snd)))
+  -- In mixed coordinates, diagonal units lie in the closed discrete integer lattice.
+  let L := (mixedEmbedding.integerLattice F).toAddSubgroup
+  have : DiscreteTopology L :=
+    inferInstanceAs (DiscreteTopology (mixedEmbedding.integerLattice F))
+  have hL : IsClosed (L : Set (mixedEmbedding.mixedSpace F)) :=
+    L.isClosed_of_discreteTopology
+  have hfin : (q '' D ∩ (L : Set (mixedEmbedding.mixedSpace F))).Finite :=
+    (hC.inter_right hL).finite (DiscreteTopology.isDiscrete.mono Set.inter_subset_right)
+  let f : (𝓞 F)ˣ → mixedEmbedding.mixedSpace F :=
+    fun u ↦ mixedEmbedding F (algebraMap (𝓞 F) F u.val)
+  have hf : Injective f :=
+    (mixedEmbedding_injective F).comp (RingOfIntegers.coe_injective.comp Units.val_injective)
+  refine (hfin.preimage hf.injOn).subset ?_
+  rintro u ⟨x, hx, hxK⟩
+  obtain ⟨y, hy, hxy⟩ := Set.mem_smul_set.mp hx
+  have hquot : x / y = unitAtInfinity u :=
+    (div_eq_iff_eq_mul).mpr hxy.symm
+  refine ⟨⟨(x, y), ⟨hxK, hy⟩, ?_⟩, ⟨u.val, rfl⟩⟩
+  change m (x / y).val = mixedEmbedding F (algebraMap (𝓞 F) F u.val)
+  rw [hquot, InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp]
+  rfl
 
 -- TODO(paper-gap): (A.2.3.20) describes a positive real ray. For complex v₀ the
 -- sector in Definition A.2.3.6 is wider, as (A.2.3.21) on p. 551 also shows.
@@ -933,6 +1378,15 @@ private theorem infiniteIdeleFundamentalDomain_subset_compact :
     exact h.symm
   · simp only [extend, hw, dite_false]
     rfl
+
+/-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain also has compact closure
+in the full archimedean idele group. -/
+theorem infiniteIdeleFundamentalDomain_precompact_ambient :
+    IsCompact (closure ((N∞).subtype '' E∞)) := by
+  have : T2Space (InfiniteAdeleRing F) :=
+    inferInstanceAs (T2Space (∀ w : InfinitePlace F, w.Completion))
+  obtain ⟨A, hA, hDomain⟩ := infiniteIdeleFundamentalDomain_subset_compact F b v₀ σ
+  exact hA.of_isClosed_subset isClosed_closure (closure_minimal hDomain hA.isClosed)
 
 include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(1), p. 552. The global domain has compact closure
@@ -1170,7 +1624,19 @@ local notation "addAtS" =>
 
 /-- Paper: Definition A.2.4.1, p. 554. The only diagonal S-integer in the domain is zero. -/
 theorem diagonal_mem_sAdeleFundamentalDomain (x : Oₛ(F, S)) : addAtS x ∈ Dₛ ↔ x = 0 := by
-  sorry
+  constructor
+  · rintro ⟨hinf, hS⟩
+    refine Subtype.ext ((diagonal_mem_adeleFundamentalDomain F a x.val).mp ⟨hinf, ?_⟩)
+    rw [diagonal_mem_integralAdelesOutside]
+    intro v _
+    by_cases hv : v ∈ S
+    · have h := hS ⟨v, hv⟩
+      change Valued.v (x.val : v.adicCompletion F) ≤ 1 at h
+      rwa [HeightOneSpectrum.valuedAdicCompletion_eq_valuation'] at h
+    · exact x.prop v hv
+  · rintro rfl
+    rw [map_zero]
+    exact ⟨((diagonal_mem_adeleFundamentalDomain F a 0).mpr rfl).1, fun v ↦ zero_mem _⟩
 
 /-- Paper: Lemma A.2.4.2(1), p. 554. S-integer translates of the additive domain
 cover the S-adeles. -/
@@ -1192,7 +1658,19 @@ def sIdeleLog (g : 𝕀ₛ) : InfinitePlace F ⊕ S → ℝ :=
 the logarithm of the S-idelic norm. -/
 theorem sIdeleLog_sum (g : 𝕀ₛ) :
     ∑ v, sIdeleLog F S g v = Real.log ((sIdeleNorm F S g).val : ℝ) := by
-  sorry
+  have hne₁ (w : InfinitePlace F) : ‖g.val.1 w‖ ^ w.mult ≠ 0 := by
+    have hu : IsUnit (g.val.1 w) := (g.isUnit.map (RingHom.fst _ _)).map (Pi.evalRingHom _ w)
+    exact pow_ne_zero _ (norm_ne_zero_iff.mpr hu.ne_zero)
+  have hne₂ (v : S) : ‖g.val.2 v‖ ≠ 0 := by
+    have hu : IsUnit (g.val.2 v) := (g.isUnit.map (RingHom.snd _ _)).map (Pi.evalRingHom _ v)
+    exact norm_ne_zero_iff.mpr hu.ne_zero
+  have hnorm : ((sIdeleNorm F S g).val : ℝ) =
+      (∏ w : InfinitePlace F, ‖g.val.1 w‖ ^ w.mult) * ∏ v : S, ‖g.val.2 v‖ := by
+    simp [sIdeleNorm, Units.coe_prod]
+  rw [hnorm, Real.log_mul (Finset.prod_ne_zero_iff.mpr fun w _ ↦ hne₁ w)
+    (Finset.prod_ne_zero_iff.mpr fun v _ ↦ hne₂ v), Real.log_prod (fun w _ ↦ hne₁ w),
+    Real.log_prod (fun v _ ↦ hne₂ v), Fintype.sum_sum_type]
+  simp [sIdeleLog, Real.log_pow]
 
 /-- Paper: Definition A.2.4.3, p. 554. On diagonal S-units the S-logarithm vanishes
 exactly on torsion units. -/
@@ -1205,7 +1683,35 @@ the full torsion subgroup of the S-units, so its order is independent of S. -/
 theorem sUnit_torsion_eq_image :
     (Units.torsion F).map (Units.map (algebraMap (𝓞 F) Oₛ(F, S)).toMonoidHom) =
       CommGroup.torsion Oₛ(F, S)ˣ := by
-  sorry
+  ext u
+  constructor
+  · rintro ⟨w, hw, rfl⟩
+    exact (CommGroup.mem_torsion _).mpr (MonoidHom.isOfFinOrder _ hw)
+  · intro hu
+    obtain ⟨n, hn, hun⟩ := isOfFinOrder_iff_pow_eq_one.mp hu
+    -- A root of unity in F is integral over ℤ, hence lies in the ring of integers.
+    have hint (y : Oₛ(F, S)ˣ) (hy : y ^ n = 1) : IsIntegral ℤ (y.val.val : F) := by
+      refine IsIntegral.of_pow hn ?_
+      have : (y.val.val : F) ^ n = 1 := by
+        simpa using congrArg (fun z : Oₛ(F, S)ˣ ↦ (z.val.val : F)) hy
+      rw [this]
+      exact isIntegral_one
+    have hinv : u⁻¹ ^ n = 1 := by rw [inv_pow, hun, inv_one]
+    let w : (𝓞 F)ˣ :=
+      { val := ⟨u.val.val, hint u hun⟩
+        inv := ⟨u⁻¹.val.val, hint u⁻¹ hinv⟩
+        val_inv := RingOfIntegers.ext (congrArg (fun z : Oₛ(F, S) ↦ (z.val : F)) u.val_inv)
+        inv_val := RingOfIntegers.ext (congrArg (fun z : Oₛ(F, S) ↦ (z.val : F)) u.inv_val) }
+    have hmap : Units.map (algebraMap (𝓞 F) Oₛ(F, S)).toMonoidHom w = u := by
+      ext
+      rfl
+    refine ⟨w, isOfFinOrder_iff_pow_eq_one.mpr ⟨n, hn, ?_⟩, hmap⟩
+    have hF : (u.val.val : F) ^ n = 1 := by
+      simpa using congrArg (fun z : Oₛ(F, S)ˣ ↦ (z.val.val : F)) hun
+    apply Units.ext
+    apply RingOfIntegers.ext
+    simp only [Units.val_pow_eq_pow_val, map_pow, Units.val_one, map_one]
+    exact hF
 
 local notation "sRank(" F ", " S ")" => (Fintype.card (InfinitePlace F) + Finset.card S - 1)
 variable (bₛ : Module.Basis (Fin sRank(F, S)) ℤ (Additive (Oₛ(F, S)ˣ ⧸ CommGroup.torsion Oₛ(F, S)ˣ)))
@@ -1225,7 +1731,15 @@ def sRegulatorParallelotope : Set (InfinitePlace F ⊕ S → ℝ) :=
 hyperplane where the sum of the coordinates vanishes. -/
 theorem sRegulatorParallelotope_sum_zero (y : InfinitePlace F ⊕ S → ℝ)
     (hy : y ∈ sRegulatorParallelotope F S bₛ) : ∑ v, y v = 0 := by
-  sorry
+  obtain ⟨t, -, rfl⟩ := hy
+  have hu (u : Oₛ(F, S)ˣ) : ∑ v, sIdeleLog F S (unitAtS u) v = 0 := by
+    have h1 : sIdeleNorm F S (unitAtS u) = 1 :=
+      MonoidHom.mem_ker.mp ((sIdeleNorm_spec F S).2 ⟨u, rfl⟩)
+    rw [sIdeleLog_sum, h1]
+    simp
+  simp only [Finset.sum_apply, Pi.smul_apply, smul_eq_mul]
+  rw [Finset.sum_comm]
+  exact Finset.sum_eq_zero fun i _ ↦ by rw [← Finset.mul_sum, hu, mul_zero]
 
 /-- Paper: Definition A.2.4.3, p. 555. Along a basis logarithm the parallelotope
 includes the coefficient zero and excludes one. Any lift of the basis unit gives the same test.
@@ -1308,7 +1822,15 @@ theorem mem_sIdeleFundamentalDomain_of_classNumberOne [Subsingleton Picₛ(F, S)
     (rₛ : Picₛ(F, S) → outsideNormOne(F, S)) (h₁ : rₛ 1 = 1) (g : outsideNormOne(F, S)) :
     g ∈ sIdeleFundamentalDomain F v₀ σ S bₛ rₛ ↔
       projectS (outsideInclusion g.val) ∈ (Subgroup.subtype Nₛ '' Eₛ) := by
-  sorry
+  simp only [sIdeleFundamentalDomain, Set.mem_iUnion]
+  constructor
+  · rintro ⟨c, hg⟩
+    rw [Subsingleton.elim c 1, h₁, one_smul] at hg
+    exact hg
+  · intro hg
+    refine ⟨1, ?_⟩
+    rw [h₁, one_smul]
+    exact hg
 
 /-- Paper: Proposition A.2.4.4(1), p. 555. The local domain has compact closure in
 the norm-one S-ideles. -/
