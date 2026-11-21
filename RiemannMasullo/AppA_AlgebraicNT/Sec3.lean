@@ -17,8 +17,14 @@ import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
 import Mathlib.MeasureTheory.Measure.Haar.Extension
 import Mathlib.MeasureTheory.Measure.Haar.Quotient
 import Mathlib.MeasureTheory.Measure.Haar.Unique
+import Mathlib.NumberTheory.NumberField.Discriminant.Basic
+import Mathlib.NumberTheory.NumberField.Discriminant.Different
 import Mathlib.Topology.Algebra.IsOpenUnits
+import Mathlib.Topology.Maps.Proper.CompactlyGenerated
+import RiemannMasullo.ForMathlib.Analysis.Fourier.LpSpace
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Extension
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 
 /-! # Haar measures
 
@@ -387,7 +393,73 @@ theorem sAdditiveCovolumeOneMeasure_existsUnique :
     ∃! μ : Measure (SAdeleRing F S), μ.IsAddHaarMeasure ∧ μ.Regular ∧
       ∃ ν : Measure (Multiplicative (SAdeleRing F S) ⧸ Aₛ),
         IsWeilQuotientMeasure Aₛ (show Measure (Multiplicative (SAdeleRing F S)) from μ)
-          Measure.count ν ∧ ν univ = 1 := by sorry
+          Measure.count ν ∧ ν univ = 1 := by
+  let G := Multiplicative (SAdeleRing F S)
+  let H := Aₛ
+  let Q := G ⧸ H
+  obtain ⟨-, hclosed, hdiscrete, -, -, hcompact, -, -⟩ := sAdele_additive_quotient F S
+  let : IsClosed (H : Set G) := hclosed
+  let : DiscreteTopology H := isDiscrete_iff_discreteTopology.mp hdiscrete
+  let : CompactSpace Q := hcompact
+  let (v : Primes(F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let (v : InfinitePlace F) : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace G := by
+    change BorelSpace (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : BorelSpace Q := ⟨rfl⟩
+  let count : Measure H := Measure.count
+  let : count.IsHaarMeasure :=
+    { lt_top_of_isCompact := fun _ hs ↦ Measure.count_apply_lt_top.mpr hs.finite_of_discrete
+      open_pos := fun _ _ hs ↦ Measure.count_ne_zero hs }
+  let ses := TopologicalGroup.IsSES.ofClosedSubgroup H hclosed
+  -- Start with Haar probability measure on the quotient and lift it using counting measure.
+  let K : TopologicalSpace.PositiveCompacts Q := ⟨⟨univ, isCompact_univ⟩, by simp⟩
+  let ν : Measure Q := Measure.haarMeasure K
+  have hν : ν univ = 1 := Measure.haarMeasure_self (K₀ := K)
+  let μ := ses.inducedMeasure count ν
+  have hweil : IsWeilQuotientMeasure H μ count ν := by
+    refine ⟨inferInstance, inferInstance, fun f hf ↦ ?_⟩
+    let fc : CompactlySupportedContinuousMap G ℂ := ⟨f, hf⟩
+    change (∫ x, fc x ∂μ) = _
+    rw [integral_inducedMeasure_complex ses count ν fc, ses.integrate_apply]
+    refine integral_congr_ae (Filter.Eventually.of_forall fun q ↦ ?_)
+    conv_lhs => rw [← QuotientGroup.out_eq' q]
+    exact ses.pushforward_apply_apply count fc q.out
+  refine ⟨μ, ⟨?_, ses.inducedMeasure_regular count ν, ν, hweil, hν⟩, ?_⟩
+  · have hhaar := ses.isHaarMeasure_inducedMeasure count ν
+    exact
+      { toIsFiniteMeasureOnCompacts := hhaar.toIsFiniteMeasureOnCompacts
+        toIsOpenPosMeasure := hhaar.toIsOpenPosMeasure
+        map_add_left_eq_self := fun x ↦ hhaar.map_mul_left_eq_self (Multiplicative.ofAdd x) }
+  rintro μ' ⟨-, hregular, ν', ⟨hhaar', hregular', hweil'⟩, hν'⟩
+  let : (show Measure G from μ').Regular := hregular
+  let : ν'.IsHaarMeasure := hhaar'
+  let : ν'.Regular := hregular'
+  have heq : ν' = ν := by
+    have hscale := Measure.isMulLeftInvariant_eq_smul_of_regular ν' ν
+    have hmass := congrArg (fun m : Measure Q ↦ m univ) hscale
+    change ν' univ = (ν'.haarScalarFactor ν : ℝ≥0∞) * ν univ at hmass
+    rw [hν', hν, mul_one] at hmass
+    rw [hscale, ENNReal.coe_inj.mp hmass.symm, one_smul]
+  subst ν'
+  apply Measure.ext_of_integral_eq_on_compactlySupported (X := G)
+  intro f
+  let fc : C(G, ℂ) := ⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩
+  have hc : HasCompactSupport fc := f.hasCompactSupport.comp_left Complex.ofReal_zero
+  apply Complex.ofReal_injective
+  calc
+    Complex.ofReal (∫ x : G, f x ∂(show Measure G from μ')) =
+        ∫ x : G, (f x : ℂ) ∂(show Measure G from μ') := integral_complex_ofReal.symm
+    _ = ∫ x : G, (f x : ℂ) ∂μ := (hweil' fc hc).trans (hweil.2.2 fc hc).symm
+    _ = Complex.ofReal (∫ x : G, f x ∂μ) := integral_complex_ofReal
 
 /-- Paper: Definition A.3.1.1, p. 555. This normalization gives the additive
 quotient by the diagonal S-integers mass one.
@@ -399,7 +471,131 @@ def sAdditiveCovolumeOneMeasure : Measure (SAdeleRing F S) :=
 for the additive measure normalized by the quotient. -/
 theorem sAdditiveCovolumeOneMeasure_fundamentalDomain :
     sAdditiveCovolumeOneMeasure F S
-      (sAdeleFundamentalDomain F S (RingOfIntegers.basis F)) = 1 := by sorry
+      (sAdeleFundamentalDomain F S (RingOfIntegers.basis F)) = 1 := by
+  classical
+  let G := Multiplicative (SAdeleRing F S)
+  let H := Aₛ
+  let μ : Measure G := sAdditiveCovolumeOneMeasure F S
+  let b := RingOfIntegers.basis F
+  let D : Set G := sAdeleFundamentalDomain F S b
+  let I := integralAdelesOutside F S
+  let p := adeleProjection F S
+  obtain ⟨-, hclosed, hdiscrete, -⟩ := sAdele_additive_quotient F S
+  let : DiscreteTopology H := isDiscrete_iff_discreteTopology.mp hdiscrete
+  let : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  let : Countable ((S : Set (Primes(F))).integer F) := inferInstance
+  let : Countable H := (Set.countable_range dₛ).to_subtype
+  let (v : Primes(F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let (v : InfinitePlace F) : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (BorelSpace ((v : InfinitePlace F) → v.Completion))
+  let : BorelSpace G := by
+    change BorelSpace (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  obtain ⟨hμ, -, ν, hν, hmass⟩ :=
+    Classical.choose_spec (sAdditiveCovolumeOneMeasure_existsUnique F S).exists
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hμ.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hμ.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hμ.map_add_left_eq_self x.toAdd }
+  obtain ⟨e, -, -, he⟩ := integralAdelesOutside_factors F S
+  have hlift (a : SAdeleRing F S) : ∃ c : I, p c.val = a :=
+    ⟨e.symm (a, 0), (he _).1.symm.trans (congrArg Prod.fst (e.apply_symm_apply _))⟩
+  have hIntegral (a : 𝔸[F]) (ha : a ∈ adeleFundamentalDomain F b) : a ∈ I := by
+    have h := ha.2
+    simp only [I, integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+      true_implies] at h ⊢
+    exact fun v _ ↦ h v
+  -- On adeles integral outside S, membership in the two domains agrees under projection.
+  have hproject (a : I) : p a.val ∈ D ↔ a.val ∈ adeleFundamentalDomain F b := by
+    change (_ ∧ ∀ v : S, a.val.2 v.val ∈ v.val.adicCompletionIntegers F) ↔
+      (_ ∧ a.val ∈ integralAdelesOutside F ∅)
+    refine and_congr_right fun _ ↦ ?_
+    have houtside := a.property
+    simp only [I, integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+      true_implies] at houtside ⊢
+    refine ⟨fun h v ↦ ?_, fun h v ↦ h v.val⟩
+    by_cases hv : v ∈ S
+    · exact h ⟨v, hv⟩
+    · exact houtside v hv
+  have hmeas : MeasurableSet D := by
+    have hinf : Continuous (InfiniteAdeleRing.ringEquiv_mixedSpace F) := by
+      change Continuous (fun x : InfiniteAdeleRing F ↦ InfiniteAdeleRing.ringEquiv_mixedSpace F x)
+      simp only [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+      exact (continuous_pi fun v ↦ (isometryEquivRealOfIsReal v.2).continuous.comp
+        (continuous_apply v.1)).prodMk
+        (continuous_pi fun v ↦ (isometryEquivComplexOfIsComplex v.2).continuous.comp
+          (continuous_apply v.1))
+    have hinfMeas : MeasurableSet (infiniteAdeleFundamentalDomain F b) :=
+      (ZSpan.fundamentalDomain_measurableSet _).preimage hinf.measurable
+    have hfinMeas : MeasurableSet {x : ∀ v : S, v.val.adicCompletion F |
+        ∀ v : S, x v ∈ v.val.adicCompletionIntegers F} :=
+      MeasurableSet.univ_pi' fun _ ↦ (Valued.isClosed_integer _).measurableSet
+    exact hinfMeas.prod hfinMeas
+  have hcompact : IsCompact (closure D) := by
+    have hp : Continuous p :=
+      continuous_fst.prodMk (continuous_pi fun v ↦
+        (RestrictedProduct.continuous_eval v.val).comp continuous_snd)
+    refine ((adeleFundamentalDomain_precompact F b).image hp).closure_of_subset ?_
+    intro a ha
+    obtain ⟨c, hc⟩ := hlift a
+    exact ⟨c.val, subset_closure ((hproject c).mp (hc.symm ▸ ha)), hc⟩
+  have hcover (a : G) : ∃ h : H.op, h • a ∈ D := by
+    obtain ⟨c, hc⟩ := hlift a.toAdd
+    have hcu : c.val ∈ ⋃ x : F, algebraMap F 𝔸[F] x +ᵥ adeleFundamentalDomain F b :=
+      (adeleFundamentalDomain_cover F b).symm ▸ mem_univ _
+    obtain ⟨x, hx⟩ := Set.mem_iUnion.mp hcu
+    obtain ⟨y, hy, hxy⟩ := Set.mem_vadd_set.mp hx
+    change algebraMap F 𝔸[F] x + y = c.val at hxy
+    have hxI : algebraMap F 𝔸[F] x ∈ I := by
+      have h := I.sub_mem c.property (hIntegral y hy)
+      rwa [← hxy, add_sub_cancel_right] at h
+    let xS : (S : Set (Primes(F))).integer F :=
+      ⟨x, (diagonal_mem_integralAdelesOutside F S x).mp hxI⟩
+    let h : H := ⟨Multiplicative.ofAdd (dₛ xS), ⟨xS, rfl⟩⟩
+    have hd : Multiplicative.ofAdd (p y) * (h : G) = a := by
+      change p y + p (algebraMap F 𝔸[F] x) = a.toAdd
+      rw [add_comm, ← map_add, hxy, hc]
+    refine ⟨H.equivOp h⁻¹, ?_⟩
+    change a * (h : G)⁻¹ ∈ D
+    rw [← hd, mul_inv_cancel_right]
+    exact (hproject ⟨y, hIntegral y hy⟩).mpr hy
+  have hD : IsFundamentalDomain H.op D μ := by
+    refine IsFundamentalDomain.mk'' hmeas.nullMeasurableSet (Filter.Eventually.of_forall hcover) ?_
+      (fun h ↦ (measurePreserving_smul h μ).quasiMeasurePreserving)
+    intro h hh
+    apply Disjoint.aedisjoint
+    apply Set.disjoint_left.mpr
+    intro a ha haD
+    obtain ⟨y, hy, rfl⟩ := Set.mem_smul_set.mp ha
+    obtain ⟨x, hx⟩ := (H.equivOp.symm h).property
+    change dₛ x = (H.equivOp.symm h).val.toAdd at hx
+    have hx0 : (x : F) ≠ 0 := by
+      intro hzero
+      have : x = 0 := Subtype.ext hzero
+      subst x
+      apply hh
+      apply H.equivOp.symm.injective
+      exact Subtype.ext (by simpa using hx.symm)
+    obtain ⟨c, hc⟩ := hlift y.toAdd
+    let a₀ : I := integralAdeleDiagonal F S x + c
+    have ha₀ : p a₀.val ∈ D := by
+      change p (algebraMap F 𝔸[F] (x : F) + c.val) ∈ D
+      rw [map_add, hc, show p (algebraMap F 𝔸[F] (x : F)) = dₛ x from rfl, hx, add_comm]
+      exact haD
+    refine Set.disjoint_left.mp (adeleFundamentalDomain_disjoint F b (x : F) hx0)
+      (Set.mem_vadd_set.mpr ⟨c.val, (hproject c).mp (hc.symm ▸ hy), rfl⟩)
+      ((hproject a₀).mp ha₀)
+  exact (weilQuotientMeasure_univ_eq_measure_fundamentalDomain (μ := μ) hclosed hν
+    (hmass.trans_ne ENNReal.one_ne_top) hD hcompact hcover).symm.trans hmass
 
 /-- Paper: Definition A.3.1.2(1)–(2), p. 556. Transfer Lebesgue measure from the
 real line or twice plane Lebesgue measure from the complex line to the completion. -/
@@ -417,7 +613,29 @@ theorem infiniteLocalAdditiveTamagawaMeasure_unitBox (v : InfinitePlace F) :
       ((ringEquivRealOfIsReal h).symm '' Icc (0 : ℝ) 1) = 1) ∧
     (∀ h : v.IsComplex, infiniteLocalAdditiveTamagawaMeasure F v
       ((ringEquivComplexOfIsComplex h).symm '' {z : ℂ | z.re ∈ Icc 0 1 ∧ z.im ∈ Icc 0 1}) = 2) :=
-  by sorry
+  by
+    let : BorelSpace v.Completion := ⟨rfl⟩
+    constructor
+    · intro h
+      rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+      let e := (isometryEquivRealOfIsReal h).symm.toHomeomorph.toMeasurableEquiv
+      change (volume : Measure ℝ).map e (e '' Icc 0 1) = 1
+      rw [e.map_apply, e.injective.preimage_image]
+      simp [Real.volume_Icc]
+    · intro h
+      rw [infiniteLocalAdditiveTamagawaMeasure,
+        dite_eq_right (InfinitePlace.not_isReal_iff_isComplex.mpr h)]
+      let e := (isometryEquivComplexOfIsComplex h).symm.toHomeomorph.toMeasurableEquiv
+      let square := Complex.measurableEquivRealProd ⁻¹' (Icc (0 : ℝ) 1 ×ˢ Icc (0 : ℝ) 1)
+      change Measure.map e (2 • (volume : Measure ℂ)) (e '' square) = 2
+      rw [e.map_apply, e.injective.preimage_image]
+      have hvolume : volume square = 1 := by
+        dsimp only [square]
+        rw [Complex.volume_preserving_equiv_real_prod.measure_preimage_equiv,
+          Measure.volume_eq_prod, Measure.prod_prod]
+        simp [Real.volume_Icc]
+      rw [two_nsmul, add_apply, hvolume]
+      norm_num
 
 -- The exponent of v in the global different is the exponent of the local different.
 local notation "differentExp(" F ", " v ")" =>
@@ -448,12 +666,257 @@ theorem finiteLocalAdditiveTamagawaMeasure_integers (v : Primes(F)) :
 /-- Paper: Definition A.3.1.2, p. 556. The local additive Tamagawa measures
 are additive Haar measures on their completions. -/
 theorem finiteLocalAdditiveTamagawaMeasure_isAddHaar (v : Primes(F)) :
-    (finiteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure := by sorry
+    (finiteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure := by
+  let μ := Measure.addHaar (G := v.adicCompletion F)
+  let O := (v.adicCompletionIntegers F : Set (v.adicCompletion F))
+  have hO : IsOpen O := Valued.isOpen_valuationSubring _
+  have hK : IsCompact O := isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v)
+  have hmass := hO.measure_pos μ ⟨0, (v.adicCompletionIntegers F).zero_mem⟩
+  have hnorm : 0 < (v.asIdeal.absNorm : ℝ) :=
+    Nat.cast_pos.mpr (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v))
+  have hsqrt := Real.sqrt_pos_of_pos (pow_pos hnorm (differentExp(F, v)))
+  change ((differentMass(F, v) / μ O) • μ).IsAddHaarMeasure
+  exact Measure.IsAddHaarMeasure.smul μ
+    (ENNReal.div_ne_zero.mpr ⟨ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top,
+      hK.measure_ne_top (μ := μ)⟩)
+    (ENNReal.div_ne_top (ENNReal.inv_ne_top.mpr (ENNReal.ofReal_pos.mpr hsqrt).ne') hmass.ne')
 
 /-- Paper: §A.3.1, p. 556. The local different contributes mass one at
 all but finitely many places, so the finite-tail products have finite support. -/
 theorem finiteLocalTamagawaMass_finite :
-    {v : Primes(F) | differentMass(F, v) ≠ 1}.Finite := by sorry
+    {v : Primes(F) | differentMass(F, v) ≠ 1}.Finite := by
+  have hDifferent : differentIdeal ℤ (𝓞 F) ≠ (0 : Ideal (𝓞 F)) := differentIdeal_ne_bot
+  refine (Ideal.finite_factors hDifferent).subset ?_
+  intro v hv
+  by_contra h
+  exact hv (by simp [multiplicity_eq_zero_of_not_dvd h])
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
+section
+
+omit [NumberField F] in
+/-- The archimedean factors are additive Haar measures by transport from the real and
+complex lines. -/
+private theorem infiniteLocalAdditiveTamagawaMeasure_haar (v : InfinitePlace F) :
+    (infiniteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure := by
+  let : BorelSpace v.Completion := ⟨rfl⟩
+  by_cases h : v.IsReal
+  · rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+    exact (ringEquivRealOfIsReal h).symm.toAddEquiv.isAddHaarMeasure_map volume
+      (isometryEquivRealOfIsReal h).symm.continuous (isometryEquivRealOfIsReal h).continuous
+  · let hc := InfinitePlace.not_isReal_iff_isComplex.mp h
+    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_right h]
+    have : (2 • (volume : Measure ℂ)).IsAddHaarMeasure := by
+      rw [show 2 • (volume : Measure ℂ) = (2 : ℝ≥0∞) • volume by simp [two_smul]]
+      exact Measure.IsAddHaarMeasure.smul (μ := (volume : Measure ℂ)) (by norm_num) (by simp)
+    exact (ringEquivComplexOfIsComplex hc).symm.toAddEquiv.isAddHaarMeasure_map _
+      (isometryEquivComplexOfIsComplex hc).symm.continuous
+      (isometryEquivComplexOfIsComplex hc).continuous
+
+/-- In mixed real and complex coordinates, the archimedean product measure is Lebesgue
+measure multiplied by two for each complex place. -/
+private theorem infiniteLocalAdditiveTamagawaMeasure_map_mixedSpace :
+    (Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)).map
+        (InfiniteAdeleRing.ringEquiv_mixedSpace F) =
+      ((2 : ℝ≥0∞) ^ InfinitePlace.nrComplexPlaces F) • (volume : Measure (mixedEmbedding.mixedSpace F)) := by
+  let μ := infiniteLocalAdditiveTamagawaMeasure F
+  let (v : InfinitePlace F) : BorelSpace v.Completion := ⟨rfl⟩
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let (v : InfinitePlace F) : (μ v).IsAddHaarMeasure :=
+    infiniteLocalAdditiveTamagawaMeasure_haar F v
+  have hsplit := measurePreserving_piEquivPiSubtypeProd μ (fun v ↦ v.IsReal)
+  let reindex : {v : InfinitePlace F // ¬ v.IsReal} ≃ {v : InfinitePlace F // v.IsComplex} :=
+    Equiv.subtypeEquivRight fun _ ↦ InfinitePlace.not_isReal_iff_isComplex
+  have hr (v : {v : InfinitePlace F // v.IsReal}) :
+      MeasurePreserving (ringEquivRealOfIsReal v.2) (μ v) volume := by
+    let e := (isometryEquivRealOfIsReal v.2).toHomeomorph.toMeasurableEquiv
+    refine ⟨e.measurable, ?_⟩
+    change (infiniteLocalAdditiveTamagawaMeasure F v).map e = _
+    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left v.2]
+    change (volume.map e.symm).map e = _
+    rw [Measure.map_map e.measurable e.symm.measurable, e.self_comp_symm, Measure.map_id]
+  have hc (v : {v : InfinitePlace F // ¬ v.IsReal}) :
+      MeasurePreserving (ringEquivComplexOfIsComplex (reindex v).2)
+        (μ v) ((2 : ℝ≥0) • (volume : Measure ℂ)) := by
+    let e := (isometryEquivComplexOfIsComplex (reindex v).2).toHomeomorph.toMeasurableEquiv
+    refine ⟨e.measurable, ?_⟩
+    change (infiniteLocalAdditiveTamagawaMeasure F v).map e = _
+    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_right v.2]
+    change (Measure.map e.symm (2 • (volume : Measure ℂ))).map e = _
+    rw [show 2 • (volume : Measure ℂ) = (2 : ℝ≥0) • volume by simp [two_smul]]
+    rw [Measure.map_map e.measurable e.symm.measurable, e.self_comp_symm, Measure.map_id]
+  have hright := (measurePreserving_piCongrLeft
+    (fun _ : {v : InfinitePlace F // v.IsComplex} ↦ (2 : ℝ≥0) • (volume : Measure ℂ)) reindex).comp
+      (measurePreserving_pi (ι := {v : InfinitePlace F // ¬ v.IsReal}) _ _ hc)
+  let μreal := fun v : {v : InfinitePlace F // v.IsReal} ↦ μ v
+  let μcomplex := fun v : {v : InfinitePlace F // ¬ v.IsReal} ↦ μ v
+  let (v : {v : InfinitePlace F // v.IsReal}) : SigmaFinite (μreal v) :=
+    inferInstanceAs (SigmaFinite (μ v.val))
+  let (v : {v : InfinitePlace F // ¬ v.IsReal}) : SigmaFinite (μcomplex v) :=
+    inferInstanceAs (SigmaFinite (μ v.val))
+  let : SigmaFinite (Measure.pi μreal) := Measure.pi.sigmaFinite μreal
+  let : SigmaFinite (Measure.pi μcomplex) := Measure.pi.sigmaFinite μcomplex
+  have hleft := measurePreserving_pi μreal (fun _ ↦ volume) hr
+  let hreal : SFinite (Measure.pi μreal) := inferInstance
+  let hcomplex : SFinite (Measure.pi μcomplex) := inferInstance
+  have hmap := (hleft.prod (μc := Measure.pi μcomplex) hright).comp hsplit
+  let μr : Measure ({v : InfinitePlace F // v.IsReal} → ℝ) := volume
+  let μc : Measure ({v : InfinitePlace F // v.IsComplex} → ℂ) := volume
+  let k : ℝ≥0 := 2 ^ InfinitePlace.nrComplexPlaces F
+  have hpow : (Measure.pi fun _ : {v : InfinitePlace F // v.IsComplex} ↦
+      (2 : ℝ≥0) • (volume : Measure ℂ)) = k • μc := by
+    apply Measure.pi_eq
+    intro T hT
+    rw [Measure.coe_nnreal_smul_apply, show μc = Measure.pi (fun _ ↦ volume) from volume_pi,
+      Measure.pi_pi]
+    simp only [Measure.coe_nnreal_smul_apply, k, ENNReal.coe_pow, ENNReal.coe_ofNat,
+      Finset.prod_mul_distrib, Finset.prod_const, Finset.card_univ, InfinitePlace.nrComplexPlaces]
+  have hmap' : (Measure.pi μ).map (InfiniteAdeleRing.ringEquiv_mixedSpace F) =
+      μr.prod (Measure.pi fun _ : {v : InfinitePlace F // v.IsComplex} ↦
+        (2 : ℝ≥0) • (volume : Measure ℂ)) := by
+    rw [show μr = Measure.pi (fun _ ↦ volume) from volume_pi]
+    exact hmap.map_eq
+  rw [hmap', hpow]
+  have hk : (k : ℝ≥0∞) = (2 : ℝ≥0∞) ^ InfinitePlace.nrComplexPlaces F := by simp [k]
+  rw [← hk, ← ENNReal.smul_def]
+  change μr.prod (k • μc) = k • μr.prod μc
+  refine Measure.prod_eq fun U V _ _ ↦ ?_
+  rw [Measure.coe_nnreal_smul_apply, Measure.prod_prod, Measure.coe_nnreal_smul_apply,
+    mul_left_comm]
+
+/-- The archimedean fundamental domain has local product mass the square root of the
+absolute discriminant. -/
+private theorem infiniteAdeleFundamentalDomain_tamagawaMass :
+    let B := infiniteAdeleFundamentalDomain F (RingOfIntegers.basis F)
+    MeasurableSet B ∧
+      Measure.pi (infiniteLocalAdditiveTamagawaMeasure F) B =
+        ENNReal.ofReal (Real.sqrt (↑(discr F).natAbs : ℝ)) := by
+  let e := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let D := ZSpan.fundamentalDomain (mixedEmbedding.latticeBasis F)
+  let (v : InfinitePlace F) : BorelSpace v.Completion := ⟨rfl⟩
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let : BorelSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (BorelSpace ((v : InfinitePlace F) → v.Completion))
+  have he : Continuous e := by
+    change Continuous (fun x : InfiniteAdeleRing F ↦ InfiniteAdeleRing.ringEquiv_mixedSpace F x)
+    simp only [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact (continuous_pi fun v ↦ (isometryEquivRealOfIsReal v.2).continuous.comp
+      (continuous_apply v.1)).prodMk
+      (continuous_pi fun v ↦ (isometryEquivComplexOfIsComplex v.2).continuous.comp
+        (continuous_apply v.1))
+  have hD : MeasurableSet D := ZSpan.fundamentalDomain_measurableSet _
+  have hB : infiniteAdeleFundamentalDomain F (RingOfIntegers.basis F) = e ⁻¹' D := by
+    unfold infiniteAdeleFundamentalDomain
+    dsimp only [D]
+    congr 2
+    apply DFunLike.ext
+    intro i
+    rw [Module.Basis.ofZLatticeBasis_apply, Module.Basis.map_apply,
+      mixedEmbedding.latticeBasis_apply, integralBasis_apply]
+    rfl
+  dsimp only
+  rw [hB, ← Measure.map_apply he.measurable hD, infiniteLocalAdditiveTamagawaMeasure_map_mixedSpace,
+    smul_apply, smul_eq_mul, mixedEmbedding.volume_fundamentalDomain_latticeBasis]
+  refine ⟨hD.preimage he.measurable, ?_⟩
+  rw [← mul_assoc, ← mul_pow, ENNReal.mul_inv_cancel (by norm_num) (by simp), one_pow, one_mul]
+  rw [← ENNReal.ofReal_coe_nnreal, Real.coe_sqrt, coe_nnNorm, Int.norm_eq_abs, Nat.cast_natAbs, Int.cast_abs]
+
+/-- The product of the local integer masses is the reciprocal square root of the
+absolute discriminant. -/
+private theorem finiteLocalTamagawaMass_finprod :
+    (∏ᶠ v : Primes(F), differentMass(F, v)) =
+      (ENNReal.ofReal (Real.sqrt (↑(discr F).natAbs : ℝ)))⁻¹ := by
+  let J := differentIdeal ℤ (𝓞 F)
+  have hJ : J ≠ ⊥ := differentIdeal_ne_bot
+  let T := (Ideal.finite_factors hJ).toFinset
+  have hout (v : Primes(F)) (hv : v ∉ T) : differentExp(F, v) = 0 := by
+    apply multiplicity_eq_zero_of_not_dvd
+    simpa [T, J] using hv
+  have hfactor : ∏ v ∈ T, v.asIdeal ^ differentExp(F, v) = J := by
+    rw [← finprod_eq_finsetProd_of_mulSupport_subset
+      (f := fun v : Primes(F) ↦ v.asIdeal ^ differentExp(F, v))]
+    · exact Ideal.finprod_heightOneSpectrum_pow_multiplicity hJ
+    · intro v hv
+      by_contra hn
+      exact hv (by simp [hout v hn])
+  have hnorm : (∏ v ∈ T, (↑(Ideal.absNorm v.asIdeal) : ℝ) ^ differentExp(F, v)) =
+      (↑(discr F).natAbs : ℝ) := by
+    exact_mod_cast (by
+      simpa only [map_prod, map_pow, J, NumberField.absNorm_differentIdeal F (𝓞 F)] using
+        congrArg (fun I : Ideal (𝓞 F) ↦ Ideal.absNorm I) hfactor :
+      (∏ v ∈ T, Ideal.absNorm v.asIdeal ^ differentExp(F, v)) = (discr F).natAbs)
+  rw [finprod_eq_finsetProd_of_mulSupport_subset _ (s := T)]
+  · rw [← ENNReal.prod_inv_distrib, ← ENNReal.ofReal_prod_of_nonneg (fun _ _ ↦ Real.sqrt_nonneg _),
+      ← Real.sqrt_prod T (fun _ _ ↦ by positivity), hnorm]
+    exact fun v _ w _ _ ↦ Or.inr ENNReal.ofReal_ne_top
+  · intro v hv
+    by_contra hn
+    exact hv (by simp [hout v hn])
+
+/-- On the open subring of adeles integral outside S, restriction followed by projection
+to the S-adeles preserves the Haar property. The omitted local integer factors are compact. -/
+private theorem additiveTamagawaMeasure_projected_haar :
+    let I := integralAdelesOutside F S
+    ∃ μ : Measure (SAdeleRing F S), μ.IsAddHaarMeasure ∧
+      ∀ W : Set (SAdeleRing F S), MeasurableSet W →
+        μ W = additiveTamagawaMeasure F {a | a ∈ I ∧ adeleProjection F S a ∈ W} := by
+  let I := integralAdelesOutside F S
+  let p := (adeleProjection F S).comp I.subtype
+  let (v : Primes(F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (v : Primes(F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let (v : InfinitePlace F) : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace (SAdeleRing F S) :=
+    inferInstanceAs (BorelSpace (((v : InfinitePlace F) → v.Completion) ×
+      ((v : S) → v.val.adicCompletion F)))
+  let : LocallyCompactSpace (SAdeleRing F S) :=
+    inferInstanceAs (LocallyCompactSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let : T2Space (SAdeleRing F S) :=
+    inferInstanceAs (T2Space (((v : InfinitePlace F) → v.Completion) ×
+      ((v : S) → v.val.adicCompletion F)))
+  let : BorelSpace 𝔸[F] := ⟨rfl⟩
+  let hAdd : MeasurableAdd 𝔸[F] := by
+    let : Fact (∀ v : Primes(F), IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+      ⟨fun v ↦ Valued.isOpen_valuationSubring _⟩
+    exact ContinuousAdd.measurableAdd
+  let : MeasurableSpace I := borel _
+  let : BorelSpace I := ⟨rfl⟩
+  have hopen : IsOpen (I : Set 𝔸[F]) := by
+    change IsOpen (integralAdelesOutside F S : Set 𝔸[F])
+    simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred]
+    exact (isOpen_restrictedProduct_forall_mem
+      (G := fun v : Primes(F) ↦ v.adicCompletion F)
+      (A := fun v ↦ v.adicCompletionIntegers F) (S : Set (Primes(F)))ᶜ
+      (fun _ _ ↦ Valued.isOpen_valuationSubring _)).preimage continuous_snd
+  let μ := additiveTamagawaMeasure F
+  let : μ.IsAddHaarMeasure :=
+    (Classical.choose_spec (additiveTamagawaMeasure_existsUnique F).exists).1
+  let μI := μ.comap I.subtype
+  let : μI.IsAddHaarMeasure :=
+    Measure.IsAddHaarMeasure.comap (mH := hAdd) (f := I.subtype.toAddMonoidHom) μ
+      hopen.isOpenEmbedding_subtypeVal
+  obtain ⟨e, he, he', hcoord⟩ := integralAdelesOutside_factors F S
+  let E : I ≃ₜ _ := ⟨e.toEquiv, he, he'⟩
+  have hp : (p : I → SAdeleRing F S) = Prod.fst ∘ E := funext fun a ↦ (hcoord a).1.symm
+  have hproper : IsProperMap (p : I → SAdeleRing F S) :=
+    hp ▸ (isProperMap_fst_of_compactSpace.comp E.isProperMap)
+  have hsurj : Surjective p := hp ▸ Prod.fst_surjective.comp E.surjective
+  refine ⟨μI.map p, Measure.isAddHaarMeasure_map μI p.toAddMonoidHom hproper.continuous hsurj
+    (isProperMap_iff_tendsto_cocompact.mp hproper).2, ?_⟩
+  intro W hW
+  rw [Measure.map_apply hproper.continuous.measurable hW]
+  change (μ.comap (Subtype.val : I → 𝔸[F])) (p ⁻¹' W) = _
+  have hi : MeasurableEmbedding (Subtype.val : I → 𝔸[F]) :=
+    hopen.isOpenEmbedding_subtypeVal.measurableEmbedding
+  rw [hi.comap_apply]
+  congr 1
+  ext a
+  exact ⟨fun ⟨x, hx, hxa⟩ ↦ ⟨hxa ▸ x.property, hxa ▸ hx⟩,
+    fun ⟨ha, hWa⟩ ↦ ⟨⟨a, ha⟩, hWa, rfl⟩⟩
 
 /-- Paper: Lemma A.3.1.3, p. 556. The global additive measure is the restricted
 product of the local measures, expressed on rectangles with integral tails.
@@ -465,7 +928,113 @@ theorem additiveTamagawaMeasure_restrictedProduct
         {a | a.1 ∈ B ∧ (∀ v : S, a.2 v.val ∈ U v) ∧ a ∈ integralAdelesOutside F S} =
       Measure.pi (infiniteLocalAdditiveTamagawaMeasure F) B *
         (∏ v : S, finiteLocalAdditiveTamagawaMeasure F v.val (U v)) *
-          ∏ᶠ v : {v : Primes(F) // v ∉ S}, differentMass(F, v.val) := by sorry
+          ∏ᶠ v : {v : Primes(F) // v ∉ S}, differentMass(F, v.val) := by
+  let (v : Primes(F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (v : Primes(F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let (v : InfinitePlace F) : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace (SAdeleRing F S) :=
+    inferInstanceAs (BorelSpace (((v : InfinitePlace F) → v.Completion) ×
+      ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology (SAdeleRing F S) :=
+    inferInstanceAs (SecondCountableTopology (((v : InfinitePlace F) → v.Completion) ×
+      ((v : S) → v.val.adicCompletion F)))
+  let : LocallyCompactSpace (SAdeleRing F S) :=
+    inferInstanceAs (LocallyCompactSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let μarch := infiniteLocalAdditiveTamagawaMeasure F
+  let μf (v : S) := finiteLocalAdditiveTamagawaMeasure F v.val
+  let (v : InfinitePlace F) : (μarch v).IsAddHaarMeasure :=
+    infiniteLocalAdditiveTamagawaMeasure_haar F v
+  have hfinite (v : S) : (μf v).IsAddHaarMeasure := by
+    let O := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F))
+    let μ := Measure.addHaar (G := v.val.adicCompletion F)
+    have hO : IsOpen O := Valued.isOpen_valuationSubring _
+    have hK : IsCompact O := isCompact_iff_compactSpace.mpr inferInstance
+    have hpos : μ O ≠ 0 := (hO.measure_pos μ ⟨0, (v.val.adicCompletionIntegers F).zero_mem⟩).ne'
+    have htop : μ O ≠ ⊤ := hK.measure_ne_top
+    have hnorm : 0 < Ideal.absNorm v.val.asIdeal :=
+      Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr v.val.ne_bot)
+    change ((differentMass(F, v.val) / μ O) • μ).IsAddHaarMeasure
+    rw [div_eq_mul_inv]
+    apply Measure.IsAddHaarMeasure.smul
+    · exact mul_ne_zero (ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top)
+        (ENNReal.inv_ne_zero.mpr htop)
+    · exact ENNReal.mul_ne_top (ENNReal.inv_ne_top.mpr (ENNReal.ofReal_pos.mpr (by positivity)).ne')
+        (ENNReal.inv_ne_top.mpr hpos)
+  let (v : S) : (μf v).IsAddHaarMeasure := hfinite v
+  let μ : Measure (SAdeleRing F S) := (Measure.pi μarch).prod (Measure.pi μf)
+  let : BorelSpace ((v : InfinitePlace F) → v.Completion) := inferInstance
+  let : BorelSpace ((v : S) → v.val.adicCompletion F) := inferInstance
+  let : (Measure.pi μarch).IsAddHaarMeasure := Measure.pi.isAddHaarMeasure _
+  let : (Measure.pi μf).IsAddHaarMeasure := Measure.pi.isAddHaarMeasure _
+  let : μ.IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  obtain ⟨ν, hν, hrect⟩ := additiveTamagawaMeasure_projected_haar F S
+  let : ν.IsAddHaarMeasure := hν
+  let c := ν.addHaarScalarFactor μ
+  have hscale : ν = c • μ := Measure.isAddLeftInvariant_eq_smul ν μ
+  have happly (B' : Set (InfiniteAdeleRing F)) (hB' : MeasurableSet B')
+      (U' : (v : S) → Set (v.val.adicCompletion F)) (hU' : ∀ v, MeasurableSet (U' v)) :
+      additiveTamagawaMeasure F
+          {a | a.1 ∈ B' ∧ (∀ v : S, a.2 v.val ∈ U' v) ∧ a ∈ integralAdelesOutside F S} =
+        (c : ℝ≥0∞) * (Measure.pi μarch B' * ∏ v : S, μf v (U' v)) := by
+    let W : Set (SAdeleRing F S) := B' ×ˢ Set.univ.pi U'
+    have hW : MeasurableSet W := hB'.prod (MeasurableSet.pi (Set.to_countable _) fun v _ ↦ hU' v)
+    have hset : {a : 𝔸[F] | a ∈ integralAdelesOutside F S ∧ adeleProjection F S a ∈ W} =
+        {a | a.1 ∈ B' ∧ (∀ v : S, a.2 v.val ∈ U' v) ∧ a ∈ integralAdelesOutside F S} := by
+      ext a
+      change (a ∈ integralAdelesOutside F S ∧ (a.1 ∈ B' ∧ (fun v : S ↦ a.2 v.val) ∈
+        Set.univ.pi U')) ↔ _
+      simp only [Set.mem_pi, Set.mem_univ, forall_true_left, Set.mem_ofPred_eq]
+      tauto
+    rw [← hset, ← hrect W hW, hscale, smul_apply]
+    change (c : ℝ≥0∞) * ((Measure.pi μarch).prod (Measure.pi μf)) (B' ×ˢ Set.univ.pi U') = _
+    rw [Measure.prod_prod, Measure.pi_pi]
+  let D := infiniteAdeleFundamentalDomain F (RingOfIntegers.basis F)
+  let O (v : S) := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F))
+  let d := ENNReal.ofReal (Real.sqrt (↑(discr F).natAbs : ℝ))
+  obtain ⟨hD, hmassD⟩ := infiniteAdeleFundamentalDomain_tamagawaMass F
+  have hO (v : S) : MeasurableSet (O v) := (Valued.isOpen_valuationSubring _).measurableSet
+  have hdomain : {a : 𝔸[F] | a.1 ∈ D ∧ (∀ v : S, a.2 v.val ∈ O v) ∧
+      a ∈ integralAdelesOutside F S} = adeleFundamentalDomain F (RingOfIntegers.basis F) := by
+    ext a
+    change (_ ∧ (∀ v : S, a.2 v.val ∈ O v) ∧ a ∈ integralAdelesOutside F S) ↔
+      (_ ∧ a ∈ integralAdelesOutside F ∅)
+    simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+      true_implies]
+    refine and_congr_right fun _ ↦ ⟨fun ⟨hin, hout⟩ v ↦ ?_, fun hall ↦ ⟨fun v ↦ hall v.val,
+      fun v _ ↦ hall v⟩⟩
+    by_cases hv : v ∈ S
+    · exact hin ⟨v, hv⟩
+    · exact hout v hv
+  have hnormalize := happly D hD O hO
+  rw [hdomain, additiveTamagawaMeasure_fundamentalDomain, hmassD] at hnormalize
+  simp only [μf, O, finiteLocalAdditiveTamagawaMeasure_integers] at hnormalize
+  let tail := ∏ᶠ v : {v : Primes(F) // v ∉ S}, differentMass(F, v.val)
+  have hsplit : (∏ v : S, differentMass(F, v.val)) * tail = d⁻¹ := by
+    rw [show d⁻¹ = _ from (finiteLocalTamagawaMass_finprod F).symm]
+    rw [← Finset.prod_subtype S (fun _ ↦ Iff.rfl) (fun v ↦ differentMass(F, v)),
+      ← finprod_mem_coe_finset,
+      show tail = ∏ᶠ v ∈ (S : Set (Primes(F)))ᶜ, differentMass(F, v) from
+        finprod_set_coe_eq_finprod_mem (f := fun v ↦ differentMass(F, v))
+          (S : Set (Primes(F)))ᶜ]
+    have hpartition := finprod_mem_inter_mul_sdiff'
+      (f := fun v : Primes(F) ↦ differentMass(F, v)) (s := Set.univ) (S : Set (Primes(F)))
+      ((finiteLocalTamagawaMass_finite F).subset Set.inter_subset_right)
+    rw [Set.univ_inter, ← Set.compl_eq_univ_sdiff, finprod_mem_univ] at hpartition
+    exact hpartition
+  have hdisc : 0 < (discr F).natAbs := Int.natAbs_pos.mpr (discr_ne_zero F)
+  have hcancel : d * d⁻¹ = 1 :=
+    ENNReal.mul_inv_cancel (ENNReal.ofReal_pos.mpr (by positivity)).ne' ENNReal.ofReal_ne_top
+  have hc : (c : ℝ≥0∞) = tail := calc
+    (c : ℝ≥0∞) = (c : ℝ≥0∞) * (d * d⁻¹) := by rw [hcancel, mul_one]
+    _ = ((c : ℝ≥0∞) * (d * ∏ v : S, differentMass(F, v.val))) * tail := by
+      rw [← hsplit, ← mul_assoc d, ← mul_assoc]
+    _ = tail := by rw [← hnormalize, one_mul]
+  rw [happly B hB U hU, hc, mul_comm tail]
+
+end
 
 -- TODO(paper-gap): The S-local equality in (A.3.1.3) fails for the quotient-volume-one
 -- measure of Definition A.3.1.1. For F = ℚ(i) and S archimedean, the product has
@@ -512,10 +1081,45 @@ def IsTamagawaSelfDual (μ : Measure R) (ψ : R → Circle) : Prop :=
 
 end SelfDuality
 
+open scoped FourierTransform in
 /-- Paper: Example A.3.1.5, p. 557. Lebesgue measure is self-dual for the real
 character with phase `2πx`. -/
 theorem realTamagawaMeasure_selfDual :
-    IsTamagawaSelfDual (volume : Measure ℝ) (fun x ↦ Circle.exp (2 * Real.pi * x)) := by sorry
+    IsTamagawaSelfDual (volume : Measure ℝ) (fun x ↦ Circle.exp (2 * Real.pi * x)) := by
+  obtain ⟨e, he⟩ := exists_realPontryaginDualEquiv
+  refine ⟨e, he, ?_⟩
+  let μ : Measure (Multiplicative ℝ) := volume (α := ℝ)
+  let : MeasurableSpace (PontryaginDual (Multiplicative ℝ)) := borel _
+  let : BorelSpace (PontryaginDual (Multiplicative ℝ)) := ⟨rfl⟩
+  let hvol : (volume : Measure ℝ).IsAddHaarMeasure := inferInstance
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hvol.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hvol.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hvol.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := inferInstanceAs (volume : Measure ℝ).Regular
+  refine ⟨e.isHaarMeasure_map μ, Measure.Regular.map e.toHomeomorph, ?_⟩
+  intro f hf₁ hf₂
+  let g : ℝ → ℂ := fun x ↦ f (Multiplicative.ofAdd x)
+  have hFourier : lcaFourier μ f ∘ e = 𝓕 g := by
+    funext y
+    change lcaFourier μ f (e y) = 𝓕 g y.toAdd
+    rw [lcaFourier, Real.fourier_eq]
+    change (∫ x : ℝ, g x * star (e y (Multiplicative.ofAdd x) : ℂ)) =
+      ∫ x : ℝ, Real.fourierChar (-inner ℝ x y.toAdd) • g x
+    congr 1
+    funext x
+    have hPair : e y (Multiplicative.ofAdd x) = Real.fourierChar (x * y.toAdd) := by
+      change e (Multiplicative.ofAdd y.toAdd) (Multiplicative.ofAdd x) = _
+      rw [he, Real.fourierChar_apply', mul_comm x y.toAdd]
+    rw [hPair, Circle.star_addChar, Real.inner_apply, Circle.smul_def, smul_eq_mul, mul_comm]
+  have h := memLp_two_fourier_and_eLpNorm_eq (f := g) hf₁ hf₂
+  have hEmb := e.toHomeomorph.measurableEmbedding
+  refine ⟨hEmb.memLp_map_measure_iff.mpr (hFourier ▸ h.1), ?_⟩
+  calc
+    _ = eLpNorm (lcaFourier μ f ∘ e) 2 μ := hEmb.eLpNorm_map_measure
+    _ = eLpNorm (𝓕 g) 2 volume :=
+      congrArg (fun k : Multiplicative ℝ → ℂ ↦ eLpNorm k 2 μ) hFourier
+    _ = _ := h.2
 
 /-- Paper: Example A.3.1.5, p. 557. Twice plane Lebesgue measure is self-dual
 for the complex character with phase `4π Re(z)`. -/
@@ -561,7 +1165,59 @@ the p-adic character has the phase opposite to the real exponential of that frac
 Deviation: the sign, as in `padicStandardCharacter`. -/
 theorem padicStandardCharacter_div_pow (a : ℤ) (n : ℕ) :
     padicStandardCharacter p ((a : ℚ_[p]) / (p : ℚ_[p]) ^ n) =
-      Circle.exp (-(2 * Real.pi * ((a : ℝ) / (p : ℝ) ^ n))) := by sorry
+      Circle.exp (-(2 * Real.pi * ((a : ℝ) / (p : ℝ) ^ n))) := by
+  have hp0 : (p : ℚ_[p]) ≠ 0 := by exact_mod_cast (Fact.out : p.Prime).ne_zero
+  have hpR : (p : ℝ) ≠ 0 := by exact_mod_cast (Fact.out : p.Prime).ne_zero
+  set x : ℚ_[p] := (a : ℚ_[p]) / (p : ℚ_[p]) ^ n with hx
+  set m := (-x.valuation).toNat with hm
+  -- The cleared element `p ^ m * x` is an integer `b` with `b / p ^ m = a / p ^ n`.
+  obtain ⟨b, hb, hbR⟩ : ∃ b : ℤ, (p : ℚ_[p]) ^ m * x = b ∧
+      (b : ℝ) / (p : ℝ) ^ m = (a : ℝ) / (p : ℝ) ^ n := by
+    rcases le_or_gt n m with h | h
+    · obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le h
+      refine ⟨a * p ^ k, ?_, ?_⟩
+      · rw [hx, hk, pow_add]
+        push_cast
+        field_simp
+      · rw [hk, pow_add]
+        push_cast
+        field_simp
+    · obtain ⟨k, hk⟩ := Nat.exists_eq_add_of_le h.le
+      have hint := padicStandardCharacter_integral p x
+      have hxk : (p : ℚ_[p]) ^ m * x = (a : ℚ_[p]) / (p : ℚ_[p]) ^ k := by
+        rw [hx, hk, pow_add]
+        field_simp
+      rw [← hm, hxk, norm_div, div_le_one (norm_pos_iff.mpr (pow_ne_zero _ hp0)), Padic.norm_p_pow] at hint
+      obtain ⟨c, rfl⟩ := (Padic.norm_int_le_pow_iff_dvd a k).mp hint
+      refine ⟨c, ?_, ?_⟩
+      · rw [hxk]
+        push_cast
+        field_simp
+      · rw [hk, pow_add]
+        push_cast
+        field_simp
+  have hA : (⟨(p : ℚ_[p]) ^ m * x, padicStandardCharacter_integral p x⟩ : ℤ_[p]) = (b : ℤ_[p]) :=
+    Subtype.ext (by
+      change (p : ℚ_[p]) ^ m * x = ((b : ℤ_[p]) : ℚ_[p])
+      rw [hb]
+      simp)
+  have hval : (((PadicInt.toZModPow m (b : ℤ_[p])).val : ℕ) : ℝ) = ((b % (p ^ m : ℕ) : ℤ) : ℝ) := by
+    rw [map_intCast]
+    have := NeZero.of_pos (pow_pos (Fact.out : p.Prime).pos m)
+    exact_mod_cast ZMod.val_intCast (n := p ^ m) b
+  have hdiv := Int.emod_add_mul_ediv b (p ^ m : ℕ)
+  change Circle.exp (-(2 * Real.pi * ((PadicInt.toZModPow m
+    (⟨(p : ℚ_[p]) ^ m * x, padicStandardCharacter_integral p x⟩ : ℤ_[p])).val : ℝ) /
+      (p : ℝ) ^ m)) = _
+  rw [hA, hval, Circle.exp_eq_exp]
+  refine ⟨b / (p ^ m : ℕ), ?_⟩
+  rw [← hbR]
+  have hdivR : ((b % (p ^ m : ℕ) : ℤ) : ℝ) = b - (p : ℝ) ^ m * ((b / (p ^ m : ℕ) : ℤ) : ℝ) := by
+    rw [eq_sub_iff_add_eq]
+    exact_mod_cast hdiv
+  rw [hdivR]
+  field_simp
+  ring
 
 local notation "ℤₚ" => Metric.closedBall (0 : ℚ_[p]) 1
 
@@ -616,7 +1272,17 @@ global rational character takes the value of the standard real character. -/
 theorem ratAdeleStandardCharacter_real (a : 𝔸[ℚ]) (ha : a.2 = 0) :
     ratAdeleStandardCharacter a =
       Circle.exp (2 * Real.pi * extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
-        (a.1 Rat.infinitePlace)) := by sorry
+        (a.1 Rat.infinitePlace)) := by
+  have h0 (q : ℕ) [Fact q.Prime] : padicStandardCharacter q 0 = 1 := by
+    have hval (n : ℕ) (hn : n = 0) (x : ZMod (q ^ n)) : x.val = 0 := by
+      subst hn
+      exact Nat.lt_one_iff.mp (by simpa using x.val_lt)
+    simp only [padicStandardCharacter]
+    rw [hval _ (by simp) _]
+    simp
+  have h0' (v : Primes(ℚ)) : (0 : FiniteAdeleRing (𝓞 ℚ) ℚ) v = 0 := rfl
+  rw [ratAdeleStandardCharacter, ha]
+  simp [h0', h0]
 
 /-- Paper: Example A.3.1.8, p. 558. The global rational character is trivial on the
 diagonally embedded rational numbers. The paper uses this without stating it; it is what
@@ -697,11 +1363,51 @@ def sAdeleStandardCharacter (a : SAdeleRing F S) : Circle :=
   (∏ w : InfinitePlace F, adeleStandardCharacter F (Pi.single w (a.1 w), 0)) *
     ∏ v : S, finiteLocalStandardCharacter F v.val (a.2 v)
 
+/-- The standard p-adic character is trivial at zero. -/
+theorem padicStandardCharacter_zero (p : ℕ) [Fact p.Prime] : padicStandardCharacter p 0 = 1 := by
+  have h (n : ℕ) (hx : ‖(p : ℚ_[p]) ^ n * 0‖ ≤ 1) :
+      PadicInt.toZModPow n (⟨(p : ℚ_[p]) ^ n * 0, hx⟩ : ℤ_[p]) = 0 := by
+    rw [show (⟨(p : ℚ_[p]) ^ n * 0, hx⟩ : ℤ_[p]) = (0 : ℤ_[p]) from Subtype.ext (mul_zero _)]
+    exact map_zero _
+  simp only [padicStandardCharacter]
+  rw [h]
+  simp
+
+/-- The rational adelic character is trivial at zero. -/
+theorem ratAdeleStandardCharacter_zero : ratAdeleStandardCharacter 0 = 1 := by
+  have h₁ : (0 : InfiniteAdeleRing ℚ) Rat.infinitePlace = 0 := rfl
+  have h₂ (v : Primes(ℚ)) : (0 : FiniteAdeleRing (𝓞 ℚ) ℚ) v = 0 := rfl
+  simp [ratAdeleStandardCharacter, h₁, h₂, padicStandardCharacter_zero]
+
+/-- The standard adelic character is trivial at zero. -/
+theorem adeleStandardCharacter_zero : adeleStandardCharacter F 0 = 1 := by
+  simp [adeleStandardCharacter, ratAdeleStandardCharacter_zero]
+
+/-- The local character at a finite place is trivial at zero. -/
+theorem finiteLocalStandardCharacter_zero (v : Primes(F)) :
+    finiteLocalStandardCharacter F v 0 = 1 := by
+  have h : (RestrictedProduct.single (fun w : Primes(F) ↦ w.adicCompletionIntegers F) v
+      (0 : v.adicCompletion F) : FiniteAdeleRing (𝓞 F) F) = 0 :=
+    RestrictedProduct.single_zero _ _
+  simp only [finiteLocalStandardCharacter, h]
+  exact adeleStandardCharacter_zero F
+
 /-- Paper: Example A.3.1.11, p. 559. On an S-adele supported at a single finite
 place, the product character restricts to the trace character at that place. -/
 theorem sAdeleStandardCharacter_single_finite (v : S) (x : v.val.adicCompletion F) :
-    sAdeleStandardCharacter F S (0, Pi.single v x) = finiteLocalStandardCharacter F v.val x :=
-  by sorry
+    sAdeleStandardCharacter F S (0, Pi.single v x) = finiteLocalStandardCharacter F v.val x := by
+  have h₀ (w : InfinitePlace F) : (0 : InfiniteAdeleRing F) w = 0 := rfl
+  have h₁ (w : InfinitePlace F) :
+      adeleStandardCharacter F (Pi.single w ((0 : InfiniteAdeleRing F) w), 0) = 1 := by
+    rw [h₀, Pi.single_zero]
+    exact adeleStandardCharacter_zero F
+  unfold sAdeleStandardCharacter
+  dsimp only
+  rw [Finset.prod_eq_one fun w _ ↦ h₁ w, one_mul, Finset.prod_eq_single v]
+  · rw [Pi.single_eq_same]
+  · intro w _ hw
+    rw [Pi.single_eq_of_ne hw, finiteLocalStandardCharacter_zero]
+  · simp
 
 -- TODO(paper-gap): In Example A.3.1.11, the lattice fails to annihilate itself
 -- under (A.3.1.10) with the real and p-adic signs as printed. For F = ℚ and

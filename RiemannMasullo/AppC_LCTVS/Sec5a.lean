@@ -18,6 +18,7 @@ import RiemannMasullo.ForMathlib.Topology.Compactness.Paracompact
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.LocallyConvex
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
 import Mathlib.Analysis.Calculus.Deriv.Comp
+import Mathlib.Analysis.Calculus.FDeriv.RestrictScalars
 import Mathlib.Analysis.Calculus.MeanValue
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 
@@ -1090,12 +1091,31 @@ theorem WeakGateauxDifferentiableOn.weaklyPartialDifferentiableOn {Ω : Set V}
   intro φ x
   exact (hD.hasDerivWithinAt φ x (EuclideanSpace.single i 1)).differentiableWithinAt
 
+/-- Continuity of a weak directional derivative on the coordinate slices suffices to
+identify all its values with the scalar Fréchet differentials. -/
+theorem HasWeakDirectionalDerivativesOn.hasWeakDifferentialOn {Ω : Set V} (hΩ : IsOpen Ω)
+    (hd : 1 ≤ d) {f : V → E} {D : Ω × V → PettisWeakCompletion E}
+    (hD : HasWeakDirectionalDerivativesOn (k := k) f D)
+    (hc : ∀ i : Fin d, Continuous (fun x : Ω ↦ D (x, EuclideanSpace.single i 1))) :
+    HasWeakDifferentialOn k f D := by
+  have hf : WeaklyContDiffOn k f Ω := (weaklyContDiffOn_iff_continuous_weakPartials hΩ hd f).2
+    fun i ↦ ⟨_, fun φ x ↦ hD.hasDerivWithinAt φ x (EuclideanSpace.single i 1), hc i⟩
+  obtain ⟨_, hA, _⟩ := hf
+  intro φ x
+  obtain ⟨L, hL, _⟩ := hA φ x
+  refine ⟨L, hL, fun v ↦ ?_⟩
+  have hline : HasLineDerivWithinAt k (φ ∘ f)
+      ((show Module.Dual ℂ (StrongDual ℂ E) from D (x, v)) φ) Ω x v := hD.hasDerivWithinAt φ x v
+  exact (hline.hasLineDerivAt (hΩ.mem_nhds x.property)).unique
+    ((hL.hasFDerivAt (hΩ.mem_nhds x.property)).hasLineDerivAt v)
+
 /-- Paper: Lemma C.5.1.16(2), p. 729. A jointly continuous weak Gâteaux derivative
 is the weak differential. -/
 theorem hasWeakDifferentialOn_of_continuous_directional {Ω : Set V} (hΩ : IsOpen Ω)
     (hd : 1 ≤ d) {f : V → E} {D : Ω × V → PettisWeakCompletion E}
     (hD : HasWeakDirectionalDerivativesOn (k := k) f D) (hc : Continuous D) :
-    HasWeakDifferentialOn k f D := by sorry
+    HasWeakDifferentialOn k f D := by
+  exact hD.hasWeakDifferentialOn hΩ hd fun _ ↦ hc.comp (continuous_id.prodMk continuous_const)
 
 variable [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
 
@@ -1105,7 +1125,53 @@ theorem hasStrongDifferentialOn_of_basepoint_continuous_directional {Ω : Set V}
     (hΩ : IsOpen Ω) (hd : 1 ≤ d) {f : V → E} {D : Ω × V → E}
     (hD : HasWeakDirectionalDerivativesOn (k := k) f (toPettisWeakCompletion E ∘ D))
     (hc : ∀ v : V, Continuous (fun x : Ω ↦ D (x, v))) :
-    HasStrongDifferentialOn (k := k) f D := by sorry
+    HasStrongDifferentialOn (k := k) f D := by
+  classical
+  have hp : ∀ i : Fin d, ∃ P : Ω → PettisWeakCompletion E,
+      HasWeakPartialOn i f P ∧ Continuous P := by
+    intro i
+    refine ⟨fun x ↦ toPettisWeakCompletion E (D (x, EuclideanSpace.single i 1)), ?_,
+      (continuous_toPettisWeakCompletion (E := E)).comp (hc _)⟩
+    exact fun φ x ↦ hD.hasDerivWithinAt φ x _
+  obtain ⟨A, hA, hAc⟩ := (weaklyContDiffOn_iff_continuous_weakPartials hΩ hd f).2 hp
+  have hweak : HasWeakDifferentialOn k f (toPettisWeakCompletion E ∘ D) := by
+    intro φ x
+    obtain ⟨L, hL, hLA⟩ := hA φ x
+    refine ⟨L, hL, fun v ↦ ?_⟩
+    have hline := hD.hasDerivWithinAt φ x v
+    have hline' := hL.hasLineDerivWithinAt v
+    have hu : UniqueDiffWithinAt k ((fun t : k ↦ (x : V) + t • v) ⁻¹' Ω) 0 := by
+      apply (hΩ.preimage (continuous_const.add (continuous_id.smul continuous_const))).uniqueDiffWithinAt
+      simpa using x.property
+    exact (hline.derivWithin hu).symm.trans (hline'.derivWithin hu)
+  have hinj : Function.Injective (toPettisWeakCompletion E) := by
+    intro a b hab
+    apply (toWeakSpace ℂ E).injective
+    apply (isEmbedding_toPettisWeakCompletion (E := E)).injective
+    simpa using hab
+  have hformula (x : Ω) (v : V) :
+      D (x, v) = ∑ i : Fin d, algebraMap k ℂ (v i) • D (x, EuclideanSpace.single i 1) := by
+    apply hinj
+    apply LinearMap.ext
+    intro φ
+    obtain ⟨L, _, hL⟩ := hweak φ x
+    change φ (D (x, v)) = φ (∑ i : Fin d, algebraMap k ℂ (v i) • D (x, EuclideanSpace.single i 1))
+    simp only [map_sum, map_smul]
+    have hv (w : V) : φ (D (x, w)) = L w := hL w
+    simp only [hv]
+    have hcoord : (∑ i : Fin d, (v i) • EuclideanSpace.single i (1 : k)) = v := by
+      ext j
+      simp [PiLp.single_apply, Pi.single_apply, Finset.sum_ite_eq']
+    calc
+      L v = L (∑ i : Fin d, (v i) • EuclideanSpace.single i (1 : k)) := by rw [hcoord]
+      _ = ∑ i : Fin d, algebraMap k ℂ (v i) • L (EuclideanSpace.single i 1) := by
+        simp [map_sum, map_smul, Algebra.smul_def, smul_eq_mul]
+  apply hasStrongDifferentialOn_of_weak hΩ hd hweak
+  apply (continuous_finsetSum _ fun i _ ↦ ?_).congr
+  · exact fun p ↦ (hformula p.1 p.2).symm
+  · exact ((continuous_algebraMap k ℂ).comp
+      ((EuclideanSpace.proj (𝕜 := k) i).continuous.comp continuous_snd)).smul
+      ((hc _).comp continuous_fst)
 
 /-- Paper: Lemma C.5.1.17(1), p. 730. Precomposition with a differentiable map
 preserves weak differentiability. -/
@@ -1156,7 +1222,15 @@ theorem HasStrongDifferentialOn.hasDerivWithinAt_curve
     QuasiCompleteSpace ℂ E →
       HasDerivWithinAt (φ ∘ f ∘ γ)
         (φ (D (⟨γ t, hγU ht⟩, derivWithin γ (Ioo a₀ b₀) t)))
-        (Ioo a₀ b₀) t := by sorry
+        (Ioo a₀ b₀) t := by
+  intro _
+  -- The curve hypothesis uses the canonical real normed-space instance on V.
+  clear ‹NormedSpace ℝ V›
+  have hweak := ((hasWeakCompletionDifferentialOn_iff (k := k) hU f _).1 hD.2).1
+  obtain ⟨L, hL, heval⟩ := hweak φ ⟨γ t, hγU ht⟩
+  have hf := (hL.hasFDerivAt (hU.mem_nhds (hγU ht))).restrictScalars ℝ
+  have hcurve := (hγ t (hinterval ht)).hasDerivWithinAt
+  exact (hf.comp_hasDerivWithinAt t hcurve).congr_deriv (heval _).symm
 
 /-- Paper: Theorem C.5.1.21(1, 2), p. 732. Strong continuous differentiability
 is equivalent to a weak differential with a jointly continuous vector-valued lift. -/
@@ -1330,7 +1404,12 @@ the smooth submodule and of every finite-order submodule. -/
 theorem const_mem_vectorSmoothSpace (Ω : Set V) (z : E) :
     (fun _ : Ω ↦ z) ∈ vectorSmoothSpace Ω ∧
       ∀ m : ℕ, (fun _ : Ω ↦ z) ∈ vectorContDiffOrderSpace Ω m ∧
-        (fun _ : V ↦ z) ∈ vectorContDiffOrderSubmodule Ω m := by sorry
+        (fun _ : V ↦ z) ∈ vectorContDiffOrderSubmodule Ω m := by
+  have h3 (m : ℕ) : (fun _ : V ↦ z) ∈ vectorContDiffOrderSubmodule Ω m :=
+    vectorSmoothOn_const Ω z m
+  have h2 (m : ℕ) : (fun _ : Ω ↦ z) ∈ vectorContDiffOrderSpace Ω m :=
+    Submodule.mem_map.mpr ⟨_, h3 m, rfl⟩
+  exact ⟨Submodule.mem_iInf _ |>.mpr h2, fun m ↦ ⟨h2 m, h3 m⟩⟩
 
 -- TODO(paper-gap): C.5.1.24 is false with the global bound at order zero.
 -- On ℝ, x ↦ x² is weakly C¹ even under the recursive scalar reading, and fails order zero.
