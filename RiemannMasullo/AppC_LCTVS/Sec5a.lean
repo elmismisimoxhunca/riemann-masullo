@@ -698,9 +698,45 @@ theorem weaklyDifferentiableOn_iff_existsUnique {Ω : Set V} (hΩ : IsOpen Ω) (
     exact hL.differentiableWithinAt
 
 /-- Paper: Definition C.5.1.6, p. 723. Weak continuous differentiability on an open
-set means continuous differentiability of each scalar evaluation. -/
-theorem weaklyContDiffOn_iff_scalar {Ω : Set V} (hΩ : IsOpen Ω) (f : V → E) :
-    WeaklyContDiffOn k f Ω ↔ ∀ φ : StrongDual ℂ E, ContDiffOn k 1 (φ ∘ f) Ω := by sorry
+set means continuous differentiability of each scalar evaluation.
+The source is finite-dimensional, as in the paper (k^d): for an infinite-dimensional normed
+source, joint continuity of the scalar derivatives does not give continuity in operator norm. -/
+theorem weaklyContDiffOn_iff_scalar [FiniteDimensional k V] {Ω : Set V} (hΩ : IsOpen Ω)
+    (f : V → E) :
+    WeaklyContDiffOn k f Ω ↔ ∀ φ : StrongDual ℂ E, ContDiffOn k 1 (φ ∘ f) Ω := by
+  have hEval {D : Ω × V → PettisWeakCompletion E}
+      (hD : HasWeakDifferentialOn k f D) (φ : StrongDual ℂ E) (x : Ω) (v : V) :
+      (WeakBilin.eval _ φ : PettisWeakCompletion E →L[ℂ] ℂ) (D (x, v)) =
+        fderivWithin k (φ ∘ f) Ω x v := by
+    obtain ⟨L, hL, heval⟩ := hD φ x
+    rw [hL.fderivWithin (hΩ.uniqueDiffOn x x.property)]
+    exact heval v
+  constructor
+  · rintro ⟨D, hD, hDc⟩ φ
+    have hDiff : DifferentiableOn k (φ ∘ f) Ω := by
+      intro x hx
+      obtain ⟨_, hL, _⟩ := hD φ ⟨x, hx⟩
+      exact hL.differentiableWithinAt
+    have hCont : ContinuousOn (fderivWithin k (φ ∘ f) Ω) Ω := by
+      apply continuousOn_clm_apply.mpr
+      intro v
+      apply continuousOn_iff_continuous_domRestrict.mpr
+      change Continuous (fun x : Ω ↦ fderivWithin k (φ ∘ f) Ω x v)
+      let ev : PettisWeakCompletion E →L[ℂ] ℂ := WeakBilin.eval _ φ
+      exact (ev.continuous.comp (hDc.comp (continuous_id.prodMk continuous_const))).congr
+        (fun x ↦ hEval hD φ x v)
+    simpa using (contDiffOn_succ_iff_fderivWithin (n := 0) hΩ.uniqueDiffOn).2
+      ⟨hDiff, by simp, contDiffOn_zero.mpr hCont⟩
+  · intro hf
+    have hDiff : WeaklyDifferentiableOn k f Ω := fun φ ↦ (hf φ).differentiableOn (by simp)
+    obtain ⟨D, hD, _⟩ := (weaklyDifferentiableOn_iff_existsUnique hΩ f).mp hDiff
+    refine ⟨D, hD, WeakBilin.continuous_of_continuous_eval _ ?_⟩
+    intro φ
+    have hCont : Continuous (fun x : Ω ↦ fderivWithin k (φ ∘ f) Ω x) :=
+      continuousOn_iff_continuous_domRestrict.mp
+        ((hf φ).continuousOn_fderivWithin hΩ.uniqueDiffOn le_rfl)
+    exact ((hCont.comp continuous_fst).clm_apply continuous_snd).congr
+      (fun p ↦ (hEval hD φ p.1 p.2).symm)
 
 /-- Paper: Definition C.5.1.8(1), p. 724. The continuous differential in the weak
 completion is linear in the direction and has a vanishing normalized remainder there. -/
@@ -1238,7 +1274,14 @@ theorem vectorContDiffOn_iff_weakDifferential {Ω : Set V} (hΩ : IsOpen Ω)
     (hd : 1 ≤ d) (f : V → E) :
     VectorContDiffOn (k := k) Ω f ↔
       ∃ D : Ω × V → E, HasWeakDifferentialOn k f (toPettisWeakCompletion E ∘ D) ∧
-        Continuous D := by sorry
+        Continuous D := by
+  constructor
+  · rintro ⟨D, hD⟩
+    -- Lemma C.5.1.12 turns the strong remainder into the scalar weak differential.
+    exact ⟨D, ((hasWeakCompletionDifferentialOn_iff hΩ f _).1 hD.2).1, hD.1⟩
+  · rintro ⟨D, hD, hc⟩
+    -- Lemma C.5.1.13(2): a continuous E-valued weak differential is strong.
+    exact ⟨D, hasStrongDifferentialOn_of_weak hΩ hd hD hc⟩
 
 /-- Paper: Theorem C.5.1.21(1, 3), p. 732. Strong continuous differentiability
 is equivalent to weak coordinate partials with continuous vector-valued lifts. -/
@@ -1246,7 +1289,42 @@ theorem vectorContDiffOn_iff_weakPartials {Ω : Set V} (hΩ : IsOpen Ω)
     (hd : 1 ≤ d) (f : V → E) :
     VectorContDiffOn (k := k) Ω f ↔
       ∀ i : Fin d, ∃ D : Ω → E, HasWeakPartialOn i f (toPettisWeakCompletion E ∘ D) ∧
-        Continuous D := by sorry
+        Continuous D := by
+  rw [vectorContDiffOn_iff_weakDifferential hΩ hd f]
+  let e (i : Fin d) := EuclideanSpace.single i (1 : k)
+  constructor
+  · rintro ⟨D, hD, hc⟩ i
+    refine ⟨fun x ↦ D (x, e i), ?_, hc.comp (continuous_id.prodMk continuous_const)⟩
+    intro φ x
+    obtain ⟨L, hL, heval⟩ := hD φ x
+    change HasLineDerivWithinAt k (φ ∘ f) (φ (D (x, e i))) Ω (x : V) (e i)
+    rw [show φ (D (x, e i)) = L (e i) from heval (e i)]
+    exact hL.hasLineDerivWithinAt (e i)
+  · intro h
+    choose P hP hPc using h
+    obtain ⟨_, hWeak, _⟩ := (weaklyContDiffOn_iff_continuous_weakPartials hΩ hd f).2
+      (fun i ↦ ⟨_, hP i, continuous_toPettisWeakCompletion.comp (hPc i)⟩)
+    let D (p : Ω × V) : E := ∑ i, algebraMap k ℂ (p.2 i) • P i p.1
+    refine ⟨D, ?_, continuous_finsetSum _ fun i _ ↦ ?_⟩
+    · intro φ x
+      obtain ⟨L, hL, _⟩ := hWeak φ x
+      refine ⟨L, hL, fun v ↦ ?_⟩
+      have hpartial (i : Fin d) : φ (P i x) = L (e i) := by
+        have hp : HasLineDerivWithinAt k (φ ∘ f) (φ (P i x)) Ω (x : V) (e i) :=
+          hP i φ x
+        have hx := hΩ.mem_nhds x.property
+        exact (hp.hasLineDerivAt hx).unique ((hL.hasFDerivAt hx).hasLineDerivAt (e i))
+      have hcoord : (∑ i, v i • e i) = v := by
+        simpa only [EuclideanSpace.basisFun_repr, EuclideanSpace.basisFun_apply, e] using
+          (EuclideanSpace.basisFun (Fin d) k).sum_repr v
+      change φ (∑ i, algebraMap k ℂ (v i) • P i x) = L v
+      calc
+        _ = L (∑ i, v i • e i) := by
+          simp only [map_sum, map_smul, hpartial, Algebra.smul_def, Algebra.algebraMap_self_apply]
+        _ = L v := congrArg L hcoord
+    · exact ((continuous_algebraMap k ℂ).comp
+        ((EuclideanSpace.proj (𝕜 := k) i).continuous.comp continuous_snd)).smul
+        ((hPc i).comp continuous_fst)
 
 /-- Paper: Theorem C.5.1.21(1, 4), p. 732. Strong continuous differentiability
 is equivalent to jointly continuous vector-valued lifts of the weak directional limits. -/
@@ -1255,7 +1333,13 @@ theorem vectorContDiffOn_iff_weakDirectional {Ω : Set V} (hΩ : IsOpen Ω)
     VectorContDiffOn (k := k) Ω f ↔
       ∃ D : Ω × V → E,
         HasWeakDirectionalDerivativesOn (k := k) f (toPettisWeakCompletion E ∘ D) ∧
-          Continuous D := by sorry
+          Continuous D := by
+  constructor
+  · rintro ⟨D, hc, hD⟩
+    exact ⟨D, hD.hasWeakDirectionalDerivativesOn hΩ, hc⟩
+  · rintro ⟨D, hD, hc⟩
+    exact ⟨D, hasStrongDifferentialOn_of_basepoint_continuous_directional hΩ hd hD
+      (fun _ ↦ hc.comp (continuous_id.prodMk continuous_const))⟩
 
 /-- Paper: Lemma C.5.1.22, p. 732. If all scalar evaluations extend with one
 continuous derivative, the vector-valued function extends uniquely as a continuous map
