@@ -20,6 +20,8 @@ import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
 import Mathlib.Topology.MetricSpace.Thickening
 import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import Mathlib.Analysis.Normed.Module.Connected
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.VectorMeasure.Integral
 
@@ -1851,13 +1853,251 @@ theorem vectorMeromorphic_inv :
 -- changes. Residue linearity below uses the common domain of the representatives.
 
 variable [T2Space E] [PolynormableSpace ℂ E] [QuasiCompleteSpace ℂ E]
+/-! ### Local Laurent expansions -/
+
+/-- Integer powers of the local coordinate are continuous away from the center. -/
+private theorem continuousOn_zpow_sub {z : ℂ} {e : ℤ} {s : Set ℂ}
+    (hs : ∀ w ∈ s, w - z ≠ 0) : ContinuousOn (fun w ↦ (w - z) ^ e) s := by
+  rcases le_or_gt 0 e with hpos | hneg
+  · have heq : ∀ w : ℂ, (w - z) ^ e = (w - z) ^ (e.toNat : ℕ) := fun w =>
+      (congrArg (fun x : ℤ => (w - z) ^ x) (Int.toNat_of_nonneg hpos).symm).trans
+        (zpow_natCast (w - z) e.toNat)
+    simp only [heq]
+    exact (continuousOn_id.sub continuousOn_const).pow _
+  · obtain ⟨m, hm⟩ : ∃ m : ℕ, e = -(((m + 1 : ℕ) : ℕ) : ℤ) :=
+      ⟨(-e - 1).toNat, by
+        have h1 : (((-e - 1).toNat : ℕ) : ℤ) = -e - 1 :=
+          Int.toNat_of_nonneg (show (0 : ℤ) ≤ -e - 1 by omega)
+        push_cast
+        rw [h1]
+        omega⟩
+    have heq : ∀ w : ℂ, (w - z) ^ e = ((w - z) ^ (m + 1 : ℕ))⁻¹ := by
+      intro w
+      rw [hm, zpow_neg, zpow_natCast]
+    simp only [heq]
+    exact ContinuousOn.inv₀ ((continuousOn_id.sub continuousOn_const).pow _)
+      (fun w hw => pow_ne_zero (m + 1) (hs w hw))
+
+omit [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E] [QuasiCompleteSpace ℂ E] in
+/-- A holomorphic function is weakly holomorphic. -/
+private theorem vectorHolomorphicOn_weaklyHolomorphic {U : Set ℂ} (hU : IsOpen U)
+    {g : ℂ → E} (hg : VectorHolomorphicOn g U) : WeaklyHolomorphicOn g U := by
+  intro φ v hv
+  have h := VectorHolomorphicOn.hasDerivAt_comp hg hU φ ⟨v, hv⟩
+  exact h.differentiableAt.differentiableWithinAt
+
+omit [ContinuousSMul ℂ E] [T2Space E] [QuasiCompleteSpace ℂ E] in
+/-- Uniform convergence in the target is preserved by multiplication with a scalar
+function bounded on the set. -/
+private theorem TendstoUniformlyOn.bounded_smul {ι : Type*} {l : Filter ι}
+    {F : ι → ℂ → E} {g : ℂ → E} {s : Set ℂ} (h : TendstoUniformlyOn F g l s)
+    (c : ℂ → ℂ) (hB : ∃ B : ℝ, ∀ w ∈ s, ‖c w‖ ≤ B) :
+    TendstoUniformlyOn (fun i w ↦ c w • F i w) (fun w ↦ c w • g w) l s := by
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  rw [IsTopologicalAddGroup.tendstoUniformlyOn_iff _ _ _ _ rfl] at h ⊢
+  intro u hu
+  obtain ⟨B, hB⟩ := hB
+  obtain ⟨q, hq, hqu⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hu
+  let δ : ℝ := 1 / (max B 1)
+  have hδ : 0 < δ := by positivity
+  filter_upwards [h (q.ball 0 δ) (q.ball_mem_nhds hq hδ)] with i hi w hw
+  apply hqu
+  rw [Seminorm.mem_ball_zero, ← smul_sub]
+  have hlt : q (F i w - g w) < δ := by simpa [Seminorm.mem_ball_zero] using hi w hw
+  calc q (c w • (F i w - g w))
+      = ‖c w‖ * q (F i w - g w) := map_smul_eq_mul q _ _
+    _ ≤ max B 1 * q (F i w - g w) :=
+        mul_le_mul_of_nonneg_right ((hB w hw).trans (le_max_left _ _)) (apply_nonneg q _)
+    _ < max B 1 * δ := mul_lt_mul_of_pos_left hlt (by positivity)
+    _ = 1 := by
+        simp only [δ]
+        exact mul_div_cancel₀ 1 (by positivity)
+
+omit [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E] [QuasiCompleteSpace ℂ E] in
+/-- On a circle in the punctured disc of convergence, integrating a scalar evaluation
+of the function against the local coordinate to the power `-k - 1` gives `2πi`
+times the scalar evaluation of the Laurent coefficient at `k`. -/
+private theorem circleIntegral_dual_laurentCoeff {a : ℤ → E}
+    {N : ℤ} {r R : ℝ} (hR : 0 < R) (hRr : R < r) (hzero : ∀ k < N, a k = 0)
+    (hconv : ∀ K : Set ℂ, K ⊆ Metric.ball z r \ {z} → IsCompact K →
+      TendstoUniformlyOn
+        (fun n w ↦ ∑ j ∈ Finset.range n, (w - z) ^ (N + (j : ℤ)) • a (N + (j : ℤ)))
+        f atTop K)
+    (φ : StrongDual ℂ E) (k : ℤ) :
+    circleIntegral (fun w ↦ (w - z) ^ (-k - 1) * φ (f w)) z R =
+      (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) := by
+  have hne (w : ℂ) (hw : w ∈ Metric.sphere z R) : w - z ≠ 0 :=
+    sub_ne_zero.mpr (Metric.ne_of_mem_sphere hw hR.ne')
+  have hsub : Metric.sphere z R ⊆ Metric.ball z r \ {z} := by
+    intro w hw
+    exact ⟨Metric.mem_ball.mpr ((Metric.mem_sphere.mp hw).trans_lt hRr),
+      sub_ne_zero.mp (hne w hw)⟩
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : UniformSpace ℂ := PseudoMetricSpace.toUniformSpace
+  have hscalar := φ.uniformContinuous.comp_tendstoUniformlyOn
+    (hconv _ hsub (isCompact_sphere z R))
+  let term (j : ℕ) (w : ℂ) := (w - z) ^ (N + (j : ℤ) - k - 1) • φ (a (N + (j : ℤ)))
+  have hterm (j : ℕ) : ContinuousOn (term j) (Metric.sphere z R) :=
+    ((continuousOn_id.sub continuousOn_const).zpow₀ _ fun w hw ↦ Or.inl (hne w hw)).smul
+      continuousOn_const
+  have hweighted : TendstoUniformlyOn (fun n w ↦ ∑ j ∈ Finset.range n, term j w)
+      (fun w ↦ (w - z) ^ (-k - 1) * φ (f w)) atTop (Metric.sphere z R) := by
+    rw [Metric.tendstoUniformlyOn_iff] at hscalar ⊢
+    intro ε hε
+    have hbound : 0 < R ^ (-k - 1) := zpow_pos hR _
+    filter_upwards [hscalar (ε / R ^ (-k - 1)) (div_pos hε hbound)] with n hn w hw
+    have hsum :
+        ∑ j ∈ Finset.range n, term j w =
+          (w - z) ^ (-k - 1) * φ (∑ j ∈ Finset.range n,
+            (w - z) ^ (N + (j : ℤ)) • a (N + (j : ℤ))) := by
+      rw [map_sum, Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro j _
+      have hexp : N + (j : ℤ) - k - 1 = (-k - 1) + (N + (j : ℤ)) := by omega
+      simp [term, hexp, zpow_add₀ (hne w hw), smul_eq_mul, mul_assoc]
+    have hnorm : ‖w - z‖ = R := by simpa only [dist_eq_norm] using Metric.mem_sphere.mp hw
+    rw [hsum, dist_eq_norm, ← mul_sub, norm_mul, norm_zpow, hnorm, ← dist_eq_norm,
+      ← lt_div_iff₀' hbound]
+    exact hn w hw
+  have hlim := hweighted.tendsto_circleIntegral_of_continuousOn hR.le
+    (Eventually.of_forall fun n ↦ continuousOn_finsetSum _ fun j _ ↦ hterm j)
+  have hintegral (j : ℕ) : circleIntegral (term j) z R =
+      if N + (j : ℤ) = k then (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) else 0 := by
+    dsimp only [term]
+    rw [circleIntegral.integral_smul_const]
+    split_ifs with hj
+    · rw [hj, show k - k - 1 = (-1 : ℤ) by omega]
+      simp only [zpow_neg_one, circleIntegral.integral_sub_center_inv z hR.ne', smul_eq_mul]
+    · have hpow : N + (j : ℤ) - k - 1 ≠ -1 := by omega
+      rw [circleIntegral.integral_sub_zpow_of_ne hpow, zero_smul]
+  -- Only the summand whose shifted exponent is minus one contributes.
+  have heventual : ∀ᶠ n : ℕ in atTop, circleIntegral (fun w ↦ ∑ j ∈ Finset.range n, term j w)
+      z R = (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) := by
+    filter_upwards [eventually_gt_atTop (k - N).toNat] with n hn
+    rw [circleIntegral.integral_fun_sum fun j _ ↦ ContinuousOn.circleIntegrable hR.le (hterm j)]
+    simp only [hintegral]
+    by_cases hk : N ≤ k
+    · have hj : N + ((k - N).toNat : ℤ) = k := by omega
+      rw [Finset.sum_eq_single (k - N).toNat]
+      · rw [ite_eq_left hj]
+      · intro j _ hj'
+        have : N + (j : ℤ) ≠ k := by omega
+        simp [this]
+      · exact fun h ↦ (h (Finset.mem_range.mpr hn)).elim
+    · have hak : a k = 0 := hzero k (lt_of_not_ge hk)
+      have hj (j : ℕ) : N + (j : ℤ) ≠ k := by omega
+      simp [hj, hak]
+  exact tendsto_nhds_unique hlim (tendsto_const_nhds.congr' (heventual.mono fun _ hn ↦ hn.symm))
+
+omit [ContinuousSMul ℂ E] [QuasiCompleteSpace ℂ E] in
+/-- A vector Laurent series is determined by its scalarizations, each of which is
+recovered from a circle integral. -/
+private theorem HasVectorLaurentSeriesAt.unique {a b : ℤ → E}
+    (ha : HasVectorLaurentSeriesAt f z a) (hb : HasVectorLaurentSeriesAt f z b) : a = b := by
+  let _ : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  obtain ⟨Na, ra, hra, hza, hconva⟩ := ha
+  obtain ⟨Nb, rb, hrb, hzb, hconvb⟩ := hb
+  have hmin : 0 < min ra rb := lt_min hra hrb
+  have hR : 0 < min ra rb / 2 := by positivity
+  have hRa : min ra rb / 2 < ra := (half_lt_self hmin).trans_le (min_le_left _ _)
+  have hRb : min ra rb / 2 < rb := (half_lt_self hmin).trans_le (min_le_right _ _)
+  have hc : (2 * (Real.pi : ℂ) * Complex.I) ≠ 0 :=
+    mul_ne_zero (mul_ne_zero two_ne_zero (by exact_mod_cast Real.pi_ne_zero)) Complex.I_ne_zero
+  ext k
+  rw [SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)]
+  intro φ
+  exact mul_left_cancel₀ hc
+    ((circleIntegral_dual_laurentCoeff hR hRa hza hconva φ k).symm.trans
+      (circleIntegral_dual_laurentCoeff hR hRb hzb hconvb φ k))
+
+omit [ContinuousSMul ℂ E] [T2Space E] [QuasiCompleteSpace ℂ E] in
+/-- A holomorphic Taylor expansion, divided by a power of the local coordinate,
+is a Laurent expansion of the cleared function. -/
+private theorem hasVectorLaurentSeriesAt_of_taylor {g : ℂ → E} {b : ℕ → E} {n : ℕ} {r : ℝ}
+    (hr : 0 < r)
+    (hb : ∀ ρ : ℝ, 0 < ρ → Metric.closedBall z ρ ⊆ Metric.ball z r →
+      TendstoUniformlyOn (fun m w ↦ ∑ k ∈ Finset.range m, (w - z) ^ k • b k)
+        g atTop (Metric.closedBall z ρ))
+    (heq : EqOn g (fun w ↦ (w - z) ^ n • f w) (Metric.ball z r \ {z})) :
+    HasVectorLaurentSeriesAt f z
+      (fun k : ℤ ↦ if -(n : ℤ) ≤ k then b (k + n).toNat else 0) := by
+  let N : ℤ := -(n : ℤ)
+  let a : ℤ → E := fun k ↦ if N ≤ k then b (k - N).toNat else 0
+  have ha_eq : a = fun k : ℤ ↦ if -(n : ℤ) ≤ k then b (k + n).toNat else 0 := by
+    funext k
+    simp only [a, N, sub_eq_add_neg, neg_neg]
+  rw [← ha_eq]
+  refine ⟨N, r, hr, fun k hk ↦ by simp [a, hk.not_ge], fun K hK hKcomp ↦ ?_⟩
+  obtain ⟨ρ, hρ0, hρr, hKρ⟩ : ∃ ρ : ℝ, 0 < ρ ∧ ρ < r ∧ K ⊆ Metric.closedBall z ρ := by
+    rcases K.eq_empty_or_nonempty with rfl | hne
+    · exact ⟨r / 2, by positivity, by linarith, by simp⟩
+    · obtain ⟨w, hw, hmax⟩ := hKcomp.exists_isMaxOn hne
+        (continuous_id.dist continuous_const).continuousOn
+      exact ⟨dist w z, dist_pos.mpr (hK hw).2, Metric.mem_ball.mp (hK hw).1,
+        fun x hx ↦ Metric.mem_closedBall.mpr (hmax hx)⟩
+  have huni := (hb ρ hρ0 (Metric.closedBall_subset_ball hρr)).mono hKρ
+  let c : ℂ → ℂ := fun w ↦ (w - z) ^ N
+  have hcne : ∀ w ∈ K, w - z ≠ 0 := fun w hw ↦ sub_ne_zero.mpr (hK hw).2
+  have hB : ∃ B : ℝ, ∀ w ∈ K, ‖c w‖ ≤ B :=
+    ⟨_, hKcomp.exists_bound_of_continuousOn (continuousOn_zpow_sub hcne) |>.choose_spec⟩
+  have hsmul := TendstoUniformlyOn.bounded_smul huni c hB
+  have hpartial : ∀ m : ℕ, EqOn
+      (fun w ↦ c w • ∑ j ∈ Finset.range m, (w - z) ^ j • b j)
+      (fun w ↦ ∑ j ∈ Finset.range m, (w - z) ^ (N + (j : ℤ)) • a (N + (j : ℤ))) K := by
+    intro m w hw
+    show c w • (∑ j ∈ Finset.range m, (w - z) ^ j • b j) =
+      ∑ j ∈ Finset.range m, (w - z) ^ (N + (j : ℤ)) • a (N + (j : ℤ))
+    rw [Finset.smul_sum]
+    refine Finset.sum_congr rfl fun j _ ↦ ?_
+    have hle : N ≤ N + (j : ℤ) := by omega
+    have hidx : (N + (j : ℤ) - N).toNat = j := by
+      rw [add_sub_cancel_left, Int.toNat_natCast]
+    simp only [a, ite_eq_left hle, hidx, smul_smul]
+    rw [← zpow_natCast (w - z) j, zpow_add₀ (hcne w hw)]
+  have hlim : EqOn (fun w ↦ c w • g w) f K := by
+    intro w hw
+    show c w • g w = f w
+    have hgw : g w = (w - z) ^ n • f w := heq ⟨(hK hw).1, (hK hw).2⟩
+    have hne := hcne w hw
+    rw [hgw]
+    change (w - z) ^ N • ((w - z) ^ n • f w) = f w
+    rw [smul_smul, ← zpow_natCast (w - z) n, ← zpow_add₀ hne]
+    have hexp : N + (n : ℤ) = 0 := by simp [N]
+    rw [hexp, zpow_zero, one_smul]
+  exact TendstoUniformlyOn.congr_right
+    (TendstoUniformlyOn.congr hsmul (Eventually.of_forall hpartial)) hlim
 
 /-- Paper: Definition C.5.3.1, p. 739. Every point of the domain of a meromorphic
 pair has a unique local Laurent expansion in the original target.
 Deviation: Includes the ordinary Taylor expansion at points outside the exceptional set. -/
 theorem IsVectorMeromorphicOn.existsUnique_laurentSeries (hΩ : IsOpen Ω)
     (hf : IsVectorMeromorphicOn f Ω D) (hz : z ∈ Ω) :
-    ∃! a : ℤ → E, HasVectorLaurentSeriesAt f z a := by sorry
+    ∃! a : ℤ → E, HasVectorLaurentSeriesAt f z a := by
+  have : IsOpen Ω := hΩ
+  suffices ∃ a : ℤ → E, HasVectorLaurentSeriesAt f z a by
+    obtain ⟨a, ha⟩ := this
+    exact existsUnique_of_exists_of_unique ⟨a, ha⟩ fun a₁ a₂ ha₁ ha₂ ↦
+      HasVectorLaurentSeriesAt.unique ha₁ ha₂
+  by_cases hzD : z ∈ D
+  · obtain ⟨n, r, g, hr, -, hg, heq⟩ := hf.2.2.2.2 z hzD
+    have hweak : WeaklyHolomorphicOn g (Metric.ball z r) :=
+      vectorHolomorphicOn_weaklyHolomorphic Metric.isOpen_ball hg
+    obtain ⟨b, hb⟩ :=
+      (weaklyHolomorphicOn_iff_taylor Metric.isOpen_ball (Metric.isConnected_ball hr) g).mp
+      hweak z (Metric.mem_ball_self hr)
+    exact ⟨_, hasVectorLaurentSeriesAt_of_taylor hr hb heq⟩
+  · have hopen : IsOpen (Ω \ D) := hf.2.2.1
+    obtain ⟨r, hr, hsub⟩ := Metric.nhds_basis_ball.mem_iff.mp (hopen.mem_nhds ⟨hz, hzD⟩)
+    have hg : VectorHolomorphicOn f (Metric.ball z r) := hf.2.2.2.1.mono hsub
+    have hweak : WeaklyHolomorphicOn f (Metric.ball z r) :=
+      vectorHolomorphicOn_weaklyHolomorphic Metric.isOpen_ball hg
+    obtain ⟨b, hb⟩ :=
+      (weaklyHolomorphicOn_iff_taylor Metric.isOpen_ball (Metric.isConnected_ball hr) f).mp
+      hweak z (Metric.mem_ball_self hr)
+    have heq : EqOn f (fun w ↦ (w - z) ^ (0 : ℕ) • f w) (Metric.ball z r \ {z}) := by
+      intro w _
+      simp
+    exact ⟨_, hasVectorLaurentSeriesAt_of_taylor hr hb heq⟩
 
 /-- Paper: Coefficient notation in Lemma C.5.3.2, p. 740. A coefficient is read
 from the local Laurent expansion, with existence supplied as evidence. -/
@@ -2019,5 +2259,6 @@ theorem IsVectorMeromorphicOn.eqOn_of_eqOn_ball (hΩ : IsOpen Ω) (hconn : IsCon
     EqOn f g (Ω \ (D ∪ D')) := by sorry
 
 end ResidueTheorem
+
 
 end RiemannMasullo
