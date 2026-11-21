@@ -1096,6 +1096,63 @@ theorem exists_vectorPeriodicSmoothDerivativeSeminorm (q : Seminorm ℂ E) (hq :
         HasVectorMultiPartial α f.val g ∧ BddAbove (range (q ∘ g)) ∧
           s f = ⨆ x : V, q (g x) := by sorry
 
+omit hAdd hSMul hSemi hT2 in
+/-- A continuous seminorm is bounded above on every von Neumann bounded set. -/
+private theorem bddAbove_image_continuous_seminorm_of_isVonNBounded
+    {q : Seminorm ℂ E} (hq : Continuous q) {s : Set E} (hs : IsVonNBounded ℂ s) :
+    BddAbove (q '' s) := by
+  obtain ⟨a, ha, ha0⟩ :=
+    ((hs (q.ball_mem_nhds hq one_pos)).and (eventually_ne_cobounded (0 : ℂ))).exists
+  refine ⟨‖a‖, ?_⟩
+  rintro y ⟨z, hz, rfl⟩
+  obtain ⟨w, hw, hwz⟩ := ha hz
+  rw [Seminorm.mem_ball_zero] at hw
+  rw [← hwz]
+  change q (a • w) ≤ ‖a‖
+  rw [map_smul_eq_mul]
+  exact ((mul_lt_mul_of_pos_left hw (norm_pos_iff.mpr ha0)).trans_eq (mul_one _)).le
+
+omit hAdd hSMul in
+/-- Successive weak coordinate partials along a fixed list of coordinates are unique. -/
+private theorem hasPartials_unique :
+    ∀ (l : List (Fin d)) {f g₁ g₂ : V → E},
+      HasVectorMultiPartial.hasPartials g₁ f l →
+        HasVectorMultiPartial.hasPartials g₂ f l → g₁ = g₂
+  | [], _, _, _, h₁, h₂ => h₁.symm.trans h₂
+  | _i :: rest, _, _, _, h₁, h₂ => by
+    have _ : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+    obtain ⟨f₁, hf₁, hr₁⟩ := h₁
+    obtain ⟨f₂, hf₂, hr₂⟩ := h₂
+    have hf12 : f₁ = f₂ := by
+      funext x
+      rw [SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)]
+      intro φ
+      exact (hf₁.hasLineDerivAt_eval φ x).unique (hf₂.hasLineDerivAt_eval φ x)
+    subst hf12
+    exact hasPartials_unique rest hr₁ hr₂
+
+omit hAdd hSMul hSemi hT2 in
+/-- Addition preserves chains of weak coordinate partials, at the level of `HasVectorMultiPartial`. -/
+private theorem hasVectorMultiPartial_add {α : Fin d → ℕ} {f₁ f₂ g₁ g₂ : V → E}
+    (h₁ : HasVectorMultiPartial α f₁ g₁) (h₂ : HasVectorMultiPartial α f₂ g₂) :
+    HasVectorMultiPartial α (f₁ + f₂) (g₁ + g₂) := by
+  unfold HasVectorMultiPartial at h₁ h₂ ⊢
+  exact hasPartials_add g₁ g₂ _ f₁ f₂ h₁ h₂
+
+omit hAdd hSMul hSemi hT2 in
+/-- Scalar multiplication preserves chains of weak coordinate partials. -/
+private theorem hasVectorMultiPartial_smul {α : Fin d → ℕ} {f g : V → E} (c : ℂ)
+    (h : HasVectorMultiPartial α f g) : HasVectorMultiPartial α (c • f) (c • g) := by
+  unfold HasVectorMultiPartial at h ⊢
+  exact hasPartials_smul c g _ f h
+
+omit hAdd hSMul in
+/-- The mixed weak derivative in `HasVectorMultiPartial` is unique. -/
+private theorem hasVectorMultiPartial_unique {α : Fin d → ℕ} {f g₁ g₂ : V → E}
+    (h₁ : HasVectorMultiPartial α f g₁) (h₂ : HasVectorMultiPartial α f g₂) : g₁ = g₂ := by
+  unfold HasVectorMultiPartial at h₁ h₂
+  exact hasPartials_unique _ h₁ h₂
+
 /-- Paper: (C.5.1.46), p. 735. The supremum of a continuous seminorm on
 a polynomially weighted mixed derivative is finite and defines a seminorm. -/
 theorem exists_vectorSchwartzDerivativeSeminorm (q : Seminorm ℂ E) (hq : Continuous q)
@@ -1104,7 +1161,62 @@ theorem exists_vectorSchwartzDerivativeSeminorm (q : Seminorm ℂ E) (hq : Conti
       ∀ f : vectorSchwartzSubmodule d E, ∃ g : V → E,
         HasVectorMultiPartial α f.val g ∧
           BddAbove (range fun x : V ↦ q (p.eval (fun i ↦ (x i : ℂ)) • g x)) ∧
-          s f = ⨆ x : V, q (p.eval (fun i ↦ (x i : ℂ)) • g x) := by sorry
+          s f = ⨆ x : V, q (p.eval (fun i ↦ (x i : ℂ)) • g x) := by
+  have hdecay (f : vectorSchwartzSubmodule d E) :
+      ∃ g : V → E, HasVectorMultiPartial α f.val g ∧
+        IsVonNBounded ℂ (range fun x : V ↦ p.eval (fun i ↦ (x i : ℂ)) • g x) := by
+    have hd : HasVectorSchwartzDecay f.val := by
+      have hmem : f.val ∈ vectorSchwartzSubmodule d E := f.property
+      unfold vectorSchwartzSubmodule at hmem
+      rw [Submodule.mem_inf] at hmem
+      exact hmem.2
+    exact hd α p
+  let gOf (f : vectorSchwartzSubmodule d E) : V → E := Classical.choose (hdecay f)
+  have hg (f : vectorSchwartzSubmodule d E) :
+      HasVectorMultiPartial α f.val (gOf f) ∧
+        IsVonNBounded ℂ (range fun x : V ↦ p.eval (fun i ↦ (x i : ℂ)) • gOf f x) :=
+    Classical.choose_spec (hdecay f)
+  have hadd (f₁ f₂ : vectorSchwartzSubmodule d E) : gOf (f₁ + f₂) = gOf f₁ + gOf f₂ := by
+    apply hasVectorMultiPartial_unique (hg (f₁ + f₂)).1
+    simpa only [Submodule.coe_add] using hasVectorMultiPartial_add (hg f₁).1 (hg f₂).1
+  have hsmul (c : ℂ) (f : vectorSchwartzSubmodule d E) : gOf (c • f) = c • gOf f := by
+    apply hasVectorMultiPartial_unique (hg (c • f)).1
+    simpa only [Submodule.coe_smul] using hasVectorMultiPartial_smul c (hg f).1
+  let w (x : V) : ℂ := p.eval (fun i ↦ (x i : ℂ))
+  have hbdd (f : vectorSchwartzSubmodule d E) :
+      BddAbove (range fun x : V ↦ q (w x • gOf f x)) := by
+    have heq : range (fun x : V ↦ q (w x • gOf f x)) =
+        (q : E → ℝ) '' range (fun x : V ↦ w x • gOf f x) := by
+      ext r
+      constructor
+      · rintro ⟨x, rfl⟩
+        exact ⟨w x • gOf f x, ⟨x, rfl⟩, rfl⟩
+      · rintro ⟨_, ⟨x, rfl⟩, rfl⟩
+        exact ⟨x, rfl⟩
+    rw [heq]
+    exact bddAbove_image_continuous_seminorm_of_isVonNBounded hq (hg f).2
+  have : Nonempty V := ⟨0⟩
+  let val (f : vectorSchwartzSubmodule d E) : ℝ := ⨆ x : V, q (w x • gOf f x)
+  let s : Seminorm ℂ (vectorSchwartzSubmodule d E) :=
+    Seminorm.of val
+      (fun f₁ f₂ ↦ by
+        apply ciSup_le
+        intro x
+        calc
+          q (w x • gOf (f₁ + f₂) x)
+              = q (w x • gOf f₁ x + w x • gOf f₂ x) := by
+                rw [hadd, Pi.add_apply, smul_add]
+          _ ≤ q (w x • gOf f₁ x) + q (w x • gOf f₂ x) := map_add_le_add q _ _
+          _ ≤ val f₁ + val f₂ :=
+            add_le_add (le_ciSup (hbdd f₁) x) (le_ciSup (hbdd f₂) x))
+      (fun c f ↦ by
+        have hpt : ∀ x : V, q (w x • gOf (c • f) x) = ‖c‖ * q (w x • gOf f x) := by
+          intro x
+          rw [hsmul, Pi.smul_apply, smul_comm (w x) c (gOf f x), map_smul_eq_mul]
+        simp_rw [val, hpt]
+        exact (Real.mul_iSup_of_nonneg (norm_nonneg c) _).symm)
+  refine ⟨s, fun f ↦ ⟨gOf f, (hg f).1, hbdd f, ?_⟩⟩
+  rfl
 
 -- Remark C.5.1.29 on p. 736 repeats the weak definitions and equalities of Remark C.5.1.27.
 
