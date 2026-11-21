@@ -180,7 +180,104 @@ numbers agree with Mathlib's singular values, including the zero tail.
 Deviation: This checks the rank cutoff and the zero-based indexing. -/
 theorem approximationNumber_eq_singularValues [FiniteDimensional ℂ E] [FiniteDimensional ℂ F]
     (T : E →L[ℂ] F) (n : ℕ) :
-    approximationNumber T n = T.toLinearMap.singularValues n := by sorry
+    approximationNumber T n = T.toLinearMap.singularValues n := by
+  classical
+  let errors : Set ℝ := {r | ∃ S : E →L[ℂ] F,
+    Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) ∧ r = ‖S - T‖}
+  change sInf errors = _
+  have hnonneg : (0 : ℝ) ∈ lowerBounds errors := by
+    rintro r ⟨S, _, rfl⟩
+    exact norm_nonneg _
+  have hzero : Module.rank ℂ (0 : E →L[ℂ] F).toLinearMap.range ≤ (n : Cardinal) := by simp
+  by_cases hlarge : Module.finrank ℂ T.toLinearMap.range ≤ n
+  · have hrank : Module.rank ℂ T.toLinearMap.range ≤ (n : Cardinal) := by
+      simpa only [← Module.finrank_eq_rank, Nat.cast_le] using hlarge
+    rw [T.toLinearMap.singularValues_eq_zero_iff_le_finrank_range.mpr hlarge]
+    apply le_antisymm
+    · exact (csInf_le ⟨0, hnonneg⟩ ⟨T, hrank, rfl⟩).trans_eq (by simp)
+    · exact le_csInf ⟨_, T, hrank, rfl⟩ hnonneg
+  have hn := (Nat.lt_of_not_ge hlarge).trans_le T.toLinearMap.finrank_range_le
+  let hSymm := T.toLinearMap.isSymmetric_adjoint_comp_self
+  let b := hSymm.eigenvectorBasis rfl
+  let σ := T.toLinearMap.singularValues
+  have hσ : ∀ i, 0 ≤ σ i := T.toLinearMap.singularValues_nonneg
+  have hanti : Antitone σ := T.toLinearMap.singularValues_antitone
+  -- In the eigenbasis of T†T, the squared norm of T x is a weighted sum of coordinates.
+  have henergy (x : E) : ‖T x‖ ^ 2 =
+      ∑ i : Fin (Module.finrank ℂ E), σ i ^ 2 * ‖⟪b i, x⟫_ℂ‖ ^ 2 := by
+    rw [show ‖T x‖ ^ 2 = RCLike.re ⟪x, (T.toLinearMap.adjoint ∘ₗ T.toLinearMap) x⟫_ℂ by
+      rw [LinearMap.comp_apply, LinearMap.adjoint_inner_right, ← norm_sq_eq_re_inner]
+      rfl]
+    rw [← b.sum_inner_mul_inner, map_sum]
+    apply Finset.sum_congr rfl
+    intro i _
+    rw [← b.repr_apply_apply, hSymm.eigenvectorBasis_apply_self_apply rfl,
+      ← T.toLinearMap.sq_singularValues_fin rfl i, b.repr_apply_apply]
+    rw [mul_left_comm, RCLike.re_ofReal_mul, inner_mul_symm_re_eq_norm, norm_mul,
+      ← inner_conj_symm x, RCLike.norm_conj, ← pow_two]
+  let V (k : ℕ) := Submodule.span ℂ (b '' {i | (i : ℕ) < k})
+  have hdim (k : ℕ) (hk : k ≤ Module.finrank ℂ E) : Module.finrank ℂ (V k) = k := by
+    have hind := b.orthonormal.linearIndependent.comp (Fin.castLE hk) (Fin.castLE_injective hk)
+    change Module.finrank ℂ (Submodule.span ℂ (b '' {i | (i : ℕ) < k})) = k
+    rw [← Fin.range_castLE hk, ← Set.range_comp]
+    simpa only [Fintype.card_fin] using finrank_span_eq_card hind
+  apply le_antisymm
+  · -- Truncate T to the first n eigenvectors.
+    let S := T.comp (V n).starProjection
+    have hS : Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) := by
+      rw [← Module.finrank_eq_rank, Nat.cast_le]
+      change Module.finrank ℂ (T.toLinearMap.comp (V n).starProjection.toLinearMap).range ≤ n
+      rw [LinearMap.range_comp, Submodule.range_starProjection]
+      exact (Submodule.finrank_map_le _ _).trans_eq (hdim n hn.le)
+    refine (csInf_le ⟨0, hnonneg⟩ ⟨S, hS, rfl⟩).trans ?_
+    rw [norm_sub_rev]
+    apply ContinuousLinearMap.opNorm_le_bound _ (hσ n)
+    intro x
+    let y := (V n)ᗮ.starProjection x
+    have hy : y ∈ (V n)ᗮ := ((V n)ᗮ.orthogonalProjectionOnto x).property
+    have heq : (T - S) x = T y := by
+      simp [S, y, map_sub]
+    rw [heq]
+    refine (show ‖T y‖ ≤ σ n * ‖y‖ from ?_).trans
+      (mul_le_mul_of_nonneg_left ((V n)ᗮ.norm_starProjection_apply_le x) (hσ n))
+    apply le_of_sq_le_sq _ (mul_nonneg (hσ n) (norm_nonneg _))
+    rw [henergy, mul_pow, ← b.sum_sq_norm_inner_right y, Finset.mul_sum]
+    apply Finset.sum_le_sum
+    intro i _
+    by_cases hi : (i : ℕ) < n
+    · have hz := ((V n).mem_orthogonal y).mp hy (b i)
+          (Submodule.subset_span (Set.mem_image_of_mem _ hi))
+      simp [hz]
+    · exact mul_le_mul_of_nonneg_right
+        ((sq_le_sq₀ (hσ i) (hσ n)).mpr (hanti (Nat.le_of_not_lt hi))) (sq_nonneg _)
+  · refine le_csInf ⟨_, 0, hzero, rfl⟩ ?_
+    rintro r ⟨S, hS, rfl⟩
+    have hSdim : Module.finrank ℂ S.toLinearMap.range ≤ n := by
+      simpa only [← Module.finrank_eq_rank, Nat.cast_le] using hS
+    -- Every admissible S kills a nonzero vector in the span of the first n + 1 eigenvectors.
+    let R := S.toLinearMap.rangeRestrict.comp (V (n + 1)).subtype
+    have hker : R.ker ≠ ⊥ := LinearMap.ker_ne_bot_of_finrank_lt (by
+      rw [hdim (n + 1) hn]
+      exact Nat.lt_succ_of_le hSdim)
+    obtain ⟨x, hx, hx0⟩ := Submodule.exists_mem_ne_zero_of_ne_bot hker
+    have hSx : S (x : E) = 0 := congrArg Subtype.val (LinearMap.mem_ker.mp hx)
+    have hxnorm : 0 < ‖(x : E)‖ := norm_pos_iff.mpr (fun h ↦ hx0 (Subtype.ext h))
+    have hlower : σ n * ‖(x : E)‖ ≤ ‖T (x : E)‖ := by
+      apply le_of_sq_le_sq _ (norm_nonneg _)
+      rw [henergy, mul_pow, ← b.sum_sq_norm_inner_right (x : E), Finset.mul_sum]
+      apply Finset.sum_le_sum
+      intro i _
+      by_cases hi : (i : ℕ) ≤ n
+      · exact mul_le_mul_of_nonneg_right
+          ((sq_le_sq₀ (hσ n) (hσ i)).mpr (hanti hi)) (sq_nonneg _)
+      · have hsupport := (b.toBasis.repr_support_subset_of_mem_span _ x.property)
+        have hz : ⟪b i, (x : E)⟫_ℂ = 0 := by
+          rw [← b.repr_apply_apply, ← b.coe_toBasis_repr_apply, ← Finsupp.notMem_support_iff]
+          exact fun hs ↦ hi (Nat.lt_succ_iff.mp (hsupport hs))
+        simp [hz]
+    have hbound := (S - T).le_opNorm (x : E)
+    rw [sub_apply, hSx, zero_sub, norm_neg] at hbound
+    exact le_of_mul_le_mul_right (hlower.trans hbound) hxnorm
 
 end ApproximationNumbers
 
@@ -188,9 +285,85 @@ section SingularValues
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
 
+/-- Within any positive operator-norm distance of `A.adjoint` there is a compact operator.
+The approximant is `A.adjoint` postcomposed with the orthogonal projection onto a
+finite-dimensional subspace, so it factors through a locally compact space. -/
+private theorem exists_isCompactOperator_norm_sub_adjoint_le (A : H →L[ℂ] H)
+    (hA : IsCompactOperator A) {ε : ℝ} (hε : 0 < ε) :
+    ∃ C : H →L[ℂ] H, IsCompactOperator C ∧ ‖A.adjoint - C‖ ≤ ε := by
+  obtain ⟨t, -, ht_fin, ht_cover⟩ :=
+    (hA.isCompact_closure_image_closedBall 1).finite_cover_balls hε
+  let U : Submodule ℂ H := Submodule.span ℂ t
+  have : FiniteDimensional ℂ U := FiniteDimensional.span_of_finite ℂ ht_fin
+  have : CompleteSpace U := FiniteDimensional.completeSpace ℂ U
+  have : U.HasOrthogonalProjection := inferInstance
+  have hnorm : ‖A - U.starProjection ∘L A‖ ≤ ε := by
+    refine ContinuousLinearMap.opNorm_le_bound _ hε.le fun x ↦ ?_
+    rcases eq_or_ne x 0 with rfl | hx
+    · simp
+    · have hx0 : 0 < ‖x‖ := norm_pos_iff.mpr hx
+      let u : H := (‖x‖⁻¹ : ℂ) • x
+      have hu : ‖u‖ = 1 := by
+        rw [norm_smul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hx0,
+          inv_mul_cancel₀ hx0.ne']
+      have hBu : ‖(A - U.starProjection ∘L A) u‖ < ε := by
+        have hu_ball : u ∈ Metric.closedBall (0 : H) 1 := by
+          rw [Metric.mem_closedBall, dist_zero_right, hu]
+        have hAu : A u ∈ closure (A '' Metric.closedBall (0 : H) 1) :=
+          subset_closure ⟨u, hu_ball, rfl⟩
+        obtain ⟨y, hy, hxy⟩ := Set.mem_iUnion₂.mp (ht_cover hAu)
+        have hdist : Metric.infDist (A u) (U : Set H) < ε :=
+          (Metric.infDist_lt_iff ⟨0, Submodule.zero_mem U⟩).2
+            ⟨y, Submodule.subset_span hy, Metric.mem_ball.mp hxy⟩
+        rw [sub_apply, ContinuousLinearMap.comp_apply, ← dist_eq_norm,
+          U.dist_starProjection_eq_infDist]
+        exact hdist
+      have hxeq : (‖x‖ : ℂ) • u = x := by
+        simp only [u, smul_smul, mul_inv_cancel₀ (Complex.ofReal_ne_zero.mpr hx0.ne'), one_smul]
+      have hBx : ‖(A - U.starProjection ∘L A) x‖ =
+          ‖x‖ * ‖(A - U.starProjection ∘L A) u‖ := by
+        conv_lhs => rw [← hxeq]
+        rw [(A - U.starProjection ∘L A).map_smul, norm_smul, Complex.norm_real,
+          Real.norm_eq_abs, abs_of_nonneg hx0.le]
+      rw [hBx]
+      calc
+        ‖x‖ * ‖(A - U.starProjection ∘L A) u‖ ≤ ‖x‖ * ε :=
+          mul_le_mul_of_nonneg_left hBu.le hx0.le
+        _ = ε * ‖x‖ := mul_comm _ _
+  refine ⟨A.adjoint ∘L U.starProjection, ?_, ?_⟩
+  · have : LocallyCompactSpace U :=
+      LocallyCompactSpace.of_finiteDimensional_of_complete ℂ U
+    have hfac : A.adjoint ∘L U.starProjection =
+        (A.adjoint ∘L U.subtypeL) ∘L U.orthogonalProjectionOnto := rfl
+    rw [hfac]
+    exact (isCompactOperator_of_locallyCompactSpace_rng
+      (A.adjoint ∘L U.subtypeL)).comp_clm U.orthogonalProjectionOnto
+  · rw [← (isSelfAdjoint_starProjection U).adjoint_eq, ← ContinuousLinearMap.adjoint_comp,
+      ← (ContinuousLinearMap.adjoint (E := H) (F := H)).map_sub,
+      (ContinuousLinearMap.adjoint (E := H) (F := H)).norm_map]
+    exact hnorm
+
 /-- Paper: Lemma C.3.5.3(1), p. 700. The adjoint of a compact endomorphism is compact. -/
 theorem isCompactOperator_adjoint_of_compact (A : H →L[ℂ] H)
-    (hA : IsCompactOperator A) : IsCompactOperator A.adjoint := by sorry
+    (hA : IsCompactOperator A) : IsCompactOperator A.adjoint := by
+  have happrox : ∀ n : ℕ, ∃ C : H →L[ℂ] H,
+      IsCompactOperator C ∧ ‖A.adjoint - C‖ ≤ 1 / (n + 1 : ℝ) := by
+    intro n
+    exact exists_isCompactOperator_norm_sub_adjoint_le A hA (by positivity)
+  choose C hC hle using happrox
+  refine isCompactOperator_of_tendsto (l := atTop) (F := C) ?_ (Eventually.of_forall hC)
+  rw [Metric.tendsto_atTop]
+  intro ε hε
+  obtain ⟨N, hN⟩ := exists_nat_gt (1 / ε)
+  refine ⟨N, fun n hn ↦ ?_⟩
+  rw [dist_eq_norm, norm_sub_rev]
+  refine (hle n).trans_lt ?_
+  have hbig : 1 / ε < (n : ℝ) + 1 :=
+    lt_trans (lt_of_lt_of_le hN (Nat.cast_le.mpr hn)) (lt_add_one _)
+  have hmul : 1 < ((n : ℝ) + 1) * ε := (div_lt_iff₀ hε).mp hbig
+  rw [show (1 : ℝ) / (n + 1 : ℝ) = 1 / ((n : ℝ) + 1) by simp,
+    div_lt_iff₀' (by positivity)]
+  exact hmul
 
 /-- Paper: Lemma C.3.5.3(1), p. 700. A compact endomorphism and its adjoint
 have the same singular values at every index up to the Hilbert space dimension.
@@ -203,7 +376,22 @@ theorem approximationNumber_adjoint (A : H →L[ℂ] H) (hA : IsCompactOperator 
 endomorphism equals its operator norm.
 Deviation: The first approximation number has index zero. -/
 theorem approximationNumber_zero_eq_opNorm (A : H →L[ℂ] H) (hA : IsCompactOperator A) :
-    approximationNumber A 0 = ‖A‖ := by sorry
+    approximationNumber A 0 = ‖A‖ := by
+  have hset : {r | ∃ S : H →L[ℂ] H, Module.rank ℂ S.toLinearMap.range ≤ ((0 : ℕ) : Cardinal) ∧
+      r = ‖S - A‖} = {‖A‖} := by
+    ext r
+    constructor
+    · rintro ⟨S, hS, rfl⟩
+      have h0 : Module.rank ℂ S.toLinearMap.range = 0 := by
+        rw [Nat.cast_zero] at hS
+        exact le_zero_iff.mp hS
+      rw [Submodule.rank_eq_zero, LinearMap.range_eq_bot] at h0
+      have hS0 : S = 0 := ContinuousLinearMap.coe_injective h0
+      simp [hS0]
+    · rintro rfl
+      exact ⟨0, by simp, by simp⟩
+  unfold approximationNumber
+  rw [hset, csInf_singleton]
 
 -- TODO(paper-gap): The proof of (C.3.5.4) uses global weak continuity of the
 -- quadratic form of a compact operator and weak compactness of the unit sphere.
@@ -388,17 +576,95 @@ of the sum of the p-th powers of the approximation numbers. -/
 def schattenNorm {p : ℝ} {hp : 1 ≤ p} (T : schattenClass E F p hp) : ℝ :=
   (∑' n, (approximationNumber T.val n) ^ p) ^ (1 / p)
 
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- An approximation number vanishes once its index bounds the rank of the operator,
+since the operator approximates itself. -/
+private theorem approximationNumber_eq_zero_of_rank_le (T : E →L[ℂ] F) {n : ℕ}
+    (hn : Module.rank ℂ T.toLinearMap.range ≤ (n : Cardinal)) :
+    approximationNumber T n = 0 := by
+  have hlow : ∀ r ∈ {r | ∃ S : E →L[ℂ] F,
+      Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) ∧ r = ‖S - T‖}, 0 ≤ r :=
+    fun _ ⟨_, _, h⟩ ↦ h ▸ norm_nonneg _
+  apply le_antisymm
+  · exact (csInf_le ⟨0, hlow⟩ ⟨T, hn, rfl⟩).trans_eq (by simp)
+  · exact le_csInf ⟨_, T, hn, rfl⟩ hlow
+
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- The zeroth approximation number is the operator norm, since the only approximant of
+rank zero is the zero operator. -/
+private theorem approximationNumber_zero_eq_norm (T : E →L[ℂ] F) :
+    approximationNumber T 0 = ‖T‖ := by
+  have hset : {r | ∃ S : E →L[ℂ] F, Module.rank ℂ S.toLinearMap.range ≤ ((0 : ℕ) : Cardinal) ∧
+      r = ‖S - T‖} = {‖T‖} := by
+    ext r
+    constructor
+    · rintro ⟨S, hS, rfl⟩
+      have h0 : Module.rank ℂ S.toLinearMap.range = 0 := by
+        rw [Nat.cast_zero] at hS
+        exact le_zero_iff.mp hS
+      rw [Submodule.rank_eq_zero, LinearMap.range_eq_bot] at h0
+      have hS0 : S = 0 := ContinuousLinearMap.coe_injective h0
+      simp [hS0]
+    · rintro rfl
+      exact ⟨0, by simp, by simp⟩
+  unfold approximationNumber
+  rw [hset, csInf_singleton]
+
+/-- An operator with finite-dimensional range is compact and its approximation numbers
+vanish from the dimension of the range on, so it lies in every Schatten class. -/
+private theorem mem_schattenClass_of_finiteDimensional_range {p : ℝ} (hp : 1 ≤ p)
+    (T : E →L[ℂ] F) (hT : FiniteDimensional ℂ T.toLinearMap.range) :
+    T ∈ schattenClass E F p hp := by
+  have : ProperSpace T.toLinearMap.range := FiniteDimensional.proper_rclike ℂ _
+  refine ⟨?_, ?_⟩
+  · let T' : E →L[ℂ] T.toLinearMap.range :=
+      T.codRestrict _ (fun x ↦ LinearMap.mem_range_self T.toLinearMap x)
+    exact (isCompactOperator_of_locallyCompactSpace_dom T').continuous_comp
+      continuous_subtype_val
+  · apply summable_of_ne_finset_zero (s := Finset.range (Module.finrank ℂ T.toLinearMap.range))
+    intro n hn
+    have hn : Module.finrank ℂ T.toLinearMap.range ≤ n := by simpa using hn
+    rw [approximationNumber_eq_zero_of_rank_le T (by
+      rw [← Module.finrank_eq_rank]
+      exact_mod_cast hn), Real.zero_rpow (by linarith)]
+
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- The range of a rank-one map lies in the span of its vector. -/
+private theorem range_smulRight_le (φ : E →L[ℂ] ℂ) (f : F) :
+    (φ.smulRight f).toLinearMap.range ≤ ℂ ∙ f := by
+  rintro _ ⟨x, rfl⟩
+  exact Submodule.mem_span_singleton.mpr ⟨φ x, rfl⟩
+
 /-- Paper: Definition C.3.6.2(1), p. 704. A rank-one map belongs to every
 Schatten class.
 Deviation: This checks class membership on rank-one maps. -/
 theorem smulRight_mem_schattenClass {p : ℝ} (hp : 1 ≤ p) (φ : E →L[ℂ] ℂ) (f : F) :
-    φ.smulRight f ∈ schattenClass E F p hp := by sorry
+    φ.smulRight f ∈ schattenClass E F p hp := by
+  have := FiniteDimensional.span_of_finite ℂ (Set.finite_singleton f)
+  exact mem_schattenClass_of_finiteDimensional_range hp _
+    (Submodule.finiteDimensional_of_le (range_smulRight_le φ f))
 
 /-- Paper: Definition C.3.6.2(1), p. 704. A rank-one map has Schatten norm
 equal to the product of the norms of its functional and its vector.
 Deviation: This checks the normalization of the Schatten norm for all indices. -/
 theorem schattenNorm_smulRight {p : ℝ} (hp : 1 ≤ p) (φ : E →L[ℂ] ℂ) (f : F) :
-    schattenNorm ⟨φ.smulRight f, smulRight_mem_schattenClass hp φ f⟩ = ‖φ‖ * ‖f‖ := by sorry
+    schattenNorm ⟨φ.smulRight f, smulRight_mem_schattenClass hp φ f⟩ = ‖φ‖ * ‖f‖ := by
+  have hp0 : p ≠ 0 := by linarith
+  have hrank : Module.rank ℂ (φ.smulRight f).toLinearMap.range ≤ 1 :=
+    (Submodule.rank_mono (range_smulRight_le φ f)).trans
+      ((rank_span_le _).trans_eq (Cardinal.mk_singleton f))
+  have hterm (n : ℕ) : approximationNumber (φ.smulRight f) n ^ p =
+      if n = 0 then ‖φ.smulRight f‖ ^ p else 0 := by
+    rcases n with _ | n
+    · simp [approximationNumber_zero_eq_norm]
+    · have h1 : (1 : Cardinal) ≤ ((n + 1 : ℕ) : Cardinal) := by
+        exact_mod_cast Nat.succ_le_succ (Nat.zero_le n)
+      rw [approximationNumber_eq_zero_of_rank_le _ (hrank.trans h1), Real.zero_rpow hp0]
+      simp
+  unfold schattenNorm
+  simp only [hterm, tsum_ite_eq]
+  rw [one_div, Real.rpow_rpow_inv (norm_nonneg _) hp0,
+    ContinuousLinearMap.norm_smulRight_apply]
 
 variable (E F) in
 /-- Paper: Definition C.3.6.2(2), p. 704. The Hilbert-Schmidt operators
@@ -436,7 +702,24 @@ variable {G : Type*} [NormedAddCommGroup G] [InnerProductSpace ℂ G] [CompleteS
 by at most the operator norm of the difference of the two operators.
 Deviation: The approximation-number index starts at zero. -/
 theorem abs_approximationNumber_sub_le (A B : E →L[ℂ] F) (n : ℕ) :
-    |approximationNumber A n - approximationNumber B n| ≤ ‖A - B‖ := by sorry
+    |approximationNumber A n - approximationNumber B n| ≤ ‖A - B‖ := by
+  have key (A B : E →L[ℂ] F) :
+      approximationNumber A n ≤ approximationNumber B n + ‖A - B‖ := by
+    have hz : Module.rank ℂ (0 : E →L[ℂ] F).toLinearMap.range ≤ (n : Cardinal) := by simp
+    rw [← sub_le_iff_le_add]
+    unfold approximationNumber
+    refine le_csInf (by exact ⟨_, 0, hz, rfl⟩) ?_
+    rintro _ ⟨S, hS, rfl⟩
+    rw [sub_le_iff_le_add]
+    calc
+      approximationNumber A n ≤ ‖S - A‖ :=
+        csInf_le ⟨0, fun r ⟨S, _, h⟩ ↦ h ▸ norm_nonneg _⟩ ⟨S, hS, rfl⟩
+      _ = ‖(S - B) + (B - A)‖ := by rw [sub_add_sub_cancel]
+      _ ≤ ‖S - B‖ + ‖A - B‖ := (norm_add_le _ _).trans_eq (by rw [norm_sub_rev B A])
+  rw [abs_sub_le_iff]
+  constructor
+  · linarith [key A B]
+  · linarith [key B A, norm_sub_rev A B]
 
 /-- Every strict upper bound for an approximation number is realized as a strict error bound
 by some approximant of the prescribed rank. -/
@@ -525,14 +808,27 @@ variable {E F : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [Complet
 tensor under the canonical map belongs to each Schatten class. -/
 theorem tensorToFiniteRank_mem_schattenClass {p : ℝ} (hp : 1 ≤ p)
     (z : StrongDual ℂ E ⊗[ℂ] F) :
-    tensorToFiniteRank z ∈ schattenClass E F p hp := by sorry
+    tensorToFiniteRank z ∈ schattenClass E F p hp := by
+  refine mem_schattenClass_of_finiteDimensional_range hp _ ?_
+  induction z using TensorProduct.inductionOn with
+  | tmul φ y =>
+    have := FiniteDimensional.span_of_finite ℂ (Set.finite_singleton y)
+    apply Submodule.finiteDimensional_of_le (S₂ := ℂ ∙ y)
+    rintro _ ⟨x, rfl⟩
+    exact Submodule.mem_span_singleton.mpr ⟨φ x, (tensorToFiniteRank_tmul φ y x).symm⟩
+  | add z w hz hw =>
+    rw [map_add, ContinuousLinearMap.toLinearMap_add]
+    exact Submodule.finiteDimensional_of_le (LinearMap.range_add_le _ _)
 
 /-- Paper: (C.3.6.8), p. 705. The norm of the dual of a Hilbert space satisfies
 the parallelogram identity.
 Deviation: This supplies the compatible inner product on the dual factor. -/
 theorem strongDual_parallelogram (φ ψ : StrongDual ℂ E) :
     ‖φ + ψ‖ * ‖φ + ψ‖ + ‖φ - ψ‖ * ‖φ - ψ‖ =
-      2 * (‖φ‖ * ‖φ‖ + ‖ψ‖ * ‖ψ‖) := by sorry
+      2 * (‖φ‖ * ‖φ‖ + ‖ψ‖ * ‖ψ‖) := by
+  let R := (InnerProductSpace.toDual ℂ E).symm
+  have h := parallelogram_law_with_norm_mul ℂ (R φ) (R ψ)
+  simpa only [← map_add, ← map_sub, LinearIsometryEquiv.norm_map] using h
 
 /-- Paper: (C.3.6.8), p. 705. The continuous dual of a Hilbert space has the
 inner product compatible with its operator norm. -/
@@ -547,7 +843,27 @@ the arguments under the conjugate-linear Riesz identification.
 Deviation: This checks the dual inner product convention. -/
 theorem strongDual_inner_eq (φ ψ : StrongDual ℂ E) :
     ⟪φ, ψ⟫_ℂ = ⟪(InnerProductSpace.toDual ℂ E).symm ψ,
-      (InnerProductSpace.toDual ℂ E).symm φ⟫_ℂ := by sorry
+      (InnerProductSpace.toDual ℂ E).symm φ⟫_ℂ := by
+  let R := (InnerProductSpace.toDual ℂ E).symm
+  have hI : ‖(Complex.I : ℂ)‖ = 1 := Complex.norm_I
+  have h1 : ‖R ψ + R φ‖ = ‖φ + ψ‖ := by
+    rw [← map_add, LinearIsometryEquiv.norm_map, add_comm]
+  have h2 : ‖R ψ - R φ‖ = ‖φ - ψ‖ := by
+    rw [← map_sub, LinearIsometryEquiv.norm_map, norm_sub_rev]
+  have h3 : ‖R ψ - Complex.I • R φ‖ = ‖φ - Complex.I • ψ‖ := by
+    have e : R ψ - Complex.I • R φ = R (Complex.I • (φ - Complex.I • ψ)) := by
+      simp only [map_smulₛₗ, map_sub, Complex.conj_I, smul_sub, smul_smul]
+      simp
+      abel
+    rw [e, LinearIsometryEquiv.norm_map, norm_smul, hI, one_mul]
+  have h4 : ‖R ψ + Complex.I • R φ‖ = ‖φ + Complex.I • ψ‖ := by
+    have e : R ψ + Complex.I • R φ = R ((-Complex.I) • (φ + Complex.I • ψ)) := by
+      simp only [map_smulₛₗ, map_add, map_neg, Complex.conj_I, neg_neg, smul_add, smul_smul]
+      simp [add_comm]
+    rw [e, LinearIsometryEquiv.norm_map, norm_smul, norm_neg, hI, one_mul]
+  rw [inner_eq_sum_norm_sq_div_four (𝕜 := ℂ) φ ψ, inner_eq_sum_norm_sq_div_four (𝕜 := ℂ) (R ψ) (R φ)]
+  simp only [RCLike.I_to_complex]
+  rw [h1, h2, h3, h4]
 
 /-- Paper: Proposition C.3.6.4(2), p. 705. The canonical image of an algebraic
 tensor has Hilbert-Schmidt norm equal to the norm from the tensor inner product
