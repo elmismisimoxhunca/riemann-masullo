@@ -1346,11 +1346,55 @@ theorem tensorDualOperator_isEmbedding {Y : Type*} [AddCommGroup Y] [Module ℂ 
     rw [Metric.mem_ball, dist_zero_right, Real.norm_of_nonneg (apply_nonneg _ _)]
     exact hle.trans_lt (half_lt_self hr)
 
+/-- Auxiliary for `tensorDualOperator_continuous_mu`: point evaluations are μ-continuous
+on the strong dual, since μ dominates the topology of uniform convergence on compact
+sets of the completion, on which evaluation is continuous. -/
+private theorem eval_continuous_mu {X : Type*} [AddCommGroup X] [Module ℂ X] [UniformSpace X]
+    [IsUniformAddGroup X] [ContinuousSMul ℂ X] (x : X) :
+    @Continuous (StrongDual ℂ X) ℂ (completionCompactDualTopology X) _ (fun φ : StrongDual ℂ X ↦ φ x) := by
+  classical
+  have hcover : ⋃₀ {K : Set (Completion X) | IsCompact K} = univ := by
+    apply eq_univ_of_forall
+    intro t
+    exact mem_sUnion_of_mem (mem_singleton t) (by exact isCompact_singleton)
+  have heval : @Continuous (Completion X →ᵤ[{K : Set (Completion X) | IsCompact K}] ℂ) ℂ
+      (UniformOnFun.topologicalSpace (Completion X) ℂ {K | IsCompact K}) _
+      (fun ψ : Completion X →ᵤ[{K : Set (Completion X) | IsCompact K}] ℂ ↦ ψ (x : Completion X)) :=
+    (UniformOnFun.uniformContinuous_eval hcover (x : Completion X)).continuous
+  have hEv : (fun φ : StrongDual ℂ X ↦ φ x) =
+      (fun ψ : Completion X →ᵤ[{K : Set (Completion X) | IsCompact K}] ℂ ↦ ψ (x : Completion X)) ∘
+        (fun φ : StrongDual ℂ X ↦ UniformOnFun.ofFun {K | IsCompact K} ⇑φ.fromCompletion) := by
+    funext φ
+    simp only [Function.comp_apply]
+    rw [show ((UniformOnFun.ofFun {K | IsCompact K} ⇑φ.fromCompletion) (x : Completion X)) =
+        ⇑φ.fromCompletion (x : Completion X) from rfl,
+      ContinuousLinearMap.fromCompletion_apply_coe]
+  rw [continuous_iff_le_induced, hEv, ← induced_compose]
+  exact induced_mono heval.le_induced
+
 /-- Paper: Remark C.2.3.2, p. 677. Each represented operator is continuous for μ. -/
 theorem tensorDualOperator_continuous_mu {X : Type*} [AddCommGroup X] [Module ℂ X]
     [UniformSpace X] [IsUniformAddGroup X] [PolynormableSpace ℂ X] [T2Space X]
     [IsTopologicalAddGroup F] [ContinuousSMul ℂ F] (z : X ⊗[ℂ] F) :
-    @Continuous _ F (completionCompactDualTopology X) _ (tensorDualOperator z) := by sorry
+    @Continuous _ F (completionCompactDualTopology X) _ (tensorDualOperator z) := by
+  induction z using TensorProduct.inductionOn with
+  | tmul x y =>
+      exact @Continuous.congr (StrongDual ℂ X) F (completionCompactDualTopology X) _
+        (fun φ : StrongDual ℂ X ↦ φ x • y)
+        (fun φ : StrongDual ℂ X ↦ tensorDualOperator (x ⊗ₜ[ℂ] y) φ)
+        (@Continuous.comp (StrongDual ℂ X) ℂ F (completionCompactDualTopology X) _ _
+          (fun φ : StrongDual ℂ X ↦ φ x) (fun c : ℂ ↦ c • y)
+          ((continuous_id).smul continuous_const) (eval_continuous_mu x))
+        (fun φ ↦ by simp [tensorDualOperator, dualTensorHom_apply, TensorProduct.map_tmul,
+          LinearMap.flip_apply, topDualPairing_apply])
+  | add z w hz hw =>
+      exact @Continuous.congr (StrongDual ℂ X) F (completionCompactDualTopology X) _
+        (fun φ : StrongDual ℂ X ↦ tensorDualOperator z φ + tensorDualOperator w φ)
+        (fun φ : StrongDual ℂ X ↦ tensorDualOperator (z + w) φ)
+        (@Continuous.add F _ _ _ (StrongDual ℂ X) (completionCompactDualTopology X)
+          (fun φ : StrongDual ℂ X ↦ tensorDualOperator z φ)
+          (fun φ : StrongDual ℂ X ↦ tensorDualOperator w φ) hz hw)
+        (fun φ ↦ by simp [map_add])
 
 -- TODO(paper-gap): For incomplete E, evaluation at a point of its completion can be a
 -- μ-continuous rank-one operator outside the image of (C.2.3.5).
