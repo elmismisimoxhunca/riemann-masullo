@@ -92,12 +92,96 @@ theorem integralIdeleInsertion_exhaustive :
       range (integralIdeleInsertion F T)) ∧
     ∀ g : 𝕀[F], ∃ T, g ∈ range (integralIdeleInsertion F T) := by sorry
 
+/- The subring of adeles integral outside a finite set of finite places is open,
+being the product of the infinite adeles with the cofinite distinguished sets of
+the finite adeles. Used to make each full stage an open subgroup of the ideles. -/
+private theorem isOpen_integralAdelesOutside (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    IsOpen (integralAdelesOutside F S : Set 𝔸[F]) := by
+  simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred]
+  exact (isOpen_restrictedProduct_forall_mem (↑S : Set (HeightOneSpectrum (𝓞 F)))ᶜ
+    (fun v _ ↦ Valued.isOpen_integer (v.adicCompletion F))).preimage continuous_snd
+
+/- The insertion from the full stage into the ideles is continuous, injective and open
+onto its image, and its image is the open set of ideles integral outside `S` with
+integral inverse (helper for Lemma D.1.10.1(1), p. 784, and (2), p. 784). -/
+private theorem integralIdeleInsertion_continuous_aux (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    Continuous (integralIdeleInsertion F S) :=
+  Units.continuous_map continuous_subtype_val
+
+private theorem integralIdeleInsertion_isOpenEmbedding_aux
+    (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    IsOpenEmbedding (integralIdeleInsertion F S) := by
+  have hemb : IsEmbedding ((integralAdelesOutside F S).subtype.toMonoidHom) :=
+    Topology.IsEmbedding.subtypeVal
+  exact IsOpenEmbedding.of_isEmbedding_isOpenMap
+    (Topology.IsEmbedding.units_map hemb)
+    (Units.isOpenMap_map hemb.injective
+      ((isOpen_integralAdelesOutside F S).isOpenEmbedding_subtypeVal.isOpenMap))
+
+private theorem isOpen_range_integralIdeleInsertion_aux
+    (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    IsOpen (Set.range (integralIdeleInsertion F S)) := by
+  have hmem (a : 𝔸[F]) : a ∈ integralAdelesOutside F S ↔
+      ∀ v : HeightOneSpectrum (𝓞 F), v ∉ S → a.2 v ∈ v.adicCompletionIntegers F := by
+    simp only [integralAdelesOutside, Subring.mem_iInf]
+    rfl
+  have heq : Set.range (integralIdeleInsertion F S) =
+      (fun g : 𝕀[F] ↦ g.val) ⁻¹' (integralAdelesOutside F S : Set 𝔸[F]) ∩
+        (fun g : 𝕀[F] ↦ g.inv) ⁻¹' (integralAdelesOutside F S : Set 𝔸[F]) := by
+    ext g
+    rw [mem_inter_iff, mem_preimage, mem_preimage, mem_range_integralIdeleInsertion F S g]
+    constructor
+    · intro h
+      exact ⟨(hmem _).mpr fun v hv ↦ (h v hv).1, (hmem _).mpr fun v hv ↦ (h v hv).2⟩
+    · intro h v hv
+      exact ⟨(hmem _).mp h.1 v hv, (hmem _).mp h.2 v hv⟩
+  rw [heq]
+  exact ((isOpen_integralAdelesOutside F S).preimage Units.continuous_val).inter
+    ((isOpen_integralAdelesOutside F S).preimage Units.continuous_coe_inv)
+
+/- Every idele is integral outside a finite set of finite places with integral inverse,
+so it lies in the image of the insertion from that stage (helper for the exhaustiveness
+part of Lemma D.1.10.1(2), p. 784). -/
+private theorem integralIdeleInsertion_exhaustive_aux (g : 𝕀[F]) :
+    ∃ T : Finset (HeightOneSpectrum (𝓞 F)), g ∈ Set.range (integralIdeleInsertion F T) := by
+  classical
+  have hboth : ∀ᶠ v in Filter.cofinite,
+      g.val.2 v ∈ v.adicCompletionIntegers F ∧ g.inv.2 v ∈ v.adicCompletionIntegers F := by
+    filter_upwards [g.val.2.2, g.inv.2.2] with v h1 h2
+    exact ⟨h1, h2⟩
+  have hfin := Filter.eventually_cofinite.mp hboth
+  refine ⟨hfin.toFinset, ?_⟩
+  rw [mem_range_integralIdeleInsertion]
+  intro v hv
+  rw [hfin.mem_toFinset] at hv
+  simp only [mem_setOf_eq, not_not] at hv
+  exact hv
+
 /-- Paper: Lemma D.1.10.1(2), p. 784. The topology on the union of the full S-stages
 is final for their insertions. Their transition maps are the inclusions of the images.
 Deviation: The source is the full stage in (D.1.10.1), with the outside local units. -/
 theorem integralIdeleInsertion_finalTopology (U : Set 𝕀[F]) :
     IsOpen U ↔ ∀ T : Finset (HeightOneSpectrum (𝓞 F)),
-      IsOpen (integralIdeleInsertion F T ⁻¹' U) := by sorry
+      IsOpen (integralIdeleInsertion F T ⁻¹' U) := by
+  constructor
+  · intro hU T
+    exact hU.preimage (integralIdeleInsertion_continuous_aux F T)
+  · intro h
+    have heq : U = ⋃ T : Finset (HeightOneSpectrum (𝓞 F)),
+        integralIdeleInsertion F T '' (integralIdeleInsertion F T ⁻¹' U) := by
+      ext g
+      simp only [mem_iUnion, mem_image, mem_preimage]
+      constructor
+      · intro hg
+        obtain ⟨T, hu⟩ := integralIdeleInsertion_exhaustive_aux F g
+        obtain ⟨u, rfl⟩ := hu
+        exact ⟨T, u, mem_preimage.mpr hg, rfl⟩
+      · rintro ⟨T, u, hu, rfl⟩
+        exact hu
+    rw [heq]
+    exact isOpen_iUnion fun T ↦
+      IsOpenEmbedding.isOpenMap (integralIdeleInsertion_isOpenEmbedding_aux F T)
+        (integralIdeleInsertion F T ⁻¹' U) (h T)
 
 /-- Paper: (D.1.10.2), p. 784. The composite of insertion with the global class map
 kills the diagonal S-units. -/
