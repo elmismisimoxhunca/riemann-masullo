@@ -18,6 +18,8 @@ import Mathlib.Analysis.Calculus.ContDiff.Comp
 import Mathlib.Analysis.Calculus.ContDiff.Operations
 import Mathlib.MeasureTheory.Measure.Haar.Unique
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Extension
+import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
+import Mathlib.MeasureTheory.Constructions.Polish.StronglyMeasurable
 
 /-!
 # Fourier analysis and Schwartz spaces of elementary abelian Lie groups
@@ -368,12 +370,112 @@ scaled by its total Haar mass. -/
 theorem lcaConvolution_subsingleton [Subsingleton G] (f g : G → ℂ) (x : G) :
     lcaConvolution μ f g x = (μ univ).toReal * f x * g x := by sorry
 
+open scoped Pointwise in
+/-- A product-measurable representative for the convolution kernel, carried on a
+rectangle with σ-finite sides. The two sectionwise identities avoid any measurability
+assumption on multiplication for the product σ-algebra. -/
+private theorem lcaConvolution_kernel {f g : G → ℂ} (hf : Integrable f μ) (hg : Integrable g μ) :
+    ∃ (S : Set G) (k : G × G → ℂ), SigmaFinite (μ.restrict S) ∧ StronglyMeasurable k ∧
+      Function.support k ⊆ S ×ˢ S ∧
+      (∀ x, ∀ᵐ y ∂μ, k (x, y) = f y * g (y⁻¹ * x)) ∧
+      (∀ᵐ y ∂μ, ∀ᵐ x ∂μ, k (x, y) = f y * g (y⁻¹ * x)) := by
+  obtain ⟨F, hF, cF, tF⟩ := exists_tendsto_ae_compactSupport hf
+  obtain ⟨H, hH, cH, tH⟩ := exists_tendsto_ae_compactSupport hg
+  let K n := tsupport (F n) ∪ tsupport (F n) * tsupport (H n)
+  have hK (n) : IsCompact (K n) := (hF n).isCompact.union ((hF n).isCompact.mul (hH n).isCompact)
+  let S := ⋃ n, K n
+  have hS : MeasurableSet S := MeasurableSet.iUnion fun n ↦ (hK n).isClosed.measurableSet
+  have hσ : SigmaFinite (μ.restrict S) := by
+    refine ⟨⟨⟨fun n ↦ K n ∪ Sᶜ, fun _ ↦ trivial, fun n ↦ ?_, ?_⟩⟩⟩
+    · rw [Measure.restrict_apply ((hK n).isClosed.measurableSet.union hS.compl),
+        union_inter_distrib_right, compl_inter_self, union_empty]
+      exact (measure_mono inter_subset_left).trans_lt (hK n).measure_lt_top
+    · rw [← iUnion_union]
+      exact union_compl_self S
+  let P (n : ℕ) (p : G × G) := F n p.2 * H n (p.2⁻¹ * p.1)
+  have hP (n) : Function.support (P n) ⊆ K n ×ˢ K n := by
+    rintro ⟨x, y⟩ hp
+    have hfy := subset_tsupport (F n) ((mul_ne_zero_iff.mp hp).1)
+    have hgy := subset_tsupport (H n) ((mul_ne_zero_iff.mp hp).2)
+    exact ⟨Or.inr ⟨y, hfy, y⁻¹ * x, hgy, mul_inv_cancel_left y x⟩, Or.inl hfy⟩
+  have mP (n) : StronglyMeasurable (P n) := by
+    have hcompact : HasCompactSupport (P n) := HasCompactSupport.intro ((hK n).prod (hK n))
+      (fun p hp ↦ Function.notMem_support.mp (fun h ↦ hp (hP n h)))
+    exact hcompact.stronglyMeasurable_of_prod ((cF n).comp continuous_snd |>.mul
+      ((cH n).comp (continuous_snd.inv.mul continuous_fst)))
+  let k (p : G × G) := limUnder atTop (fun n ↦ P n p)
+  refine ⟨S, k, hσ, StronglyMeasurable.limUnder mP, ?_, ?_, ?_⟩
+  · intro p hp
+    by_contra h
+    have hz (n) : P n p = 0 := Function.notMem_support.mp fun hn ↦
+      h ⟨mem_iUnion.mpr ⟨n, (hP n hn).1⟩, mem_iUnion.mpr ⟨n, (hP n hn).2⟩⟩
+    have ht : Tendsto (fun n ↦ P n p) atTop (𝓝 0) := by
+      simp only [hz]
+      exact tendsto_const_nhds
+    exact hp ht.limUnder_eq
+  · intro x
+    have hmp := (measurePreserving_mul_right μ x).comp (Measure.measurePreserving_inv μ)
+    filter_upwards [tF, hmp.quasiMeasurePreserving.tendsto_ae.eventually tH] with y hy hy'
+    exact (hy.mul hy').limUnder_eq
+  · filter_upwards [tF] with y hy
+    have hmp := measurePreserving_mul_left μ y⁻¹
+    filter_upwards [hmp.quasiMeasurePreserving.tendsto_ae.eventually tH] with x hx
+    exact (hy.mul hx).limUnder_eq
+
 /-- Paper: (D.1.1.5)–(D.1.1.6), p. 746. The fibre integrals of two L¹ functions
 exist almost everywhere and their convolution is L¹ with the product norm bound. -/
 theorem lcaConvolution_integrable {f g : G → ℂ} (hf : Integrable f μ) (hg : Integrable g μ) :
     (∀ᵐ x ∂μ, Integrable (fun y ↦ f y * g (y⁻¹ * x)) μ) ∧
       Integrable (lcaConvolution μ f g) μ ∧
-      eLpNorm (lcaConvolution μ f g) 1 μ ≤ eLpNorm f 1 μ * eLpNorm g 1 μ := by sorry
+      eLpNorm (lcaConvolution μ f g) 1 μ ≤ eLpNorm f 1 μ * eLpNorm g 1 μ := by
+  obtain ⟨S, k, hσ, hk, hs, hrow, hcol⟩ := lcaConvolution_kernel μ hf hg
+  have hzero (p : G × G) (hp : p ∉ S ×ˢ S) : k p = 0 :=
+    Function.notMem_support.mp fun h ↦ hp (hs h)
+  let N (x : G) := ∫⁻ y in S, ‖k (x, y)‖ₑ ∂μ
+  have hN : Measurable N := hk.eNorm.lintegral_prod_right'
+  have hfull (x) : N x = ∫⁻ y, ‖k (x, y)‖ₑ ∂μ := by
+    apply setLIntegral_eq_of_support_subset
+    intro y hy
+    by_contra h
+    exact hy (by simp [hzero (x, y) (fun hp ↦ h hp.2)])
+  have hconv (x) : (∫ y in S, k (x, y) ∂μ) = lcaConvolution μ f g x :=
+    (setIntegral_eq_integral_of_forall_compl_eq_zero
+      (fun y hy ↦ hzero (x, y) (fun hp ↦ hy hp.2))).trans (integral_congr_ae (hrow x))
+  have hm : StronglyMeasurable (lcaConvolution μ f g) := (funext hconv) ▸ hk.integral_prod_right'
+  -- Tonelli applies on the supporting rectangle, even when Haar measure on G is not σ-finite.
+  have hbound : ∫⁻ x, N x ∂μ ≤ eLpNorm f 1 μ * eLpNorm g 1 μ := calc
+    _ = ∫⁻ x in S, N x ∂μ := by
+      symm
+      apply setLIntegral_eq_of_support_subset
+      intro x hx
+      by_contra h
+      exact hx (by simp [N, fun y ↦ hzero (x, y) (fun hp ↦ h hp.1)])
+    _ = ∫⁻ y in S, ∫⁻ x in S, ‖k (x, y)‖ₑ ∂μ ∂μ := lintegral_lintegral_swap hk.eNorm.aemeasurable
+    _ ≤ ∫⁻ y, ∫⁻ x, ‖k (x, y)‖ₑ ∂μ ∂μ :=
+      lintegral_mono' Measure.restrict_le_self fun y ↦ setLIntegral_le_lintegral _ _
+    _ = ∫⁻ y, ‖f y‖ₑ * eLpNorm g 1 μ ∂μ := by
+      apply lintegral_congr_ae
+      filter_upwards [hcol] with y hy
+      calc
+        _ = ∫⁻ x, ‖f y‖ₑ * ‖g (y⁻¹ * x)‖ₑ ∂μ := lintegral_congr_ae <|
+          hy.mono fun x hx ↦ by rw [hx, eNorm_mul]
+        _ = _ := by
+          rw [lintegral_const_mul' _ _ (by simp), lintegral_mul_left_eq_self (fun z ↦ ‖g z‖ₑ),
+            eLpNorm_one_eq_lintegral_eNorm hg.aestronglyMeasurable]
+    _ = _ := by
+      rw [lintegral_mul_const'' _ hf.aestronglyMeasurable.eNorm,
+        eLpNorm_one_eq_lintegral_eNorm hf.aestronglyMeasurable]
+  have hfin := hbound.trans_lt (ENNReal.mul_lt_top (memLp_one_iff_integrable.2 hf)
+    (memLp_one_iff_integrable.2 hg))
+  have hle : ∫⁻ x, ‖lcaConvolution μ f g x‖ₑ ∂μ ≤ ∫⁻ x, N x ∂μ :=
+    lintegral_mono fun x ↦ hconv x ▸ eNorm_integral_le_lintegral_eNorm _
+  refine ⟨?_, ⟨hm.aestronglyMeasurable, hle.trans_lt hfin⟩, ?_⟩
+  · filter_upwards [ae_lt_top hN hfin.ne] with x hx
+    have hInt : Integrable (fun y ↦ k (x, y)) μ :=
+      ⟨(hk.comp_measurable measurable_prodMk_left).aestronglyMeasurable, (hfull x).symm.trans_lt hx⟩
+    exact hInt.congr (hrow x)
+  · rw [eLpNorm_one_eq_lintegral_eNorm hm.aestronglyMeasurable]
+    exact hle.trans hbound
 
 /-- Paper: Lemma D.1.1.2(1), p. 746. The Fourier transform of an L¹ function
 is continuous and vanishes at infinity on the dual group. -/
