@@ -2379,7 +2379,12 @@ include hK in
 misses every coordinate hyperplane. -/
 theorem infiniteIdele_product_disjoint_hyperplanes :
     Disjoint (Units.val '' productLocus) (⋃ v : InfinitePlace F, {a : InfiniteAdeleRing F | a v = 0}) := by
-  sorry
+  -- `productLocus` is a set of units, so its values are nonzero at every infinite place.
+  refine Set.disjoint_left.mpr ?_
+  rintro _ ⟨g, -, rfl⟩
+  simp only [Set.mem_iUnion, Set.mem_ofPred_eq, not_exists]
+  intro v
+  exact (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom g).ne_zero
 
 include hK in
 /-- Paper: Lemma A.2.3.13(3), p. 553. If the compact set has interior in the positive
