@@ -198,7 +198,18 @@ def IsSchauderBasis (x : ℕ → E) (f : ℕ → StrongDual ℂ E) : Prop :=
 predicate agrees with Mathlib's bundled sequence and its coefficient maps. -/
 theorem isSchauderBasis_iff_exists_mathlib {F : Type*} [NormedAddCommGroup F]
     [NormedSpace ℂ F] (x : ℕ → F) (f : ℕ → StrongDual ℂ F) :
-    IsSchauderBasis x f ↔ ∃ b : _root_.SchauderBasis ℂ F, b.basis = x ∧ b.coord = f := by sorry
+    IsSchauderBasis x f ↔ ∃ b : _root_.SchauderBasis ℂ F, b.basis = x ∧ b.coord = f := by
+  constructor
+  · intro h
+    -- Pack the biorthogonality and the convergence of the coordinate series into
+    -- Mathlib's bundled structure. The only mismatch is the decidability instance
+    -- for `Pi.single`, which is bridged by case-splitting on the index equality.
+    refine ⟨⟨x, f, fun i j => ?_, fun u => h.2 u⟩, rfl, rfl⟩
+    by_cases hij : i = j <;> simpa [hij, Pi.single_apply] using h.1 i j
+  · -- Conversely, unpack the bundled structure and read off the two conditions.
+    rintro ⟨b, rfl, rfl⟩
+    refine ⟨fun m n => ?_, fun u => b.expansion u⟩
+    by_cases hmn : m = n <;> simpa [hmn, Pi.single_apply] using b.ortho m n
 
 -- TODO(paper-gap): The individual block sums can converge even when the ordered
 -- series has no limit. The equivalent permutation description needs cumulative sums.
