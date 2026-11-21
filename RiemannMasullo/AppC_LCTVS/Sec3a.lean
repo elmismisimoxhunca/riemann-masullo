@@ -2280,7 +2280,24 @@ theorem traceNorm_mul_right_le (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) 
 
 /-- Paper: Lemma C.3.4.4(3), p. 698. The trace is complex linear. -/
 theorem hilbertTrace_linear :
-    ∃ f : nuclearEndomorphisms H →ₗ[ℂ] ℂ, ∀ T, f T = hilbertTrace T := by sorry
+    ∃ f : nuclearEndomorphisms H →ₗ[ℂ] ℂ, ∀ T, f T = hilbertTrace T := by
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  have hs (T : nuclearEndomorphisms H) :
+      Summable (fun i ↦ ⟪b i, T.val (b i)⟫_ℂ) :=
+    (summable_norm_hilbertDiagonal b T.val T.property).of_norm
+  refine ⟨{ toFun := hilbertTrace
+            map_add' := ?_
+            map_smul' := ?_ }, fun _ ↦ rfl⟩
+  · intro T S
+    change (∑' i, ⟪b i, (T.val + S.val) (b i)⟫_ℂ) =
+      (∑' i, ⟪b i, T.val (b i)⟫_ℂ) + ∑' i, ⟪b i, S.val (b i)⟫_ℂ
+    simp only [add_apply, inner_add_right]
+    exact (hs T).tsum_add (hs S)
+  · intro c T
+    change (∑' i, ⟪b i, (c • T.val) (b i)⟫_ℂ) =
+      c • ∑' i, ⟪b i, T.val (b i)⟫_ℂ
+    simp only [smul_apply, inner_smul_right, smul_eq_mul]
+    exact (hs T).tsum_mul_left c
 
 /-- Paper: Lemma C.3.4.4(3), p. 698. The modulus of the trace is bounded by
 the trace norm, which gives continuity for the trace norm. -/
