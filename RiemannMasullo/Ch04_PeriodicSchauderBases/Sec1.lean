@@ -6,6 +6,7 @@ public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Topology.Algebra.Equicontinuity
 public import Mathlib.Topology.Algebra.Module.Complement
 import Mathlib.Analysis.PSeries
+import Mathlib.Analysis.InnerProductSpace.Dual
 
 /-!
 # Schauder bases
@@ -309,7 +310,23 @@ theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by sorr
 shrinking, with its coefficients given by the inner products against its vectors. -/
 theorem hilbertBasis_isShrinking {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
     [CompleteSpace H] (b : HilbertBasis ℕ ℂ H) :
-    IsShrinking (fun n ↦ b n) (fun n ↦ innerSL ℂ (b n)) := by sorry
+    IsShrinking (fun n ↦ b n) (fun n ↦ innerSL ℂ (b n)) := by
+  unfold IsShrinking IsSchauderBasis IsTopologicalBasis
+  constructor
+  · intro m n
+    change inner ℂ (b n) (b m) = _
+    simpa [eq_comm] using (orthonormal_iff_ite.mp b.orthonormal n m)
+  · intro u
+    let v := (InnerProductSpace.toDual ℂ H).symm u
+    have h := (b.hasSum_repr v).mapL (innerSL ℂ)
+    simp only [map_smulₛₗ] at h
+    have hh : HasSum (fun m ↦ u (b m) • innerSL ℂ (b m)) u := by
+      convert h using 1
+      · funext m
+        simp only [HilbertBasis.repr_apply_apply, inner_conj_symm]
+        rw [show inner ℂ v (b m) = u (b m) from InnerProductSpace.toDual_symm_apply]
+      · exact ((InnerProductSpace.toDual ℂ H).apply_symm_apply u).symm
+    exact hh.mono_left (SummationFilter.LeAtTop.le_atTop (L := SummationFilter.conditional ℕ))
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. Every zero neighborhood in the complex
 sequence space with the product topology contains a coordinate basis vector. -/
