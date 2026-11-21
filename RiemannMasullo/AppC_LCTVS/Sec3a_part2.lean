@@ -188,9 +188,85 @@ section SingularValues
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
 
+/-- Within any positive operator-norm distance of `A.adjoint` there is a compact operator.
+The approximant is `A.adjoint` postcomposed with the orthogonal projection onto a
+finite-dimensional subspace, so it factors through a locally compact space. -/
+private theorem exists_isCompactOperator_norm_sub_adjoint_le (A : H →L[ℂ] H)
+    (hA : IsCompactOperator A) {ε : ℝ} (hε : 0 < ε) :
+    ∃ C : H →L[ℂ] H, IsCompactOperator C ∧ ‖A.adjoint - C‖ ≤ ε := by
+  obtain ⟨t, -, ht_fin, ht_cover⟩ :=
+    (hA.isCompact_closure_image_closedBall 1).finite_cover_balls hε
+  let U : Submodule ℂ H := Submodule.span ℂ t
+  have : FiniteDimensional ℂ U := FiniteDimensional.span_of_finite ℂ ht_fin
+  have : CompleteSpace U := FiniteDimensional.completeSpace ℂ U
+  have : U.HasOrthogonalProjection := inferInstance
+  have hnorm : ‖A - U.starProjection ∘L A‖ ≤ ε := by
+    refine ContinuousLinearMap.opNorm_le_bound _ hε.le fun x ↦ ?_
+    rcases eq_or_ne x 0 with rfl | hx
+    · simp
+    · have hx0 : 0 < ‖x‖ := norm_pos_iff.mpr hx
+      let u : H := (‖x‖⁻¹ : ℂ) • x
+      have hu : ‖u‖ = 1 := by
+        rw [norm_smul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hx0,
+          inv_mul_cancel₀ hx0.ne']
+      have hBu : ‖(A - U.starProjection ∘L A) u‖ < ε := by
+        have hu_ball : u ∈ Metric.closedBall (0 : H) 1 := by
+          rw [Metric.mem_closedBall, dist_zero_right, hu]
+        have hAu : A u ∈ closure (A '' Metric.closedBall (0 : H) 1) :=
+          subset_closure ⟨u, hu_ball, rfl⟩
+        obtain ⟨y, hy, hxy⟩ := Set.mem_iUnion₂.mp (ht_cover hAu)
+        have hdist : Metric.infDist (A u) (U : Set H) < ε :=
+          (Metric.infDist_lt_iff ⟨0, Submodule.zero_mem U⟩).2
+            ⟨y, Submodule.subset_span hy, Metric.mem_ball.mp hxy⟩
+        rw [sub_apply, ContinuousLinearMap.comp_apply, ← dist_eq_norm,
+          U.dist_starProjection_eq_infDist]
+        exact hdist
+      have hxeq : (‖x‖ : ℂ) • u = x := by
+        simp only [u, smul_smul, mul_inv_cancel₀ (Complex.ofReal_ne_zero.mpr hx0.ne'), one_smul]
+      have hBx : ‖(A - U.starProjection ∘L A) x‖ =
+          ‖x‖ * ‖(A - U.starProjection ∘L A) u‖ := by
+        conv_lhs => rw [← hxeq]
+        rw [(A - U.starProjection ∘L A).map_smul, norm_smul, Complex.norm_real,
+          Real.norm_eq_abs, abs_of_nonneg hx0.le]
+      rw [hBx]
+      calc
+        ‖x‖ * ‖(A - U.starProjection ∘L A) u‖ ≤ ‖x‖ * ε :=
+          mul_le_mul_of_nonneg_left hBu.le hx0.le
+        _ = ε * ‖x‖ := mul_comm _ _
+  refine ⟨A.adjoint ∘L U.starProjection, ?_, ?_⟩
+  · have : LocallyCompactSpace U :=
+      LocallyCompactSpace.of_finiteDimensional_of_complete ℂ U
+    have hfac : A.adjoint ∘L U.starProjection =
+        (A.adjoint ∘L U.subtypeL) ∘L U.orthogonalProjectionOnto := rfl
+    rw [hfac]
+    exact (isCompactOperator_of_locallyCompactSpace_rng
+      (A.adjoint ∘L U.subtypeL)).comp_clm U.orthogonalProjectionOnto
+  · rw [← (isSelfAdjoint_starProjection U).adjoint_eq, ← ContinuousLinearMap.adjoint_comp,
+      ← (ContinuousLinearMap.adjoint (E := H) (F := H)).map_sub,
+      (ContinuousLinearMap.adjoint (E := H) (F := H)).norm_map]
+    exact hnorm
+
 /-- Paper: Lemma C.3.5.3(1), p. 700. The adjoint of a compact endomorphism is compact. -/
 theorem isCompactOperator_adjoint_of_compact (A : H →L[ℂ] H)
-    (hA : IsCompactOperator A) : IsCompactOperator A.adjoint := by sorry
+    (hA : IsCompactOperator A) : IsCompactOperator A.adjoint := by
+  have happrox : ∀ n : ℕ, ∃ C : H →L[ℂ] H,
+      IsCompactOperator C ∧ ‖A.adjoint - C‖ ≤ 1 / (n + 1 : ℝ) := by
+    intro n
+    exact exists_isCompactOperator_norm_sub_adjoint_le A hA (by positivity)
+  choose C hC hle using happrox
+  refine isCompactOperator_of_tendsto (l := atTop) (F := C) ?_ (Eventually.of_forall hC)
+  rw [Metric.tendsto_atTop]
+  intro ε hε
+  obtain ⟨N, hN⟩ := exists_nat_gt (1 / ε)
+  refine ⟨N, fun n hn ↦ ?_⟩
+  rw [dist_eq_norm, norm_sub_rev]
+  refine (hle n).trans_lt ?_
+  have hbig : 1 / ε < (n : ℝ) + 1 :=
+    lt_trans (lt_of_lt_of_le hN (Nat.cast_le.mpr hn)) (lt_add_one _)
+  have hmul : 1 < ((n : ℝ) + 1) * ε := (div_lt_iff₀ hε).mp hbig
+  rw [show (1 : ℝ) / (n + 1 : ℝ) = 1 / ((n : ℝ) + 1) by simp,
+    div_lt_iff₀' (by positivity)]
+  exact hmul
 
 /-- Paper: Lemma C.3.5.3(1), p. 700. A compact endomorphism and its adjoint
 have the same singular values at every index up to the Hilbert space dimension.
