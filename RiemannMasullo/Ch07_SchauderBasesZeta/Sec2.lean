@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
 
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
+
 /-!
 # §7.2 Poles of the S-idelic zeta functions
 
@@ -77,7 +79,7 @@ def sLocalPrincipalPartCoeff (c : Xₛ) (k : ℕ) : StrongDual ℂ ℬₛ :=
 /-- Paper: Theorem 7.2.1.1(1), p. 334.
 The bundled functional evaluates to the coefficient of the Laurent power `-k`. -/
 theorem sLocalPrincipalPartCoeff_apply (c : Xₛ) (k : ℕ) (f : ℬₛ) :
-    sLocalPrincipalPartCoeff c k f = sLocalZLaurentCoeff f c (-(k : ℤ)) := by sorry
+    sLocalPrincipalPartCoeff c k f = sLocalZLaurentCoeff f c (-(k : ℤ)) := rfl
 
 -- TODO(paper-gap): In Theorem 7.2.1.1(2), lower coefficients at a multiple
 -- pole mix with higher ones under translation. The leading coefficient has
@@ -90,7 +92,32 @@ Deviation: The weight equation for the leading coefficient is stated in
 Theorem 7.2.1.4(1). -/
 theorem sLocalPrincipalPartCoeff_ker (ω : PontryaginDual J₁) (c : Xₛ)
     (hc : onComponent(c, ω)) (k : ℕ) :
-    Kₛ(ω) ≤ (sLocalPrincipalPartCoeff c k).ker := by sorry
+    Kₛ(ω) ≤ (sLocalPrincipalPartCoeff c k).ker := by
+  have residue (Z : ℂ → ℂ) (p : ℤ) (hZ : ∀ z, Z z = 0) :
+      complexResidue (fun z : ℂ ↦ Z z / z ^ p) 0 = 0 := by
+    simp [hZ, complexResidue, circleIntegral]
+    exact tendsto_const_nhds.limUnder_eq
+  intro f hf
+  have hv := (mem_sLocalHomogeneousAdelicTheta_ker_iff (F := F) (S := S) ω f).mp hf
+  refine (exists_sLocalNormTwist (F := F) (S := S) c).elim fun χ ha ↦ ha.elim fun a hca ↦ ?_
+  let χ₀ : Xₛ := (circleToComplex).comp χ
+  have hω := (congrArg (normOneRestriction mₛ) hca).trans hc
+  have hr (z : ℂ) (g : J₁) : normOneRestriction mₛ (twistₛ χ₀ z) g = (ω g : ℂ) :=
+    (normOneRestriction_unitaryChart mₛ hmₛ χ z g).trans
+      ((normOneRestriction_unitaryChart mₛ hmₛ χ a g).symm.trans (DFunLike.congr_fun hω g))
+  have hz : (fun z : ℂ ↦ sLocalIdelicZFunction f (twistₛ χ₀ z)) = 0 := by
+    refine eq_of_agree_rightHalf (sLocalIdelicZFunction_meromorphic f χ)
+      (fun _ _ ↦ analyticAt_const.meromorphicNFAt) 0 fun z hz ↦ ?_
+    let d := (⟨twistₛ χ₀ z, sLocalOrderBound_positive χ hz⟩ :
+      {q : Xₛ // 0 ≤ sLocalIdelicOrderBound q})
+    exact (sLocalIdelicMellin_apply f d).symm.trans (hv d (hr z))
+  change complexResidue (fun z : ℂ ↦
+    sLocalIdelicZFunction f (twistₛ c z) / z ^ (-(k : ℤ) + 1)) 0 = 0
+  apply residue
+  intro z
+  have shift := (congrArg (fun b : Xₛ ↦ twistₛ b z) hca.symm).trans
+    (normTwist_normTwist mₛ hmₛ χ₀ a z)
+  exact (congrArg (sLocalIdelicZFunction f) shift).trans (congrFun hz (z + a))
 
 /-- Paper: Theorem 7.2.1.1(2), p. 334.
 The coefficient acts on the homogeneous theta quotient of its norm-one character. -/
@@ -103,7 +130,7 @@ The descended coefficient recovers the original coefficient on a test representa
 theorem sLocalThetaPrincipalPartCoeff_mk (ω : PontryaginDual J₁) (c : Xₛ)
     (hc : onComponent(c, ω)) (k : ℕ) (f : ℬₛ) :
     sLocalThetaPrincipalPartCoeff ω c hc k ((Kₛ(ω)).mkQL f) =
-      sLocalZLaurentCoeff f c (-(k : ℤ)) := by sorry
+      sLocalZLaurentCoeff f c (-(k : ℤ)) := rfl
 
 /-- Paper: Theorem 7.2.1.1(2), p. 334.
 Translation acts on coefficients of nonpositive exponent by an upper triangular formula.
@@ -149,7 +176,17 @@ theorem mem_sLocalThetaPoleBound_iff (ω : PontryaginDual J₁) (m : Xₛ → �
 /-- Paper: Theorem 7.2.1.1(4), p. 334.
 The homogeneous theta classes with the prescribed bounds on pole order form a closed subspace. -/
 theorem sLocalThetaPoleBound_isClosed (ω : PontryaginDual J₁) (m : Xₛ → ℕ) :
-    IsClosed (sLocalThetaPoleBound ω m : Set (Θₛ(ω))) := by sorry
+    IsClosed (sLocalThetaPoleBound ω m : Set (Θₛ(ω))) := by
+  let I := {i : Xₛ × ℕ // onComponent(i.1, ω) ∧ 0 < sLocalRhoPoleOrder i.1 ∧ m i.1 < i.2}
+  let T (i : I) : StrongDual ℂ (Θₛ(ω)) :=
+    sLocalThetaPrincipalPartCoeff (F := F) (S := S) ω i.val.1 i.property.1 i.val.2
+  let Z (i : I) : Set (Θₛ(ω)) := {x | T i x = 0}
+  have h : (sLocalThetaPoleBound ω m : Set (Θₛ(ω))) = ⋂ i, Z i := by
+    refine Set.ext fun x ↦ (mem_sLocalThetaPoleBound_iff (F := F) (S := S) ω m x).trans ?_
+    refine Iff.trans ?_ (Set.mem_iInter (s := Z) (x := x)).symm
+    exact ⟨fun hx i ↦ hx i.val.1 i.property.1 i.property.2.1 i.val.2 i.property.2.2,
+      fun hx c hc hp k hk ↦ hx ⟨(c, k), hc, hp, hk⟩⟩
+  exact (congrArg IsClosed h).mpr (isClosed_iInter fun i ↦ (T i).isClosed_ker)
 
 /-- Paper: Theorem 7.2.1.1(4), p. 334.
 The annihilator of the pole-bound subspace is the strong closure of the span of the
@@ -235,12 +272,17 @@ def sLocalSelectedPoleMultiplicity (SArch : Finset (InfinitePlace F)) (S₀ : Fi
 /-- Paper: Equations (7.2.2.1)–(7.2.2.2), pp. 338–339.
 Selecting just the finite places gives the multiplicity used for principal values. -/
 theorem sLocalSelectedPoleMultiplicity_finite (S₀ : Finset Places) (c : Xₛ) :
-    sLocalSelectedPoleMultiplicity ∅ S₀ c = sLocalFinitePoleMultiplicity S₀ c := by sorry
+    sLocalSelectedPoleMultiplicity ∅ S₀ c = sLocalFinitePoleMultiplicity S₀ c := by
+  classical
+  rw [sLocalSelectedPoleMultiplicity, Finset.inter_empty, Finset.card_empty, zero_add]
 
 /-- Paper: Equations (7.2.2.1)–(7.2.2.2), pp. 338–339.
 Selecting every place recovers the full pole order. -/
 theorem sLocalSelectedPoleMultiplicity_full (c : Xₛ) :
-    sLocalSelectedPoleMultiplicity Finset.univ S c = sLocalRhoPoleOrder c := by sorry
+    sLocalSelectedPoleMultiplicity Finset.univ S c = sLocalRhoPoleOrder c := by
+  classical
+  simp [sLocalSelectedPoleMultiplicity, sLocalFinitePoleMultiplicity,
+    sLocalRhoPoleOrder_eq_card_polePlaces]
 
 -- TODO(paper-gap): For D = U_S and E = U_{S₀}, the sheaf target in Remark 7.2.1.2
 -- is O(D)/O(D-E), with stalk length mult(E), whereas the printed P_{X,D-E} has
@@ -272,7 +314,8 @@ theorem sLocalThetaRemovedPrincipalParts_mk (ω : PontryaginDual J₁)
     (SArch : Finset (InfinitePlace F)) (S₀ : Finset Places) (f : ℬₛ)
     (i : removedIndices(ω, SArch, S₀)) :
     sLocalThetaRemovedPrincipalParts ω SArch S₀ ((Kₛ(ω)).mkQ f) i =
-      sLocalZLaurentCoeff f i.val.1 (-(i.val.2 : ℤ)) := by sorry
+      sLocalZLaurentCoeff f i.val.1 (-(i.val.2 : ℤ)) :=
+  sLocalThetaPrincipalPartCoeff_mk ω i.val.1 i.property.1 i.val.2 f
 
 /-- Paper: Remark 7.2.1.2, p. 335.
 On the Mellin image, the classes with the remaining pole bound are exactly the
@@ -281,7 +324,36 @@ Deviation: The remaining bound is `m_S - m_{S₀}`. -/
 theorem sLocalThetaRemovedPrincipalParts_ker (ω : PontryaginDual J₁)
     (SArch : Finset (InfinitePlace F)) (S₀ : Finset Places) :
     (sLocalThetaRemovedPrincipalParts ω SArch S₀).ker =
-      sLocalThetaPoleBound ω remainingBound(SArch, S₀) := by sorry
+      sLocalThetaPoleBound ω remainingBound(SArch, S₀) := by
+  have count (m : ℕ) (o : WithTop ℤ) (ho : ((-(m : ℤ) : ℤ) : WithTop ℤ) ≤ o) :
+      (-o.untop₀).toNat ≤ m := by
+    induction o using WithTop.recTopCoe with
+    | top => simp
+    | coe n =>
+      have hn : -(m : ℤ) ≤ n := WithTop.coe_le_coe.mp ho
+      simp only [WithTop.untop₀_coe]
+      omega
+  have bound (f : ℬₛ) (c : Xₛ) : sLocalPolarMultiplicity f c ≤ sLocalRhoPoleOrder c :=
+    count _ _ ((sLocalIdelicOrderBound_eq_neg_poleOrder c).ge.trans (sLocalZ_centered f c).2.1)
+  let ord (c : Xₛ) := sLocalRhoPoleOrder c
+  have full (x : Θₛ(ω)) : x ∈ sLocalThetaPoleBound ω ord := by
+    refine ((Kₛ(ω)).mkQ_surjective x).elim fun f hf ↦ ?_
+    exact Submodule.subset_span ⟨f, hf, fun c _ ↦ bound f c⟩
+  let A := sLocalThetaRemovedPrincipalParts (F := F) (S := S) ω SArch S₀
+  let m := remainingBound(SArch, S₀)
+  refine Submodule.ext fun x ↦ Iff.trans ?_ (mem_sLocalThetaPoleBound_iff (F := F) (S := S) ω m x).symm
+  constructor
+  · intro hx c hc hp k hk
+    by_cases hle : k ≤ sLocalRhoPoleOrder c
+    · have hA : A x = 0 := hx
+      exact congrFun hA ⟨(c, k), hc, hk, hle⟩
+    · exact (mem_sLocalThetaPoleBound_iff (F := F) (S := S) ω ord x).mp (full x)
+        c hc hp k (Nat.lt_of_not_ge hle)
+  · intro hx
+    change A x = 0
+    funext i
+    exact hx i.val.1 i.property.1 ((Nat.zero_lt_of_lt i.property.2.1).trans_le i.property.2.2)
+      i.val.2 i.property.2.1
 
 /-- A coefficient map identifies the quotient by its kernel with the attained values. -/
 private theorem sLocalThetaRemovedPrincipalParts_quotient_of_ker {V W : Type*}
@@ -379,7 +451,17 @@ local correcting factor as a meromorphic identity.
 Deviation: The Fourier Euler product already incorporates the epsilon factor. -/
 theorem sLocalRhoFactor_eq_div_fourierEulerProduct (c : Xₛ) :
     (fun z : ℂ ↦ sLocalRhoFactor (twistₛ c z)) =ᶠ[codiscrete ℂ]
-      (fun z ↦ sLocalHeckeL (twistₛ c z) / sLocalFourierEulerProduct (twistₛ c z)) := by sorry
+      (fun z ↦ sLocalHeckeL (twistₛ c z) / sLocalFourierEulerProduct (twistₛ c z)) := by
+  have quotient (e x y : ℂ) : e * (x / y) = x / (y / e) := by
+    simp [div_eq_mul_inv, mul_left_comm]
+  obtain ⟨χ, a, rfl⟩ := exists_sLocalNormTwist (F := F) (S := S) c
+  simp only [normTwist_normTwist]
+  apply eventually_codiscrete_iff_forall_eventually_nhdsNE.mpr
+  intro z
+  have ht : Tendsto (fun w : ℂ ↦ w + a) (𝓝[≠] z) (𝓝[≠] (z + a)) :=
+    ((Homeomorph.addRight a).map_punctured_nhds_eq z).le
+  filter_upwards [ht.eventually (nhdsNE_le_codiscrete _ (sLocalRhoFactor_eq_epsilon_mul χ))] with w hw
+  exact hw.trans (quotient _ _ _)
 
 -- TODO(paper-gap): The change of unitary base point on p. 336 is
 -- χ' = χ |·|^(it₀). The printed identity omits the original base point χ.
@@ -507,8 +589,9 @@ def sAdelePolarSubspace : Submodule ℂ ℬₛ :=
 Membership requires both the test and its Fourier transform to vanish at zero. -/
 theorem mem_sAdelePolarSubspace (f : ℬₛ) :
     f ∈ sAdelePolarSubspace F S ↔
-      f (Multiplicative.ofAdd 0) = 0 ∧ sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0 :=
-  by sorry
+      f (Multiplicative.ofAdd 0) = 0 ∧ sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0 := by
+  change (f (Multiplicative.ofAdd 0), sAdeleSchwartzFourier f (Multiplicative.ofAdd 0)) = 0 ↔ _
+  exact Prod.mk_eq_zero
 
 /-- Paper: Corollary 7.2.2.2, p. 340.
 Insertion with integer indicators outside S preserves the two zero evaluations

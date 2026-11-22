@@ -2,6 +2,10 @@ module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
+import Mathlib.Analysis.Calculus.InverseFunctionTheorem.ContDiff
+import Mathlib.Analysis.SpecialFunctions.Exponential
+import Mathlib.Topology.Algebra.IsOpenUnits
 
 /-! # Extensions by zero and holomorphic S-idelic zeta functions
 
@@ -175,11 +179,138 @@ Weighted Schwartz–Bruhat functions are smooth on the punctured real line. -/
 theorem realExponentialDecay_contDiffOn (f : 𝓔(ℝ, 1, Ioi 0)) :
     ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set ℝ) := by sorry
 
+/-- In exponential coordinates, the realization of a Schwartz–Bruhat stage is
+smooth along every translate of a continuous homomorphism from a real vector space. -/
+private theorem complexExponentialDecay_contDiffOn_alongTranslate {K G : Type*}
+    [NormedAddCommGroup K] [NormedSpace ℝ K] [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (U : Multiplicative K →ₜ* G) (f : SchwartzBruhat G) (u : G) :
+    ContDiff ℝ (∞ : ℕ∞ω) (fun t : K ↦ f (U (Multiplicative.ofAdd t) * u)) := by
+  obtain ⟨p, e, s, hs⟩ := (mem_schwartzBruhatSubmodule_iff f.val).mp f.property
+  let H := p.val.1
+  have hU : Continuous (fun t : K ↦ U (Multiplicative.ofAdd t)) := U.continuous
+  have hpre : IsClopen ((fun t : K ↦ U (Multiplicative.ofAdd t)) ⁻¹' (H : Set G)) :=
+    (show IsClopen (H : Set G) from ⟨H.isClosed_of_isOpen p.property.1, p.property.1⟩).preimage hU
+  have hfull := hpre.eq_univ ⟨0, by change U 1 ∈ H; simp⟩
+  have hmem (t : Multiplicative K) : U t ∈ H := by
+    change t.toAdd ∈ (fun v : K ↦ U (Multiplicative.ofAdd v)) ⁻¹' (H : Set G)
+    rw [hfull]
+    exact mem_univ _
+  let UH : Multiplicative K →* H := U.toMonoidHom.codRestrict H hmem
+  by_cases hu : u ∈ H
+  · let q : H →* p.quotient := QuotientGroup.mk' _
+    let a := AddMonoidHom.toMultiplicative.symm
+      (e.equiv.toMulEquiv.toMonoidHom.comp (q.comp UH))
+    let c := Multiplicative.toAdd (e.equiv (q ⟨u, hu⟩))
+    have ha : Continuous a := e.equiv.continuous.comp
+      (QuotientGroup.continuous_mk.comp (hU.subtype_mk _))
+    have heq (t : K) : f (U (Multiplicative.ofAdd t) * u) = s (a t + c) := by
+      rw [← show schwartzBruhatStageRealization p e s = f.val from hs,
+        schwartzBruhatStageRealization_apply, dite_eq_left (H.mul_mem (hmem _) hu)]
+      change s (Multiplicative.toAdd (e.equiv (q (UH (Multiplicative.ofAdd t) * ⟨u, hu⟩)))) = _
+      rw [map_mul, map_mul]
+      rfl
+    rw [funext heq]
+    exact contDiff_comp_affine_elementary a ha c s.property.1
+  · have heq (t : K) : f (U (Multiplicative.ofAdd t) * u) = 0 := by
+      have hnot : U (Multiplicative.ofAdd t) * u ∉ H := by
+        intro h
+        exact hu (H.mul_mem_cancel_left (hmem _) |>.mp h)
+      rw [← show schwartzBruhatStageRealization p e s = f.val from hs,
+        schwartzBruhatStageRealization_apply, dite_eq_right hnot]
+    rw [funext heq]
+    exact contDiff_const
+
+/-- The local inverse of the Banach-algebra exponential transfers smoothness in
+multiplicative coordinates to smoothness in the punctured field. -/
+private theorem complexExponentialDecay_contDiffOn_unitsChart {K : Type*} [NormedField K] [NormedAlgebra ℝ K]
+    [CompleteSpace K] [LocallyCompactSpace K] [DecidableEq K] (f : SchwartzBruhat Kˣ) :
+    ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set K) := by
+  let +nondep : NormedAlgebra ℚ K := .restrictScalars ℚ ℝ K
+  let U : Multiplicative K →ₜ* Kˣ :=
+    { toFun := fun v ↦ ⟨NormedSpace.exp v.toAdd, NormedSpace.exp (-v.toAdd),
+        by rw [← NormedSpace.exp_add, add_neg_cancel, NormedSpace.exp_zero],
+        by rw [← NormedSpace.exp_add, neg_add_cancel, NormedSpace.exp_zero]⟩
+      map_one' := Units.ext NormedSpace.exp_zero
+      map_mul' := fun x y ↦ Units.ext NormedSpace.exp_add
+      continuous_toFun := Units.isOpenEmbedding_val.isInducing.continuous_iff.mpr
+        ((show Continuous (NormedSpace.exp : K → K) from NormedSpace.exp_continuous).comp
+          (show Continuous (Multiplicative.toAdd : Multiplicative K → K) from continuous_id)) }
+  let : LocallyCompactSpace Kˣ := (IsOpenUnits.isOpenEmbedding_unitsVal (M := K)).locallyCompactSpace
+  have hExp : ContDiffAt ℝ (∞ : ℕ∞ω) (NormedSpace.exp : K → K) 0 :=
+    (NormedSpace.exp_analytic (𝕂 := ℝ) (x := (0 : K))).contDiffAt
+  let L := ContinuousLinearEquiv.refl ℝ K
+  have hD : HasFDerivAt NormedSpace.exp (L : K →L[ℝ] K) 0 := hasFDerivAt_exp_zero
+  let log := hExp.localInverse (f' := L) hD (by simp)
+  have hlog : ContDiffAt ℝ (∞ : ℕ∞ω) log 1 := by
+    simpa only [NormedSpace.exp_zero] using hExp.to_localInverse (f' := L) hD (by simp)
+  have hright : ∀ᶠ y : K in 𝓝 1, NormedSpace.exp (log y) = y := by
+    unfold log ContDiffAt.localInverse
+    simpa only [NormedSpace.exp_zero] using
+      (hExp.hasStrictFDerivAt (f' := L) hD (by simp)).eventually_right_inverse
+  intro x hx
+  have hx0 : x ≠ 0 := hx
+  let u := Units.mk0 x hx0
+  have hp : ContDiff ℝ (∞ : ℕ∞ω) (fun y : K ↦ y / x) := contDiff_id.div_const x
+  have hp0 : x / x = 1 := div_self hx0
+  have hlogx : ContDiffAt ℝ (∞ : ℕ∞ω) log (x / x) := by rw [hp0]; exact hlog
+  have hg := complexExponentialDecay_contDiffOn_alongTranslate U f u
+  have hc : ContDiffAt ℝ (∞ : ℕ∞ω)
+      (fun y : K ↦ f (U (Multiplicative.ofAdd (log (y / x))) * u)) x :=
+    hg.contDiffAt.comp x (hlogx.comp (f := fun y : K ↦ y / x) (g := log) x hp.contDiffAt)
+  apply ContDiffAt.contDiffWithinAt
+  apply hc.congr_of_eventuallyEq
+  have hnear : Tendsto (fun y : K ↦ y / x) (𝓝 x) (𝓝 1) :=
+    hp0 ▸ hp.continuous.continuousAt
+  filter_upwards [hnear.eventually hright, isOpen_compl_singleton.mem_nhds hx] with y hy hy0
+  have hunit : U (Multiplicative.ofAdd (log (y / x))) * u = Units.mk0 y hy0 := by
+    apply Units.ext
+    change NormedSpace.exp (log (y / x)) * x = y
+    rw [hy, div_mul_cancel₀ _ hx0]
+  have hy0' : y ≠ 0 := hy0
+  simp only [hunit, dite_eq_left hy0']
+
+/-- Dividing a positive weighted Schwartz–Bruhat twist by its smooth nonzero
+weight recovers the original function on the punctured field. -/
+private theorem complexExponentialDecay_contDiffOn_of_weight {K : Type*} [NormedField K]
+    [NormedAlgebra ℝ K] [CompleteSpace K] [LocallyCompactSpace K] [DecidableEq K]
+    (m : Kˣ →ₜ* ℝ≥0ˣ) (a : ℝ) (ha : a ∈ Ioi (0 : ℝ))
+    (f : ModulatedExponentialDecay m (Ioi (0 : ℝ)))
+    (w : K → ℂ) (hw : ContDiff ℝ (∞ : ℕ∞ω) w)
+    (hwu : ∀ u : Kˣ, w u.val = (((m u).val : ℝ) ^ a : ℝ)) :
+    ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set K) := by
+  let g := modulatedExponentialDecayTwist m (Ioi (0 : ℝ)) ⟨a, ha⟩ f
+  have hn (x : K) (hx : x ≠ 0) : w x ≠ 0 := by
+    change w (Units.mk0 x hx).val ≠ 0
+    rw [hwu]
+    exact Complex.ofReal_ne_zero.mpr
+      (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)) _).ne'
+  have h := (complexExponentialDecay_contDiffOn_unitsChart g).mul (hw.contDiffOn.inv fun x hx ↦ hn x hx)
+  apply h.congr
+  intro x hx
+  have hx0 : x ≠ 0 := hx
+  let u := Units.mk0 x hx0
+  simp only [dite_eq_left hx0, Pi.inv_apply]
+  have hg : g.val u = w x * f.val u :=
+    (modulatedExponentialDecayTwist_apply m _ _ f u).trans (by rw [← hwu]; rfl)
+  change f.val u = g.val u * (w x)⁻¹
+  rw [hg, mul_right_comm, mul_inv_cancel₀ (hn x hx0), one_mul]
+
 /-- Paper: Proposition 5.3.3.2(2)(2), p. 250.
 Weighted Schwartz–Bruhat functions are smooth on the punctured complex plane
 as functions of two real variables. -/
 theorem complexExponentialDecay_contDiffOn (f : 𝓔(ℂ, 2, Ioi 0)) :
-    ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set ℂ) := by sorry
+    ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set ℂ) := by
+  have hRe : ContDiff ℝ (∞ : ℕ∞ω) Complex.re := Complex.reCLM.contDiff
+  have hIm : ContDiff ℝ (∞ : ℕ∞ω) Complex.im := Complex.imCLM.contDiff
+  have hn : ContDiff ℝ (∞ : ℕ∞ω) (fun z : ℂ ↦ Complex.normSq z) := by
+    simp only [Complex.normSq_apply]
+    exact (hRe.mul hRe).add (hIm.mul hIm)
+  apply complexExponentialDecay_contDiffOn_of_weight (archimedeanUnitModulation ℂ 2) 1
+    (by norm_num : (1 : ℝ) ∈ Ioi 0) f (fun z ↦ (Complex.normSq z : ℂ))
+    (Complex.ofRealCLM.contDiff.comp hn)
+  intro u
+  rw [archimedeanUnitModulation_apply, Real.rpow_one, Complex.normSq_eq_norm_sq]
 
 end PuncturedLine
 
