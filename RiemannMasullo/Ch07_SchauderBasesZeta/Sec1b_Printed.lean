@@ -102,12 +102,60 @@ def Printed.sLocalPolarMultiplicity_greatest_smaller : Prop :=
       let orders : Set ℕ := {m | 0 < m ∧ ∃ s : ℂ, sLocalPolarMultiplicity f (chart s) = m}
       ∃ M m : ℕ, IsGreatest orders M ∧ IsGreatest (orders ∩ Iio M) m
 
+/-- The zeta function of the zero test vanishes by uniqueness of continuation. -/
+private theorem sLocalPolarMultiplicity_greatest_smaller_zeta_zero
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    sLocalIdelicZFunction (F := F) (S := S)
+      (show SchwartzBruhat (Multiplicative (SAdeleRing F S)) from
+        (0 : schwartzBruhatSubmodule (Multiplicative (SAdeleRing F S)))) = 0 := by
+  apply (sLocalIdelicZetaIntegral_exists_continuation (F := F) (S := S) _).unique
+  · exact (sLocalIdelicZetaIntegral_exists_continuation (F := F) (S := S) _).exists.choose_spec
+  · constructor
+    · intro χ
+      exact analyticOnNhd_const.meromorphicNFOn
+    · intro c hc
+      simp [sLocalIdelicZetaIntegral]
+
+/-- A number field isomorphic to ℚ has exactly one infinite place. -/
+private theorem sLocalPolarMultiplicity_greatest_smaller_card_one
+    (F : Type*) [Field F] [NumberField F] (e : F ≃+* ℚ) :
+    Fintype.card (InfinitePlace F) = 1 := by
+  let l : F ≃ₗ[ℚ] ℚ := e.toRatAlgEquiv.toLinearEquiv
+  have h₁ := InfinitePlace.card_add_two_mul_card_eq_rank F
+  have h₂ := InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces (K := F)
+  have h₃ : Module.finrank ℚ F = 1 := by rw [l.finrank_eq, Module.finrank_self]
+  omega
+
 /-- Paper: Corollary 7.1.3.3, p. 326.
 Use ℚ with only the real place, the trivial character and the zero test, for which
 the set of pole orders is empty. The Gaussian `exp(-πx²)` gives a second example:
 Γℝ(s) has only simple poles, so there is no positive order below one. -/
 theorem Printed.sLocalPolarMultiplicity_greatest_smaller_false :
-    ¬ Printed.sLocalPolarMultiplicity_greatest_smaller := by sorry
+    ¬ Printed.sLocalPolarMultiplicity_greatest_smaller := by
+  intro h
+  let F := ULift ℚ
+  let d : F ≃ ℚ := Equiv.ulift
+  letI : Field F := d.field
+  let e : F ≃+* ℚ := d.ringEquiv
+  have hchar : CharZero F := RingHom.charZero e.toRingHom
+  letI : CharZero F := hchar
+  let l : F ≃ₗ[ℚ] ℚ := e.toRatAlgEquiv.toLinearEquiv
+  have hfin : FiniteDimensional ℚ F := Module.Finite.equiv l.symm
+  letI : NumberField F := @NumberField.mk F _ hchar hfin
+  have hc : Fintype.card (InfinitePlace F) = 1 :=
+    sLocalPolarMultiplicity_greatest_smaller_card_one F e
+  let f : SchwartzBruhat (Multiplicative (SAdeleRing F ∅)) :=
+    (0 : schwartzBruhatSubmodule (Multiplicative (SAdeleRing F ∅)))
+  have hz : sLocalIdelicZFunction (F := F) (S := ∅) f = 0 :=
+    sLocalPolarMultiplicity_greatest_smaller_zeta_zero F ∅
+  obtain ⟨M, m, hM, hm⟩ := h F ∅ hc 1 f
+  obtain ⟨hpos, s, hs⟩ := hM.1
+  have hm0 (c : QuasiCharacter (SIdeleQuotient F ∅)) : sLocalPolarMultiplicity f c = 0 := by
+    apply (sLocalPolarMultiplicity_eq_zero_iff _ _).2
+    rw [hz]
+    exact analyticAt_const.meromorphicOrderAt_nonneg
+  rw [hm0] at hs
+  omega
 
 /-- Paper: Theorem 7.1.4.2(1), equation (7.1.4.2), p. 326.
 As printed: The strong annihilator of the regularized completed Hecke ideal is linearly
