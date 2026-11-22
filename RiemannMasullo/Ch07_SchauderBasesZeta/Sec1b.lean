@@ -7,6 +7,7 @@ public import Mathlib.NumberTheory.NumberField.DirichletDensity
 public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
 import Mathlib.Analysis.Complex.LocallyUniformLimit
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.Order
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
@@ -244,12 +245,173 @@ archimedean points of abscissa zero and all the indicated finite-place poles. -/
 theorem sLocalRhoPoleOrder_le_card (s : ℂ) :
     sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤ archCount + S.card := by sorry
 
+/-- The shifted gamma factors have simple poles, so each infinite place contributes at most one. -/
+private theorem sLocalRhoPoleOrder_arch_gamma_bound (χ : U𝔽) (s : ℂ) :
+    ((-(archCount : ℤ) : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt (heckeGammaFactor χ) s := by
+  classical
+  let A (w : InfinitePlace F) (z : ℂ) := if hw : w.IsReal then
+    let a := (realHeckeCharacter_parameters χ w hw).exists.choose
+    Complex.Gammaℝ (z + a.1 + (a.2.val : ℂ))
+  else
+    let a := (complexHeckeCharacter_parameters χ w
+      (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+    Complex.Gammaℂ (z + a.1 + (a.2.natAbs : ℂ) / 2) / 2
+  have hA (w : InfinitePlace F) : MeromorphicAt (A w) s ∧ -1 ≤ meromorphicOrderAt (A w) s := by
+    dsimp only [A]
+    by_cases hw : w.IsReal
+    · simp only [dite_eq_left hw]
+      let a := (realHeckeCharacter_parameters χ w hw).exists.choose
+      let g (z : ℂ) := z + a.1 + (a.2.val : ℂ)
+      change MeromorphicAt (Complex.Gammaℝ ∘ g) s ∧ -1 ≤ meromorphicOrderAt (Complex.Gammaℝ ∘ g) s
+      have hg : AnalyticAt ℂ g s := by dsimp [g]; fun_prop
+      have hm : MeromorphicAt Complex.Gammaℝ (g s) := by
+        have hi : MeromorphicAt (Complex.Gammaℝ)⁻¹ (g s) :=
+          (Complex.differentiable_Gammaℝ_inv.analyticAt (g s)).meromorphicAt
+        simpa only [inv_inv] using hi.inv
+      rw [meromorphicOrderAt_comp_of_deriv_ne_zero hg (by simp [g])]
+      exact ⟨hm.comp_analyticAt hg, neg_one_le_meromorphicOrderAt_Gammaℝ _⟩
+    · simp only [dite_eq_right hw]
+      let a := (complexHeckeCharacter_parameters χ w
+        (InfinitePlace.not_isReal_iff_isComplex.mp hw)).exists.choose
+      let g (z : ℂ) := z + a.1 + (a.2.natAbs : ℂ) / 2
+      let B := (Complex.Gammaℂ ∘ g) / (fun _ : ℂ ↦ (2 : ℂ))
+      change MeromorphicAt B s ∧ -1 ≤ meromorphicOrderAt B s
+      have hg : AnalyticAt ℂ g s := by dsimp [g]; fun_prop
+      have hm : MeromorphicAt Complex.Gammaℂ (g s) := by
+        have hi : MeromorphicAt (Complex.Gammaℂ)⁻¹ (g s) :=
+          (Complex.differentiable_Gammaℂ_inv.analyticAt (g s)).meromorphicAt
+        simpa only [inv_inv] using hi.inv
+      refine ⟨(hm.comp_analyticAt hg).div (.const _ _), ?_⟩
+      dsimp only [B]
+      rw [meromorphicOrderAt_div (hm.comp_analyticAt hg) (.const _ _),
+        meromorphicOrderAt_comp_of_deriv_ne_zero hg (by simp [g])]
+      simpa [meromorphicOrderAt_const, two_ne_zero] using neg_one_le_meromorphicOrderAt_Gammaℂ (g s)
+  change _ ≤ meromorphicOrderAt (fun z ↦ ∏ w, A w z) s
+  rw [meromorphicOrderAt_fun_prod (fun w _ ↦ (hA w).1)]
+  calc
+    _ = ∑ _w : InfinitePlace F, ((-1 : ℤ) : WithTop ℤ) := by simp
+    _ ≤ _ := Finset.sum_le_sum (fun w _ ↦ (hA w).2)
+
+/-- At negative abscissa the unramified Euler denominator cannot vanish: the norm of
+its nonconstant term is strictly greater than one. -/
+private theorem sLocalRhoPoleOrder_finite_analytic (χ : U𝔽) (v : Primes) {s : ℂ}
+    (hs : s.re < 0) : AnalyticAt ℂ (finiteHeckeEulerFactor χ v) s := by
+  classical
+  let q : ℝ := v.asIdeal.absNorm
+  have hq : 1 < q := by
+    dsimp only [q]
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq₀ : 0 < q := zero_lt_one.trans hq
+  change AnalyticAt ℂ (fun z ↦ finiteHeckeEulerFactor χ v z) s
+  by_cases h : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · simp only [finiteHeckeEulerFactor, ite_eq_left h]
+    let a := (ideleClassNormTwist χ 0).localValue v
+    change AnalyticAt ℂ (fun z : ℂ ↦ (1 - a * (q : ℂ) ^ (-z))⁻¹) s
+    apply AnalyticAt.inv
+    · exact ((differentiable_const _).sub ((differentiable_const _).mul
+        (differentiable_neg.const_cpow (.inl (Complex.ofReal_ne_zero.mpr hq₀.ne'))))).analyticAt s
+    · apply sub_ne_zero.mpr
+      intro he
+      have hn := congrArg norm he
+      rw [norm_one, norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos hq₀] at hn
+      exact (Real.one_lt_rpow hq (neg_pos.mpr hs)).ne hn
+  · simp only [finiteHeckeEulerFactor, ite_eq_right h]
+    exact analyticAt_const
+
+/-- In a unitary chart the correcting factor is the gamma product times a holomorphic
+germ: the remaining factors are epsilon, the finite Euler product and the reciprocal dual L. -/
+private theorem sLocalRhoPoleOrder_unitary_bound (η : PontryaginDual Jₛ) {s : ℂ} (hs : s.re < 0) :
+    let ι : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    ((-(archCount : ℤ) : ℤ) : WithTop ℤ) ≤
+      meromorphicOrderAt (fun z ↦ sLocalRhoFactor (twistₛ (ι.comp η) z)) s := by
+  classical
+  let ι : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let c (ψ : PontryaginDual Jₛ) := twistₛ (ι.comp ψ)
+  let L (ψ : PontryaginDual Jₛ) (z : ℂ) := sLocalHeckeL (c ψ z)
+  have hInv (ψ : PontryaginDual Jₛ) : Differentiable ℂ (fun z ↦ (L ψ z)⁻¹) := by
+    obtain ⟨χ', h, hχ', -⟩ := sLocal_character_extension ψ
+    dsimp only [L, c, ι]
+    simp_rw [sLocalHeckeL_eq_partialEulerProduct ψ χ' h hχ', mul_inv, ← Finset.prod_inv_distrib]
+    refine (differentiable_inv_heckeGammaFactor χ').mul (Differentiable.fun_finsetProd ?_)
+    intro v _
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · simp_rw [inv_inv]
+      have hq : (v.val.asIdeal.absNorm : ℂ) ≠ 0 := by
+        exact_mod_cast (Ideal.absNorm_eq_zero_iff.not.mpr v.val.ne_bot)
+      exact (differentiable_const _).sub ((differentiable_const _).mul
+        (differentiable_neg.const_cpow (.inl hq)))
+    · simp only [inv_one]
+      exact differentiable_const _
+  have hdual (z : ℂ) : dualQuasiCharacter mₛ (isProperMap_sIdeleQuotientNorm F S).continuous
+      (c η z) = c η⁻¹ (1 - z) := by
+    ext1 g
+    let N : ℂ := (((mₛ g : ℝ≥0) : ℝ) : ℂ)
+    have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)
+    change N * c η z g⁻¹ = (η⁻¹ g : ℂ) * N ^ (1 - z)
+    rw [map_inv]
+    change N * ((η g : ℂ) * N ^ z)⁻¹ = (η g : ℂ)⁻¹ * N ^ (1 - z)
+    rw [mul_inv_rev, Complex.cpow_sub 1 z hN, Complex.cpow_one, div_eq_mul_inv]
+    ac_rfl
+  obtain ⟨χ', h, hχ', -⟩ := sLocal_character_extension η
+  let P (z : ℂ) := ∏ v : S, finiteHeckeEulerFactor χ' v.val z
+  let E (z : ℂ) := sLocalEpsilonFactor (c η z)
+  let D (z : ℂ) := (L η⁻¹ (1 - z))⁻¹
+  have hP : AnalyticAt ℂ P s := Finset.analyticAt_fun_prod Finset.univ
+    (fun (v : S) _ ↦ sLocalRhoPoleOrder_finite_analytic χ' v.val hs)
+  have hE : AnalyticAt ℂ E s := sLocalEpsilonFactor_entire η s (mem_univ s)
+  have hD : AnalyticAt ℂ D s := ((hInv η⁻¹).analyticAt (1 - s)).comp
+    (f := fun z : ℂ ↦ 1 - z) (by fun_prop)
+  have heq : (fun z ↦ sLocalRhoFactor (c η z)) =ᶠ[𝓝[≠] s] heckeGammaFactor χ' * (E * P * D) := by
+    filter_upwards [nhdsNE_le_codiscrete s (sLocalRhoFactor_eq_epsilon_mul η)] with z hz
+    change sLocalRhoFactor (c η z) = E z * (sLocalHeckeL (c η z) /
+      sLocalHeckeL (dualQuasiCharacter mₛ _ (c η z))) at hz
+    rw [hdual, sLocalHeckeL_eq_partialEulerProduct η χ' h hχ'] at hz
+    change sLocalRhoFactor (c η z) = heckeGammaFactor χ' z * (E z * P z * D z)
+    rw [hz]
+    change E z * (heckeGammaFactor χ' z * P z / L η⁻¹ (1 - z)) = _
+    dsimp only [D]
+    ring
+  change _ ≤ meromorphicOrderAt (fun z ↦ sLocalRhoFactor (c η z)) s
+  rw [meromorphicOrderAt_congr heq, meromorphicOrderAt_mul (meromorphic_heckeGammaFactor χ' s)
+    ((hE.mul hP).mul hD).meromorphicAt]
+  exact (sLocalRhoPoleOrder_arch_gamma_bound χ' s).trans
+    (le_add_of_nonneg_right ((hE.mul hP).mul hD).meromorphicOrderAt_nonneg)
+
 /-- Paper: Theorem 7.1.3.2(2), p. 324.
 In the open left half-plane the pole order is bounded by the number of infinite places.
 Deviation: Includes all negative abscissae, as in the local-factor argument, and implies
 the stated bounds for negative even abscissae and by the degree. -/
 theorem sLocalRhoPoleOrder_le_archimedean_of_re_neg {s : ℂ} (hs : s.re < 0) :
-    sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤ archCount := by sorry
+    sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤ archCount := by
+  let c := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩
+  have hc (g : Jₛ) : ‖c g‖ = 1 := by
+    obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective g
+    change ‖(χ (QuotientGroup.mk (sIdeleInsertion F S u)) : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    rw [Complex.cpow_zero, mul_one, Circle.norm_coe]
+  let η : PontryaginDual Jₛ :=
+    { toFun g := ⟨c g, mem_sphere_zero_iff_norm.mpr (hc g)⟩
+      map_one' := Subtype.ext c.map_one
+      map_mul' x y := Subtype.ext (c.map_mul x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  let ρ := rhoChart(χ, hχ)
+  have h : ((-(archCount : ℤ) : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt ρ s :=
+    sLocalRhoPoleOrder_unitary_bound η hs
+  have hcomp : (fun z ↦ sLocalRhoFactor (twistₛ (chartₛ(χ, hχ) s) z)) = ρ ∘ (· + s) := by
+    funext z
+    apply congrArg sLocalRhoFactor
+    ext1 g
+    let N : ℂ := (((mₛ g : ℝ≥0) : ℝ) : ℂ)
+    have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)
+    change c g * N ^ s * N ^ z = c g * N ^ (z + s)
+    rw [add_comm z s, Complex.cpow_add _ _ hN, mul_assoc]
+  have hb : ((-(archCount : ℤ) : ℤ) : WithTop ℤ) ≤ sLocalIdelicOrderBound (chartₛ(χ, hχ) s) := by
+    unfold sLocalIdelicOrderBound
+    rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+    exact le_min (by exact_mod_cast neg_nonpos.mpr (Int.natCast_nonneg _)) h
+  rw [sLocalIdelicOrderBound_eq_neg_poleOrder] at hb
+  exact_mod_cast neg_le_neg_iff.mp (WithTop.coe_le_coe.mp hb)
 
 -- TODO(paper-gap): The bound by r₂ at negative odd abscissae in Theorem 7.1.3.2(2)
 -- omits real sign factors. The odd Dirichlet character modulo 4 gives a pole at -1
