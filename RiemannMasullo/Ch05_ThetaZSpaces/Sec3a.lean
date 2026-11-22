@@ -236,12 +236,57 @@ def finitePlacePrincipalValue (v : V) : ℬ(Fᵥ(v)) →L[ℂ] ℬ(Fᵥ(v)) :=
   ⟨(finitePlacePrincipalValue_isLinear v π).mk' (pvBundle(v, π)),
     finitePlacePrincipalValue_continuous v π⟩
 
+private theorem finitePlacePrincipalValue_spec_independent (v : V) (π π' : Fᵥ(v)ˣ)
+    (hπ : vval(v).IsUniformizer π.val) (hπ' : vval(v).IsUniformizer π'.val)
+    (f : ℬ(Fᵥ(v))) (x : Multiplicative Fᵥ(v)) :
+    finitePlacePrincipalValueFun v π f x = finitePlacePrincipalValueFun v π' f x := by
+  let k : Fᵥ(v)ˣ := π * π'⁻¹
+  have hk : k ∈ Uᵥ(v) :=
+    HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mpr (by
+      dsimp [k]
+      rw [Units.val_inv_eq_inv_val, map_mul, map_inv₀, hπ.val, ← hπ'.val]
+      exact mul_inv_cancel₀ hπ'.val_ne_zero)
+  let : BorelSpace Fᵥ(v)ˣ := ⟨rfl⟩
+  let : (μᵥ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  have hs : (fun u : Fᵥ(v)ˣ ↦ k * u) ⁻¹' (Uᵥ(v) : Set Fᵥ(v)ˣ) = Uᵥ(v) := by
+    ext u
+    simp only [mem_preimage]
+    constructor
+    · intro h
+      have := (Uᵥ(v)).mul_mem ((Uᵥ(v)).inv_mem hk) h
+      simpa [mul_assoc] using this
+    · exact fun h ↦ (Uᵥ(v)).mul_mem hk h
+  let g : Fᵥ(v)ˣ → ℂ := fun u ↦
+    f (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * ((↑π'⁻¹ : Fᵥ(v)) * x.toAdd)))
+  have hi := (measurePreserving_mul_left (μᵥ(v)) k).setIntegral_preimage_emb
+    (Homeomorph.mulLeft k).toMeasurableEquiv.measurableEmbedding g (Uᵥ(v) : Set Fᵥ(v)ˣ)
+  rw [hs] at hi
+  unfold finitePlacePrincipalValueFun
+  congr 1
+  congr 1
+  apply Eq.trans _ hi
+  apply integral_congr_ae
+  filter_upwards with u
+  dsimp [g]
+  have he : (k * u)⁻¹ * π'⁻¹ = u⁻¹ * π⁻¹ := by
+    dsimp [k]
+    rw [mul_inv_rev, mul_inv_rev, inv_inv]
+    calc
+      (u⁻¹ * (π' * π⁻¹)) * π'⁻¹ = u⁻¹ * π⁻¹ * (π' * π'⁻¹) := by ac_rfl
+      _ = _ := by simp
+  simp only [← mul_assoc, ← Units.val_mul, he]
+
 /-- Paper: Definition 5.3.1.2 and Lemma 5.3.1.3, p. 241.
 The scalar formula for the operator works with every choice of uniformizer. -/
 theorem finitePlacePrincipalValue_spec (v : V) (π : Fᵥ(v)ˣ)
     (hπ : vval(v).IsUniformizer π.val) :
     ∀ (f : ℬ(Fᵥ(v))) (x : Multiplicative Fᵥ(v)),
-      finitePlacePrincipalValue v f x = finitePlacePrincipalValueFun v π f x := by sorry
+      finitePlacePrincipalValue v f x = finitePlacePrincipalValueFun v π f x := by
+  intro f x
+  let h := vval(v).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π₀ := Units.mk0 (h.choose : Fᵥ(v)) h.choose_spec.ne_zero
+  change finitePlacePrincipalValueFun v π₀ f x = finitePlacePrincipalValueFun v π f x
+  exact finitePlacePrincipalValue_spec_independent v π₀ π h.choose_spec hπ f x
 
 open Classical in
 /-- Paper: Definition 5.3.1.2 and Lemma 5.3.1.3, p. 241.
