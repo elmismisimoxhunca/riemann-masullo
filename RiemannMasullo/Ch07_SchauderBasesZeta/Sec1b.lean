@@ -582,7 +582,68 @@ The pole order is bounded by the number of places in S, including all infinite p
 Deviation: Uses the proof's bound at every point of the component, which includes the
 archimedean points of abscissa zero and all the indicated finite-place poles. -/
 theorem sLocalRhoPoleOrder_le_card (s : ℂ) :
-    sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤ archCount + S.card := by sorry
+    sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤ archCount + S.card := by
+  classical
+  let c := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩
+  have hc (x : Jₛ) : ‖c x‖ = 1 := by
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [show c (QuotientGroup.mk g) = ideleClassNormTwist χ 0
+      (QuotientGroup.mk (sIdeleInsertion F S g)) from sIdeleRestriction_mk F S _ g]
+    change ‖(χ _ : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    simp
+  let ψ : PontryaginDual Jₛ :=
+    { toFun := fun x ↦ ⟨c x, mem_sphere_zero_iff_norm.mpr (hc x)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  have hψ : (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ = c := by
+    ext x
+    rfl
+  have hcomp : (fun z ↦ sLocalRhoFactor (F := F) (S := S)
+        (twistₛ (chartₛ(χ, hχ) s) z)) = rhoChart(χ, hχ) ∘ (· + s) := by
+    funext z
+    simp only [Function.comp]
+    congr 1
+    ext1 g
+    simp only [quasiCharacterNormTwist]
+    have hn : (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ≠ 0 := by simp
+    change ((_ : ℂ) * _) * _ = (_ : ℂ) * _
+    rw [mul_assoc]
+    congr 1
+    change (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ^ s * (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ^ z = _
+    rw [← Complex.cpow_add _ _ hn, add_comm]
+    rfl
+  have key : sLocalIdelicOrderBound (chartₛ(χ, hχ) s) =
+      min 0 (meromorphicOrderAt rhoChart(χ, hχ) s) := by
+    unfold sLocalIdelicOrderBound
+    rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+  have hord := sLocalRhoFactor_orderAt_pole (F := F) (S := S) ψ s
+  dsimp only at hord
+  rw [hψ] at hord
+  change meromorphicOrderAt rhoChart(χ, hχ) s < 0 → _ at hord
+  have hbound : (-( (archCount + S.card : ℕ) : ℤ) : WithTop ℤ) ≤
+      meromorphicOrderAt rhoChart(χ, hχ) s := by
+    by_cases h : meromorphicOrderAt rhoChart(χ, hχ) s < 0
+    · rw [hord h]
+      have ha := Finset.card_filter_le (s := (Finset.univ : Finset (InfinitePlace F)))
+        (p := fun w ↦ meromorphicOrderAt (fun z ↦ infiniteLocalTateFactor w
+          (sLocalInfiniteRestriction w (twistₛ c z))) s < 0)
+      have hf := Finset.card_filter_le (s := (Finset.univ : Finset S))
+        (p := fun v ↦ meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val
+          (sLocalFiniteRestriction v (twistₛ c z))) s < 0)
+      simp only [Finset.card_univ, Fintype.card_coe] at ha hf
+      exact_mod_cast (show -((archCount + S.card : ℕ) : ℤ) ≤
+        -(((_ + _ : ℕ)) : ℤ) by omega)
+    · exact le_trans (by exact_mod_cast (show -((archCount + S.card : ℕ) : ℤ) ≤ 0 by omega))
+        (le_of_not_gt h)
+  have hb : (-( (archCount + S.card : ℕ) : ℤ) : WithTop ℤ) ≤
+      sLocalIdelicOrderBound (chartₛ(χ, hχ) s) := by
+    rw [key]
+    exact le_min (by exact_mod_cast (show -((archCount + S.card : ℕ) : ℤ) ≤ 0 by omega)) hbound
+  rw [sLocalIdelicOrderBound_eq_neg_poleOrder] at hb
+  have : -((archCount + S.card : ℕ) : ℤ) ≤ -(sLocalRhoPoleOrder (chartₛ(χ, hχ) s) : ℤ) := by
+    exact_mod_cast hb
+  omega
 
 /-- Paper: Theorem 7.1.3.2(2), p. 324.
 In the open left half-plane the pole order is bounded by the number of infinite places.
