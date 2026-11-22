@@ -7,6 +7,9 @@ public import Mathlib.NumberTheory.NumberField.DirichletDensity
 public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
 import Mathlib.Analysis.Complex.LocallyUniformLimit
+import Mathlib.Analysis.Distribution.TemperedDistribution
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Barrelled
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Bounded
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
@@ -649,7 +652,29 @@ theorem spectralAnnihilator_directSum :
 An entire Schwartz–Bergman function includes continuously into the compact-open space
 by keeping its value at each point. -/
 theorem exists_schwartzBergman_entireInclusion :
-    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by sorry
+    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by
+  have hd (f : Aℂ) : Differentiable ℂ f.val := by
+    apply differentiableOn_univ.mp
+    simpa using f.property.2.1
+  let T (f : Aℂ) : C(ℂ, ℂ) := ⟨f.val, (hd f).continuous⟩
+  let : BarrelledSpace ℂ Aℂ := isFrechetTVS_barrelled
+    (schwartzBergman_frechet univ isOpen_univ inferInstance univ_nonempty)
+  obtain ⟨L, hL, hEmb⟩ :=
+    schwartzBergman_schwartzLine_topology univ isOpen_univ inferInstance univ_nonempty
+  have hT : Continuous T := by
+    apply continuous_of_continuous_eval_barrelled
+    intro z
+    -- Evaluate the Schwartz trace on the vertical line through z.
+    let a : (univ : Set ℝ) := ⟨z.re, mem_univ _⟩
+    have hc := (TemperedDistribution.delta z.im).continuous.comp
+      ((continuous_apply a).comp hEmb.continuous)
+    have he (f : Aℂ) : TemperedDistribution.delta z.im (L f a) = f.val z := by
+      simp only [TemperedDistribution.delta_apply, hL, weightedVerticalTrace, pow_zero, one_mul,
+        a, Complex.re_add_im]
+    exact ⟨{ toFun := fun f ↦ f.val z, map_add' := fun _ _ ↦ rfl,
+             map_smul' := fun _ _ ↦ rfl, cont := hc.congr he }, fun _ ↦ rfl⟩
+  exact ⟨{ toFun := fun f ↦ ⟨T f, hd f⟩, map_add' := fun _ _ ↦ rfl,
+           map_smul' := fun _ _ ↦ rfl, cont := hT.subtype_mk _ }, fun _ _ ↦ rfl⟩
 
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327. The canonical map includes entire
 Schwartz–Bergman functions into the compact-open space of entire functions. -/
@@ -720,7 +745,32 @@ theorem schwartzBergman_normalizedJets :
     let jets := fun i : {z : ℂ // z.re ∈ Icc 0 1} × ℕ ↦
       (i.2.factorial : ℂ)⁻¹ • (entireJet i.1.val i.2).comp schwartzBergmanEntireInclusion
     Equicontinuous (fun i (f : Aℂ) ↦ jets i f) ∧
-      Bornology.IsVonNBounded ℂ (range jets) := by sorry
+      Bornology.IsVonNBounded ℂ (range jets) := by
+  intro jets
+  have hb (f : Aℂ) : Bornology.IsVonNBounded ℂ (range fun i ↦ jets i f) := by
+    rw [NormedSpace.isVonNBounded_iff, isBounded_iff_forall_norm_le]
+    -- The unit circles about all jet centers lie in the same enlarged strip.
+    obtain ⟨M, hM⟩ := f.property.2.2 (-1) 2 (by norm_num) (subset_univ _) 0
+    refine ⟨M, forall_mem_range.mpr ?_⟩
+    rintro ⟨⟨z, hz⟩, m⟩
+    let g := schwartzBergmanEntireInclusion f
+    have hcircle (w : ℂ) (hw : w ∈ Metric.sphere z 1) : ‖g.val w‖ ≤ M := by
+      have hd := (Complex.abs_re_le_norm (w - z)).trans
+        (mem_closedBall_iff_norm.mp (Metric.sphere_subset_closedBall hw))
+      rw [Complex.sub_re, abs_le] at hd
+      have hs : w.re ∈ Icc (-1 : ℝ) 2 := ⟨by linarith [hd.1, hz.1], by linarith [hd.2, hz.2]⟩
+      simpa only [g, schwartzBergmanEntireInclusion_apply, pow_zero, one_mul] using hM ⟨w, hs, rfl⟩
+    have hd : Differentiable ℂ (g.val : ℂ → ℂ) := g.property
+    have h := Complex.norm_iteratedDeriv_le_of_forall_mem_sphere_norm_le m one_pos
+      hd.diffContOnCl hcircle
+    change ‖(m.factorial : ℂ)⁻¹ * iteratedDeriv m (g.val : ℂ → ℂ) z‖ ≤ M
+    rw [norm_mul, norm_inv, Complex.norm_natCast, inv_mul_le_iff₀ (by positivity)]
+    simpa only [one_pow, div_one] using h
+  have hF := schwartzBergman_frechet univ isOpen_univ inferInstance univ_nonempty
+  let : BarrelledSpace ℂ Aℂ := isFrechetTVS_barrelled hF
+  obtain ⟨_, _, hm, hc⟩ := hF
+  exact ⟨(PolynormableSpace.banach_steinhaus hb).equicontinuous,
+    isVonNBounded_range_clm_of_pointwise jets hb⟩
 
 -- TODO(paper-gap): Theorem 7.1.4.3(1) misses collisions across rational primes.
 -- At s = 0 for the trivial character of ℚ with 2 and 3 removed, the orbital
