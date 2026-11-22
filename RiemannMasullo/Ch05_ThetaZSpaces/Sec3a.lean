@@ -224,8 +224,14 @@ theorem finitePlacePrincipalValue_isLinear (v : V) (π : Fᵥ(v)ˣ) :
 The local principal value formula is continuous. -/
 theorem finitePlacePrincipalValue_continuous (v : V) (π : Fᵥ(v)ˣ) :
     @Continuous ℬ(Fᵥ(v)) ℬ(Fᵥ(v)) _ _
-      ((finitePlacePrincipalValue_isLinear v π).mk' (pvBundle(v, π))).toFun :=
-  by sorry
+      ((finitePlacePrincipalValue_isLinear v π).mk' (pvBundle(v, π))).toFun := by
+  let E := FinestLocallyConvex ℬ(Fᵥ(v))
+  let L : E →ₗ[ℂ] E := (finitePlacePrincipalValue_isLinear v π).mk' (pvBundle(v, π))
+  apply (congrArg (fun t ↦ @Continuous ℬ(Fᵥ(v)) ℬ(Fᵥ(v)) t t L.toFun)
+    (finitePlaceSchwartz_finestTopology F v)).mpr
+  have h := finestLocallyConvex_withSeminorms ℬ(Fᵥ(v))
+  haveI : IsTopologicalAddGroup E := h.isTopologicalAddGroup
+  exact h.continuous_of_continuous_comp L fun p ↦ h.continuous_seminorm (p.comp L)
 
 /-- Paper: Definition 5.3.1.2, p. 241.
 The principal value is the identity minus the uniformizer pullback of the trivial-isotype
