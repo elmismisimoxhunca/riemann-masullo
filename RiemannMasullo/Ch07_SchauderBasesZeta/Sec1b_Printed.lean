@@ -247,7 +247,19 @@ At the origin the regularized completed zeta is nonzero, and each prime block
 contributes the same value functional. Their difference vanishes under the jet
 identification, and the first derivative at the resulting double zero is missing. -/
 theorem Printed.orbitalAnnihilator_prime_products_false :
-    ¬ Printed.orbitalAnnihilator_prime_products := by sorry
+    ¬ Printed.orbitalAnnihilator_prime_products := by
+  intro h
+  apply Printed.spectralAnnihilator_product_false
+  intro F _ _ χ τ hτ L hL hEq
+  let P := {p : RatPrimes // ∃ v ∈ (∅ : Finset Places(F)),
+    HeightOneSpectrum.under (𝓞 ℚ) v = p}
+  let A := ∀ p : P, ↥(Printed.orbitalPrimeJetSpace χ ∅ p.val)
+  let B := ∀ ρ : Zeros(L), ↥(Jet(L, ρ.val))
+  have : IsEmpty P := ⟨fun p => by obtain ⟨v, hv, _⟩ := p.property; simp at hv⟩
+  let : Unique A := { default := 0, uniq := fun a => Subsingleton.elim _ _ }
+  obtain ⟨e⟩ := h F χ ∅ τ hτ L hL hEq
+  rw [orbitalHeckeGenerator_empty] at e
+  exact ⟨(ContinuousLinearEquiv.uniqueProd ℂ B A).symm.trans e⟩
 
 /-- Paper: Theorem 7.1.4.3(1), equation (7.1.4.24), p. 331.
 As printed: The space of all jets associated with a rational prime block is
