@@ -228,7 +228,75 @@ The constant is `-log(π)/2` from the gamma prefactor, while the printed constan
 local sign at the real place. It has the same exponent on positive reals as the
 trivial character, but its gamma argument is `(s + 1)/2` in place of `s/2`. -/
 theorem Printed.heckeArchimedean_logDeriv_false :
-    ¬ Printed.heckeArchimedean_logDeriv := by sorry
+    ¬ Printed.heckeArchimedean_logDeriv := by
+  intro h
+  have hw := Rat.isReal_infinitePlace
+  have hone : ((1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)).comp
+      ⟨IdeleClassGroup.ofCompletion (𝓞 ℚ) ℚ Rat.infinitePlace,
+        continuous_ideleClass_ofCompletion ℚ Rat.infinitePlace⟩) = 1 :=
+    ContinuousMonoidHom.ext fun _ ↦ rfl
+  have key :=
+    h ℚ 1 Rat.infinitePlace 0 (by rw [hone]; exact ⟨by simp, fun t ht ↦ by simp⟩) 2
+  simp only [hone] at key
+  have hfun : ∀ x, infiniteLocalEulerFactor Rat.infinitePlace
+      (quasiCharacterNormTwist ((Units.map nnNormHom.toMonoidHom) ^ Rat.infinitePlace.mult)
+        (continuous_infiniteLocalModule Rat.infinitePlace)
+        (ContinuousMonoidHom.comp (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ) 1)
+          x) =
+      Complex.Gammaℝ x := fun x ↦ infiniteLocalEulerFactor_real_norm _ hw x
+  simp only [Function.comp_def, hw, ite_true] at key
+  simp only [hfun] at key
+  have hz : ((2 : ℂ) - 0) / ((2 : ℝ) : ℂ) = 1 := by norm_num
+  rw [hz] at key
+  have hpi : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+  have hdΓ : ∀ s : ℂ, 0 < s.re → DifferentiableAt ℂ Complex.Gamma s := fun s hs ↦
+    Complex.differentiableAt_Gamma s fun m hm ↦ by
+      have := congrArg Complex.re hm
+      simp at this
+      linarith [(Nat.cast_nonneg m : (0 : ℝ) ≤ m)]
+  have hopen : IsOpen {s : ℂ | 0 < s.re} := isOpen_lt continuous_const Complex.continuous_re
+  have hΓ1 : AnalyticAt ℂ Complex.Gamma 1 :=
+    DifferentiableOn.analyticAt (fun s hs ↦ (hdΓ s hs).differentiableWithinAt)
+      (hopen.mem_nhds (by simp))
+  have hdpow : ∀ s : ℂ, DifferentiableAt ℂ (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2)) s :=
+    fun s ↦
+    ((differentiableAt_id.neg.div_const 2).const_cpow (Or.inl hpi))
+  have hdhalf :
+      ∀ s : ℂ, 0 < s.re → DifferentiableAt ℂ (fun s : ℂ ↦ Complex.Gamma (s / 2)) s :=
+    fun s hs ↦ (hdΓ (s / 2) (by simpa using hs)).comp s (differentiableAt_id.div_const 2)
+  have hGR : AnalyticAt ℂ (fun x : ℂ ↦ x.Gammaℝ) 2 :=
+    DifferentiableOn.analyticAt (fun s hs ↦ ((hdpow s).mul (hdhalf s hs)).differentiableWithinAt)
+      (hopen.mem_nhds (by simp))
+  have hord1 := hGR.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr
+    (Complex.Gammaℝ_ne_zero_of_re_pos (by simp))
+  have hord2 := hΓ1.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr (by simp)
+  have k := key hord1 hord2
+  have hsplit : logDeriv (fun x : ℂ ↦ x.Gammaℝ) 2 =
+      logDeriv (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2)) 2 +
+        logDeriv (fun s : ℂ ↦ Complex.Gamma (s / 2)) 2 :=
+    logDeriv_mul (f := fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2))
+      (g := fun s : ℂ ↦ Complex.Gamma (s / 2))
+      2 (by simp [hpi]) (by norm_num) (hdpow 2) (hdhalf 2 (by simp))
+  have hpow :
+      logDeriv (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2)) 2 = -(Real.log Real.pi : ℂ) / 2 := by
+    have hd : HasDerivAt (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2))
+        ((Real.pi : ℂ) ^ (-(2 : ℂ) / 2) * Complex.log Real.pi * (-1 / 2)) 2 :=
+      ((hasDerivAt_id' (2 : ℂ)).neg.div_const 2).const_cpow (Or.inl hpi)
+    have hne : (Real.pi : ℂ) ^ (-(2 : ℂ) / 2) ≠ 0 := by simp [hpi]
+    rw [logDeriv_apply, hd.deriv, ← Complex.ofReal_log Real.pi_pos.le]
+    field_simp
+  have hgam : logDeriv (fun s : ℂ ↦ Complex.Gamma (s / 2)) 2 =
+      logDeriv Complex.Gamma 1 * (1 / 2) := by
+    have := logDeriv_comp (f := Complex.Gamma) (g := fun s : ℂ ↦ s / 2) (x := 2)
+      (by norm_num; exact hdΓ 1 (by simp)) (differentiableAt_id.div_const 2)
+    simp only [Function.comp_def] at this
+    rw [this]
+    norm_num
+  rw [hsplit, hpow, hgam] at k
+  push_cast at k
+  have hlog : (Real.log Real.pi : ℂ) = 0 := by linear_combination -k
+  have := Real.log_pos (by linarith [Real.pi_gt_three] : (1 : ℝ) < Real.pi)
+  exact absurd (Complex.ofReal_eq_zero.mp hlog) this.ne'
 
 /-- Paper: Proposition B.4.2.1, proof, Equation (B.4.2.16), p. 616. As printed:
 the sum of the local contour integrals equals the centered contour with the two
@@ -279,7 +347,63 @@ place of `ℚ`, take the trivial local character, `a = 2`, and a smooth
 logarithmic bump supported in `(-1,1)` with value one at zero. On `x > 1`
 the two samples vanish, so the upper truncation is exactly `log R` for `R > 1`. -/
 theorem Printed.heckeArchimedean_integral_convergesAtTop_false :
-    ¬ Printed.heckeArchimedean_integral_convergesAtTop := by sorry
+    ¬ Printed.heckeArchimedean_integral_convergesAtTop := by
+  intro h
+  let β : ContDiffBump (0 : ℝ) := ⟨1 / 4, 1 / 2, by norm_num, by norm_num⟩
+  have hβ1 : β 0 = 1 := β.one_of_mem_closedBall (Metric.mem_closedBall_self (by norm_num))
+  have hcs : HasCompactSupport (fun x ↦ (β x : ℂ)) :=
+    β.hasCompactSupport.comp_left Complex.ofReal_zero
+  let f : 𝓢(ℝ, ℂ) := hcs.toSchwartzMap (Complex.ofRealCLM.contDiff.comp β.contDiff)
+  have hf : ∀ x, f x = β x := fun _ ↦ rfl
+  have hts : tsupport (f : ℝ → ℂ) ⊆ Metric.closedBall 0 (1 / 2) := by
+    refine (tsupport_comp_subset Complex.ofReal_zero _).trans ?_
+    rw [β.tsupport_eq]
+  have hout : ∀ x : ℝ, 1 / 2 < |x| → x ∉ tsupport (f : ℝ → ℂ) := by
+    intro x hx hmem
+    have := hts hmem
+    rw [Metric.mem_closedBall, Real.dist_eq, sub_zero] at this
+    linarith
+  have hzero : ∀ x : ℝ, 1 / 2 < |x| → f x = 0 := fun x hx ↦
+    image_eq_zero_of_notMem_tsupport (hout x hx)
+  have hder : ∀ (j : ℕ) (x : ℝ), 1 / 2 < |x| → iteratedDeriv j (f : ℝ → ℂ) x = 0 := by
+    intro j x hx
+    rw [iteratedDeriv_eq_iteratedFDeriv,
+      image_eq_zero_of_notMem_tsupport (fun hm ↦ hout x hx (tsupport_iteratedFDeriv_subset j hm))]
+    rfl
+  have hdec : ExponentialDecay f := by
+    refine ⟨fun j A _ ↦ ?_, fun j A _ ↦ ?_⟩
+    · refine EventuallyEq.trans_isBigO ?_ (Asymptotics.isBigO_zero _ _)
+      filter_upwards [eventually_gt_atTop (1 / 2 : ℝ)] with x hx
+      exact hder j x (by rw [abs_of_pos (by linarith)]; exact hx)
+    · refine EventuallyEq.trans_isBigO ?_ (Asymptotics.isBigO_zero _ _)
+      filter_upwards [eventually_lt_atBot (-(1 / 2) : ℝ)] with x hx
+      exact hder j x (by rw [abs_of_neg (by linarith)]; linarith)
+  obtain ⟨tail, ht⟩ :=
+    h ℚ Rat.infinitePlace 1 0 ⟨by simp, fun t ht ↦ by simp⟩ 2 (by norm_num) f hdec
+  have hN : (InfinitePlace.mult Rat.infinitePlace : ℝ) = 1 := by
+    simp [InfinitePlace.mult, Rat.isReal_infinitePlace]
+  have hlog : ∀ R : ℝ, 1 ≤ R → (∫ x in Ioc 1 R,
+      ((InfinitePlace.mult Rat.infinitePlace : ℝ) : ℂ) * f 0 / (x : ℂ) -
+        (f x * Complex.exp (0 * (x : ℂ)) + f (-x) * Complex.exp (-0 * (x : ℂ))) *
+          (Real.exp ((2 / (InfinitePlace.mult Rat.infinitePlace : ℝ) - 1 / 2) * x) : ℂ) /
+            (1 - (Real.exp (-(2 / (InfinitePlace.mult Rat.infinitePlace : ℝ) * x)) : ℂ))) =
+      (Real.log R : ℂ) := by
+    intro R hR
+    rw [setIntegral_congr_fun measurableSet_Ioc (g := fun x : ℝ ↦ ((x⁻¹ : ℝ) : ℂ))
+      (fun x hx ↦ by
+        have hx1 : 1 / 2 < |x| := by rw [abs_of_pos (by linarith [hx.1])]; linarith [hx.1]
+        have hx2 : 1 / 2 < |-x| := by rwa [abs_neg]
+        rw [hzero x hx1, hzero (-x) hx2, hN, hf, hβ1]
+        push_cast
+        ring)]
+    rw [integral_complex_ofReal, ← intervalIntegral.integral_of_le hR,
+      integral_inv_of_pos one_pos (by linarith), div_one]
+  have hre := (Complex.continuous_re.tendsto _).comp ht
+  refine not_tendsto_nhds_of_tendsto_atTop Real.tendsto_log_atTop _
+    (hre.congr' ?_)
+  filter_upwards [eventually_ge_atTop (1 : ℝ)] with R hR
+  simp only [Function.comp_apply]
+  rw [hlog R hR, Complex.ofReal_re]
 
 local notation "𝒮ₐ(" K ")" => SchwartzBruhat (Multiplicative K)
 local notation "𝒟(" G ")" => BruhatCompactSupport G
@@ -322,7 +446,34 @@ def Printed.finiteLog_isSchwartzBruhat : Prop :=
 /-- Paper: Proposition B.4.3.1, uniqueness sentence, p. 618. In the completion
 of `ℚ` at two, the values at `2^n` are `-n`. They are unbounded as the arguments
 tend to zero, so no value at zero gives even a continuous representative. -/
-theorem Printed.finiteLog_isSchwartzBruhat_false : ¬ Printed.finiteLog_isSchwartzBruhat := by sorry
+theorem Printed.finiteLog_isSchwartzBruhat_false : ¬ Printed.finiteLog_isSchwartzBruhat := by
+  intro h
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 ℚ)
+  let v : HeightOneSpectrum (𝓞 ℚ) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  obtain ⟨J, hJ⟩ := h ℚ v
+  let val : Valuation (v.adicCompletion ℚ) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  have hlt : ‖(π : v.adicCompletion ℚ)‖ < 1 :=
+    Valued.toNormedField.norm_lt_one_iff.mpr hπ.val_lt_one
+  have hpos : 0 < ‖(π : v.adicCompletion ℚ)‖ := norm_pos_iff.mpr hπ.ne_zero
+  have hq : 0 < Real.log (Ideal.absNorm v.asIdeal : ℝ) :=
+    Real.log_pos (by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v)
+  have hc : Continuous fun x : v.adicCompletion ℚ ↦ J (Multiplicative.ofAdd x) :=
+    (schwartzBruhat_continuous J).comp continuous_ofAdd
+  have hlim : Tendsto (fun n : ℕ ↦ (π : v.adicCompletion ℚ) ^ n) atTop (𝓝 0) :=
+    tendsto_pow_atTop_nhds_zero_of_norm_lt_one hlt
+  have hre := (Complex.continuous_re.tendsto _).comp ((hc.tendsto 0).comp hlim)
+  have hbot : Tendsto (fun n : ℕ ↦ (n : ℝ) *
+      (Real.log ‖(π : v.adicCompletion ℚ)‖ / Real.log (Ideal.absNorm v.asIdeal : ℝ)))
+      atTop atBot :=
+    tendsto_natCast_atTop_atTop.atTop_mul_const_of_neg
+      (div_neg_of_neg_of_pos (Real.log_neg hpos hlt) hq)
+  refine not_tendsto_nhds_of_tendsto_atBot hbot _ (hre.congr fun n ↦ ?_)
+  have hn := hJ _ (pow_ne_zero n hπ.ne_zero)
+  simp only [Function.comp_apply]
+  rw [show J (Multiplicative.ofAdd ((π : v.adicCompletion ℚ) ^ n)) = _ from hn,
+    Complex.ofReal_re, norm_pow, Real.log_pow]
+  ring
 
 local notation "archLogPairing(" F ", " w ", " f ")" =>
   (∫ y : InfinitePlace.Completion w, (Real.log (‖y‖ ^ InfinitePlace.mult w) : ℂ) *
