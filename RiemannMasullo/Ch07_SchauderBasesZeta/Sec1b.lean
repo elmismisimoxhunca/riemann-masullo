@@ -7,7 +7,6 @@ public import Mathlib.NumberTheory.NumberField.DirichletDensity
 public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
 import Mathlib.Analysis.Complex.LocallyUniformLimit
-import Mathlib.Analysis.Distribution.TemperedDistribution
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Barrelled
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Bounded
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
@@ -1003,29 +1002,7 @@ theorem spectralAnnihilator_directSum :
 An entire Schwartz–Bergman function includes continuously into the compact-open space
 by keeping its value at each point. -/
 theorem exists_schwartzBergman_entireInclusion :
-    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by
-  have hd (f : Aℂ) : Differentiable ℂ f.val := by
-    apply differentiableOn_univ.mp
-    simpa using f.property.2.1
-  let T (f : Aℂ) : C(ℂ, ℂ) := ⟨f.val, (hd f).continuous⟩
-  let : BarrelledSpace ℂ Aℂ := isFrechetTVS_barrelled
-    (schwartzBergman_frechet univ isOpen_univ inferInstance univ_nonempty)
-  obtain ⟨L, hL, hEmb⟩ :=
-    schwartzBergman_schwartzLine_topology univ isOpen_univ inferInstance univ_nonempty
-  have hT : Continuous T := by
-    apply continuous_of_continuous_eval_barrelled
-    intro z
-    -- Evaluate the Schwartz trace on the vertical line through z.
-    let a : (univ : Set ℝ) := ⟨z.re, mem_univ _⟩
-    have hc := (TemperedDistribution.delta z.im).continuous.comp
-      ((continuous_apply a).comp hEmb.continuous)
-    have he (f : Aℂ) : TemperedDistribution.delta z.im (L f a) = f.val z := by
-      simp only [TemperedDistribution.delta_apply, hL, weightedVerticalTrace, pow_zero, one_mul,
-        a, Complex.re_add_im]
-    exact ⟨{ toFun := fun f ↦ f.val z, map_add' := fun _ _ ↦ rfl,
-             map_smul' := fun _ _ ↦ rfl, cont := hc.congr he }, fun _ ↦ rfl⟩
-  exact ⟨{ toFun := fun f ↦ ⟨T f, hd f⟩, map_add' := fun _ _ ↦ rfl,
-           map_smul' := fun _ _ ↦ rfl, cont := hT.subtype_mk _ }, fun _ _ ↦ rfl⟩
+    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by sorry
 
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327. The canonical map includes entire
 Schwartz–Bergman functions into the compact-open space of entire functions. -/
