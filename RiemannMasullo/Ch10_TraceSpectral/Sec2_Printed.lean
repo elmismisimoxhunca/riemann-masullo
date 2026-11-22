@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
+
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 /-! # §10.2 assertions that are false as printed -/
@@ -87,7 +89,12 @@ def Printed.spectralLineJet_annulus : Prop :=
 use the trivial character and a nontrivial zero of its squared two-dimensional
 Artin factor. For s = 3 the printed full multiplicity includes k = 1 and the
 squared norm diverges logarithmically. -/
-theorem Printed.spectralLineJet_annulus_false : ¬ Printed.spectralLineJet_annulus := by sorry
+theorem Printed.spectralLineJet_annulus_false : ¬ Printed.spectralLineJet_annulus := by
+  intro hall
+  apply Printed.spectralLineJet_memLp_false
+  intro F _ _ χ hχ a s hs ω t k hk
+  obtain ⟨_, _, h⟩ := hall F χ hχ a s hs
+  exact (h ω t k (lt_of_lt_of_le hk (min_le_left _ _))).choose
 
 /-- Paper: Proposition 10.2.1.3, p. 443. As printed, the a-line family
 fails to be contained in an open ball of some positive radius. -/
@@ -105,7 +112,22 @@ All the completed Hecke L-functions are zero-free on this line by the
 absolutely convergent Euler products and the nonvanishing gamma factors.
 The resulting empty family is contained in every open ball. -/
 theorem Printed.spectralLineJet_not_subset_ball_false :
-    ¬ Printed.spectralLineJet_not_subset_ball := by sorry
+    ¬ Printed.spectralLineJet_not_subset_ball := by
+  intro hall
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice ℚ
+  obtain ⟨_, _, hn⟩ := hall ℚ χ hχ 2 2 (by norm_num)
+  apply hn
+  intro ω t k hk
+  let z := shift((2 : ℝ), t)
+  have hz : 1 < z.re := by norm_num [z]
+  have hval : continuedCompletedHeckeL (χ ω) z ≠ 0 := by
+    rw [show continuedCompletedHeckeL (χ ω) z = completedHeckeL (χ ω) ⟨z, hz⟩ from
+      (continuedCompletedHeckeL_spec (χ ω)).2 ⟨z, hz⟩]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos (χ ω) (zero_lt_one.trans hz))
+      (finiteHeckeL_ne_zero_of_one_lt_re (χ ω) ⟨z, hz⟩)
+  have horder := ((continuedCompletedHeckeL_spec (χ ω)).1 (mem_univ z)).meromorphicOrderAt_eq_zero_iff.mpr hval
+  simp [z] at horder
+  simp [horder] at hk
 
 /-- Paper: Proposition 10.2.1.3, p. 443. One constant gives (10.2.1.12)
 and the asserted noncontainment for the family with full multiplicities. -/
@@ -122,7 +144,14 @@ def Printed.spectralLineJet_annulus_and_noncontainment : Prop :=
 /-- Paper: Proposition 10.2.1.3, p. 443. For ℚ at a = 2 the zero
 family is empty and hence lies in the open ball for every C > 0. -/
 theorem Printed.spectralLineJet_annulus_and_noncontainment_false :
-    ¬ Printed.spectralLineJet_annulus_and_noncontainment := by sorry
+    ¬ Printed.spectralLineJet_annulus_and_noncontainment := by
+  intro hall
+  apply Printed.spectralLineJet_not_subset_ball_false
+  intro F _ _ χ hχ a s hs
+  obtain ⟨C, hC, _, hn⟩ := hall F χ hχ a s hs
+  refine ⟨C, hC, fun h ↦ hn ?_⟩
+  intro j
+  exact h j.val.1 j.val.2.1 j.val.2.2 j.property
 
 /-- Paper: Terminology 10.2.1.2(2), p. 444. The printed implication says
 that the functionals paired with a regular Markushevich family are bounded. -/
@@ -250,7 +279,23 @@ def Printed.spectralStripJet_annulus_and_noncontainment : Prop :=
 /-- Paper: Proposition 10.2.2.2, pp. 446–447. In ℚ take a = 2, s = 2
 and α = 0. The family is empty, so it is contained in every open ball. -/
 theorem Printed.spectralStripJet_annulus_and_noncontainment_false :
-    ¬ Printed.spectralStripJet_annulus_and_noncontainment := by sorry
+    ¬ Printed.spectralStripJet_annulus_and_noncontainment := by
+  intro hall
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice ℚ
+  obtain ⟨_, _, _, hn⟩ := hall ℚ χ hχ 2 0 2 (by norm_num) (by norm_num)
+  apply hn
+  intro j
+  have hj := j.property.1
+  let z := shift((2 : ℝ), j.val.2.2.1)
+  have hz : 1 < z.re := by norm_num [z]
+  have hval : continuedCompletedHeckeL (χ j.val.1) z ≠ 0 := by
+    rw [show continuedCompletedHeckeL (χ j.val.1) z = completedHeckeL (χ j.val.1) ⟨z, hz⟩ from
+      (continuedCompletedHeckeL_spec (χ j.val.1)).2 ⟨z, hz⟩]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos (χ j.val.1) (zero_lt_one.trans hz))
+      (finiteHeckeL_ne_zero_of_one_lt_re (χ j.val.1) ⟨z, hz⟩)
+  have horder := ((continuedCompletedHeckeL_spec (χ j.val.1)).1 (mem_univ z)).meromorphicOrderAt_eq_zero_iff.mpr hval
+  simp [z] at horder
+  simp [horder] at hj
 
 /-- Paper: Proposition 10.2.2.2, p. 447. The asserted noncontainment in an
 open ball is specialized to the allowed singleton interval, where the
@@ -268,7 +313,22 @@ def Printed.spectralStripJet_not_subset_ball_singleton : Prop :=
 I = {0}. On that strip every Hecke L-function is zero-free, so the empty
 family is contained in every open ball. -/
 theorem Printed.spectralStripJet_not_subset_ball_singleton_false :
-    ¬ Printed.spectralStripJet_not_subset_ball_singleton := by sorry
+    ¬ Printed.spectralStripJet_not_subset_ball_singleton := by
+  intro hall
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice ℚ
+  obtain ⟨_, _, hn⟩ := hall ℚ χ hχ 2 2 (by norm_num)
+  apply hn
+  intro ω t k hk
+  let z := shift((2 : ℝ), t)
+  have hz : 1 < z.re := by norm_num [z]
+  have hval : continuedCompletedHeckeL (χ ω) z ≠ 0 := by
+    rw [show continuedCompletedHeckeL (χ ω) z = completedHeckeL (χ ω) ⟨z, hz⟩ from
+      (continuedCompletedHeckeL_spec (χ ω)).2 ⟨z, hz⟩]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos (χ ω) (zero_lt_one.trans hz))
+      (finiteHeckeL_ne_zero_of_one_lt_re (χ ω) ⟨z, hz⟩)
+  have horder := ((continuedCompletedHeckeL_spec (χ ω)).1 (mem_univ z)).meromorphicOrderAt_eq_zero_iff.mpr hval
+  simp [z] at horder
+  simp [horder] at hk
 
 /-- Paper: Corollary 10.2.2.3, p. 447. The printed index requires an
 ordinate from the a-line. The conclusion identifies the normalized family

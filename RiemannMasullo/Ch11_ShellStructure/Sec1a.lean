@@ -292,6 +292,71 @@ theorem memLp_adelicTheta_of_dominated
     _ ≤ fractionalIdealOrbitSum I α g := hI.2.2.2.2 g hg k
     _ ≤ ‖fractionalIdealOrbitSum I α g‖ := Real.le_norm_self _
 
+/-- If the terms converge one by one and the absolute tails outside finite sets are small
+uniformly in the index, then the sums converge to the sum of the limits. -/
+private theorem tendsto_eLpNorm_ideleThetaSum_of_dominated_tsum {ι : Type*} (a : ℕ → ι → ℂ)
+    (b : ι → ℂ) (hab : ∀ i, Tendsto (fun k ↦ a k i) atTop (𝓝 (b i)))
+    (htails : ∀ ε : ℝ≥0∞, 0 < ε → ∃ s : Finset ι, ∀ k,
+      (∑' i : {i : ι // i ∉ s}, ‖a k i.val‖ₑ) < ε) :
+    Tendsto (fun k ↦ ∑' i, a k i) atTop (𝓝 (∑' i, b i)) := by
+  have haS : ∀ k, Summable (fun i ↦ ‖a k i‖) := fun k ↦
+    (enorm_tails_lt_iff_summable_norm (a k)).mp fun ε hε ↦ (htails ε hε).imp fun _ hs ↦ hs k
+  rw [Metric.tendsto_atTop]
+  intro ε hε
+  obtain ⟨s, hs⟩ := htails (ENNReal.ofReal (ε / 4)) (ENNReal.ofReal_pos.mpr (by positivity))
+  -- The real tails of the approximating families are at most a quarter of `ε`.
+  have hsub : ∀ k, Summable (fun i : {i : ι // i ∉ s} ↦ ‖a k i.val‖) := fun k ↦
+    (haS k).comp_injective Subtype.val_injective
+  have hatail : ∀ k, (∑' i : {i : ι // i ∉ s}, ‖a k i.val‖) ≤ ε / 4 := by
+    intro k
+    have heq : (∑' i : {i : ι // i ∉ s}, ‖a k i.val‖ₑ) =
+        ENNReal.ofReal (∑' i : {i : ι // i ∉ s}, ‖a k i.val‖) := by
+      rw [ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ norm_nonneg _) (hsub k)]
+      simp only [ofReal_norm]
+    have h := hs k
+    rw [heq] at h
+    exact ((ENNReal.ofReal_lt_ofReal_iff (by positivity)).mp h).le
+  -- Passing to the limit on finite sets bounds the tail of the limit family.
+  have hbfin : ∀ t : Finset {i : ι // i ∉ s}, ∑ i ∈ t, ‖b i.val‖ ≤ ε / 4 := fun t ↦
+    le_of_tendsto' (tendsto_finsetSum t fun i _ ↦ (hab i.val).norm) fun k ↦
+      ((hsub k).sum_le_tsum t fun _ _ ↦ norm_nonneg _).trans (hatail k)
+  have hbsub : Summable (fun i : {i : ι // i ∉ s} ↦ ‖b i.val‖) :=
+    summable_of_sum_le (fun _ ↦ norm_nonneg _) hbfin
+  have hbtail : (∑' i : {i : ι // i ∉ s}, ‖b i.val‖) ≤ ε / 4 :=
+    Real.tsum_le_of_sum_le (fun _ ↦ norm_nonneg _) hbfin
+  have hbS : Summable b := (Finset.summable_compl_iff s).mp hbsub.of_norm
+  obtain ⟨N, hN⟩ := Metric.tendsto_atTop.mp
+    (tendsto_finsetSum s fun i _ ↦ hab i) (ε / 4) (by positivity)
+  refine ⟨N, fun k hk ↦ ?_⟩
+  have hfin := hN k hk
+  rw [dist_eq_norm] at hfin ⊢
+  rw [← (haS k).of_norm.sum_add_tsum_subtype_compl s, ← hbS.sum_add_tsum_subtype_compl s]
+  have hA : ‖∑' i : {i : ι // i ∉ s}, a k i.val‖ ≤ ε / 4 :=
+    (norm_tsum_le_tsum_norm (hsub k)).trans (hatail k)
+  have hB : ‖∑' i : {i : ι // i ∉ s}, b i.val‖ ≤ ε / 4 :=
+    (norm_tsum_le_tsum_norm hbsub).trans hbtail
+  calc ‖(∑ i ∈ s, a k i + ∑' i : {i : ι // i ∉ s}, a k i.val) -
+          (∑ i ∈ s, b i + ∑' i : {i : ι // i ∉ s}, b i.val)‖
+        = ‖(∑ i ∈ s, a k i - ∑ i ∈ s, b i) +
+            (∑' i : {i : ι // i ∉ s}, a k i.val - ∑' i : {i : ι // i ∉ s}, b i.val)‖ := by
+          congr 1; ring
+    _ ≤ ‖∑ i ∈ s, a k i - ∑ i ∈ s, b i‖ +
+          (‖∑' i : {i : ι // i ∉ s}, a k i.val‖ + ‖∑' i : {i : ι // i ∉ s}, b i.val‖) :=
+        (norm_add_le _ _).trans (by gcongr; exact norm_sub_le _ _)
+    _ < ε := by linarith
+
+/-- On the Borel set, the approximating theta functions converge pointwise to the limit
+theta sum. -/
+private theorem tendsto_eLpNorm_ideleThetaSum_of_dominated_pointwise
+    (φ : ℕ → ℬ[F]) (f : 𝕀[F] → ℂ) (Z : Set 𝕀[F])
+    (hlim : ∀ g : 𝕀[F], g ∈ saturation Z → Tendsto (fun k ↦ ideleValue (φ k) g) atTop (𝓝 (f g)))
+    (htails : HasUniformThetaTails (fun k ↦ ideleValue (φ k)) Z) (g : 𝕀[F]) (hg : g ∈ Z) :
+    Tendsto (fun k ↦ adelicTheta (φ k) (classOf g)) atTop (𝓝 (ideleThetaSum f g)) :=
+  (tendsto_eLpNorm_ideleThetaSum_of_dominated_tsum
+    (fun k ξ ↦ ideleValue (φ k) (principal ξ * g)) (fun ξ ↦ f (principal ξ * g))
+    (fun ξ ↦ hlim _ (Set.mem_iUnion.mpr ⟨ξ, g, hg, rfl⟩)) (htails g hg)).congr
+    fun k ↦ ideleThetaSum_schwartzBruhat (φ k) g
+
 /-- Paper: Proposition 11.1.1.2(2), p. 476. The approximating theta
 functions converge to the limit theta sum in the restricted Lᵣ norm.
 Deviation: The pointwise limit is taken on the saturation, the total-mass
@@ -311,7 +376,66 @@ theorem tendsto_eLpNorm_ideleThetaSum_of_dominated
     (htails : HasUniformThetaTails (fun k ↦ ideleValue (φ k)) Z) :
     Tendsto (fun k ↦ eLpNorm (fun g ↦
       adelicTheta (φ k) (classOf g) - Z.indicator (ideleThetaSum f) g)
-      (ENNReal.ofReal r) (η.restrict Z)) atTop (𝓝 0) := by sorry
+      (ENNReal.ofReal r) (η.restrict Z)) atTop (𝓝 0) := by
+  have hborel : BorelSpace 𝕀[F] := ⟨rfl⟩
+  have hr0 : 0 < r := zero_lt_one.trans_le hr
+  have hp0 : ENNReal.ofReal r ≠ 0 := (ENNReal.ofReal_pos.mpr hr0).ne'
+  have hptop : ENNReal.ofReal r ≠ ∞ := ENNReal.ofReal_ne_top
+  have hpr : (ENNReal.ofReal r).toReal = r := ENNReal.toReal_ofReal hr0.le
+  have hΘ := measurable_indicator_ideleThetaSum_of_dominated φ f Z hlim hZ η hη r hr hmajorant
+  refine hmajorant.elim fun α hα ↦ hα.elim fun I hI ↦ ?_
+  set S := fractionalIdealOrbitSum I α
+  set G : ℕ → 𝕀[F] → ℂ := fun k g ↦ adelicTheta (φ k) (classOf g) - Z.indicator (ideleThetaSum f) g
+  have hGm : ∀ k, Measurable (G k) := fun k ↦
+    ((adelicTheta (φ k)).continuous.comp QuotientGroup.continuous_mk).measurable.sub hΘ
+  -- On the Borel set both theta sums are dominated by the majorant series.
+  have hbound : ∀ k, ∀ g ∈ Z, ‖G k g‖ ≤ 2 * S g := by
+    intro k g hg
+    have hlim' : ∀ ξ : Fˣ, Tendsto (fun k ↦ ideleValue (φ k) (principal ξ * g)) atTop
+        (𝓝 (f (principal ξ * g))) := fun ξ ↦ hlim _ (Set.mem_iUnion.mpr ⟨ξ, g, hg, rfl⟩)
+    have h1 : ‖adelicTheta (φ k) (classOf g)‖ ≤ S g := by
+      rw [← ideleThetaSum_schwartzBruhat]
+      exact (norm_tsum_le_tsum_norm (summable_norm_ideleValue_orbit (φ k) g)).trans
+        (hI.2.2.2.2 g hg k)
+    have h2 : ‖ideleThetaSum f g‖ ≤ S g :=
+      (norm_tsum_le_tsum_norm
+          (summable_norm_orbit_of_tendsto_of_le φ f g hlim' _ (hI.2.2.2.2 g hg))).trans
+        (Real.tsum_le_of_sum_le (fun _ ↦ norm_nonneg _)
+          (sum_norm_orbit_le_of_tendsto_of_le φ f g hlim' _ (hI.2.2.2.2 g hg)))
+    calc ‖G k g‖ ≤ ‖adelicTheta (φ k) (classOf g)‖ + ‖ideleThetaSum f g‖ := by
+          simp only [G, Set.indicator_of_mem hg]
+          exact norm_sub_le _ _
+      _ ≤ 2 * S g := by linarith
+  -- Dominated convergence for the `r`-th powers of the differences.
+  have hint : Tendsto (fun k ↦ ∫⁻ g, ‖G k g‖ₑ ^ r ∂(η.restrict Z)) atTop (𝓝 0) := by
+    have hfin : ∫⁻ g, ‖(2 : ℂ) * (S g : ℂ)‖ₑ ^ r ∂(η.restrict Z) ≠ ∞ := by
+      have hm : MemLp (fun g ↦ (2 : ℂ) * (S g : ℂ)) (ENNReal.ofReal r) (η.restrict Z) :=
+        (hI.2.2.2.1.ofReal.const_mul 2)
+      have := lintegral_rpow_eNorm_lt_top_of_eLpNorm_lt_top hp0 hptop hm.eLpNorm_lt_top
+      rw [hpr] at this
+      exact this.ne
+    have hlim0 := tendsto_lintegral_of_dominated_convergence
+      (fun g ↦ ‖(2 : ℂ) * (S g : ℂ)‖ₑ ^ r) (fun k ↦ (hGm k).eNorm.pow_const r)
+      (fun k ↦ (ae_restrict_iff' hZ).mpr (Eventually.of_forall fun g hg ↦ by
+        refine ENNReal.rpow_le_rpow ?_ hr0.le
+        rw [← ofReal_norm, ← ofReal_norm]
+        refine ENNReal.ofReal_le_ofReal ((hbound k g hg).trans (le_of_eq ?_))
+        rw [norm_mul, Complex.norm_ofNat, Complex.norm_real, Real.norm_eq_abs,
+          abs_of_nonneg (show 0 ≤ S g from tsum_nonneg fun _ ↦ NNReal.coe_nonneg _)]))
+      hfin
+      ((ae_restrict_iff' hZ).mpr (Eventually.of_forall fun g hg ↦ by
+        have h := (tendsto_sub_nhds_zero_iff.mpr
+          (tendsto_eLpNorm_ideleThetaSum_of_dominated_pointwise φ f Z hlim htails g hg)).eNorm
+        have h' := (ENNReal.continuous_rpow_const (y := r)).tendsto _ |>.comp h
+        simp only [eNorm_zero, ENNReal.zero_rpow_of_pos hr0] at h'
+        refine h'.congr fun k ↦ ?_
+        simp only [Function.comp_apply, G, Set.indicator_of_mem hg]))
+    simpa only [lintegral_zero] using hlim0
+  have hpow := (ENNReal.continuous_rpow_const (y := 1 / r)).tendsto _ |>.comp hint
+  rw [ENNReal.zero_rpow_of_pos (one_div_pos.mpr hr0)] at hpow
+  refine hpow.congr fun k ↦ ?_
+  rw [Function.comp_apply, eLpNorm_eq_lintegral_rpow_eNorm_toReal hp0 hptop
+    (hGm k).aestronglyMeasurable, hpr]
 
 /-- Paper: Remark 11.1.1.3, p. 476. The saturation of a Borel set under
 the countable group of principal ideles is Borel. -/
@@ -359,6 +483,32 @@ theorem summable_ideleThetaSum_on_fundamentalDomain
   refine (hmajorant g).elim fun α hα ↦ hα.elim fun I hI ↦ ?_
   exact summable_norm_orbit_of_tendsto_of_le φ f g (fun ξ ↦ hlim _) _ (hI.2 hg)
 
+/-- The theta series of an idele function is invariant under principal translation. -/
+private theorem tendsto_adelicTheta_of_dominated_invariant (f : 𝕀[F] → ℂ) (η : Fˣ)
+    (g : 𝕀[F]) : ideleThetaSum f (principal η * g) = ideleThetaSum f g := by
+  unfold ideleThetaSum
+  simp_rw [← mul_assoc, ← map_mul]
+  exact (Equiv.mulRight η).tsum_eq fun ξ ↦ f (principal ξ * g)
+
+/-- Every idele has a principal translate in the section times the norm-one domain. -/
+private theorem tendsto_adelicTheta_of_dominated_cover
+    (e : (ℝ≥0ˣ × N[F]) ≃ₜ* 𝕀[F]) (he_one : ∀ h, e (1, h) = h.val)
+    (v₀ : InfinitePlace F) (σ : ℂ ≃ₐ[ℝ] ℂ)
+    (b : Module.Basis (Fin (Units.rank F)) ℤ (Additive ((𝓞 F)ˣ ⧸ Units.torsion F)))
+    (rep : CommRing.Pic (𝓞 F) → N[F])
+    (hrep₁ : rep 1 = 1) (hrep : ∀ c, ideleIdealClass F (rep c).val = c) (g : 𝕀[F]) :
+    ∃ ξ : Fˣ, principal ξ * g ∈ e '' (Set.prod (Set.univ : Set ℝ≥0ˣ)
+      (ideleFundamentalDomain F b v₀ σ rep)) := by
+  obtain ⟨⟨t, h⟩, rfl⟩ := e.surjective g
+  have hcov := ideleFundamentalDomain_cover F b v₀ σ rep hrep₁ hrep
+  obtain ⟨x, hx⟩ := Set.mem_iUnion.mp (hcov ▸ Set.mem_univ h)
+  obtain ⟨y, hy, hyh⟩ := Set.mem_smul_set.mp hx
+  have key : ∀ u y : N[F], e (t, u • y) = u.val * e (t, y) := fun u y ↦ by
+    rw [← he_one u, ← map_mul, Prod.mk_mul_mk, one_mul, smul_eq_mul]
+  refine ⟨x⁻¹, (t, y), ⟨Set.mem_univ _, hy⟩, ?_⟩
+  rw [← hyh, key, map_inv]
+  exact (inv_mul_cancel_left _ _).symm
+
 include he_norm he_one hrep₁ hrep in
 /-- Paper: Corollary 11.1.1.4, p. 478. The approximating theta functions
 converge pointwise on the idele class group to the theta series of the limit.
@@ -373,7 +523,29 @@ theorem tendsto_adelicTheta_of_dominated
         ∑' ξ : {ξ : Fˣ // (ξ.val : F) ∈ I}, (α ξ.val : ℝ)))
     (htails : HasUniformThetaTails (fun k ↦ ideleValue (φ k)) TE₁) :
     ∃ Θ : C[F] → ℂ, (∀ g, Θ (classOf g) = ideleThetaSum f g) ∧
-      ∀ c, Tendsto (fun k ↦ adelicTheta (φ k) c) atTop (𝓝 (Θ c)) := by sorry
+      ∀ c, Tendsto (fun k ↦ adelicTheta (φ k) c) atTop (𝓝 (Θ c)) := by
+  -- The theta series of the limit is constant on idele classes.
+  have hclass : ∀ g g' : 𝕀[F], classOf g = classOf g' →
+      ideleThetaSum f g' = ideleThetaSum f g := by
+    intro g g' hgg
+    obtain ⟨u, ⟨ξ, rfl⟩, hu⟩ := (QuotientGroup.mk'_eq_mk' _).mp hgg
+    rw [← hu, mul_comm, tendsto_adelicTheta_of_dominated_invariant]
+  refine ⟨fun c ↦ ideleThetaSum f c.out, fun g ↦ hclass _ _ (QuotientGroup.out_eq' _).symm,
+    fun c ↦ ?_⟩
+  obtain ⟨ξ, hξ⟩ := tendsto_adelicTheta_of_dominated_cover e he_one v₀ σ b rep hrep₁ hrep c.out
+  have hc : classOf (principal ξ * c.out) = c := by
+    refine ((QuotientGroup.mk'_eq_mk' _).mpr ⟨(principal ξ)⁻¹,
+      (IdeleGroup.principalSubgroup (𝓞 F) F).inv_mem ⟨ξ, rfl⟩, ?_⟩).trans
+      (QuotientGroup.out_eq' c)
+    rw [mul_comm (principal ξ), mul_assoc, mul_inv_cancel, mul_one]
+  have hconv : Tendsto (fun k ↦ adelicTheta (φ k) (classOf (principal ξ * c.out))) atTop
+      (𝓝 (ideleThetaSum f (principal ξ * c.out))) :=
+    (tendsto_eLpNorm_ideleThetaSum_of_dominated_tsum
+      (fun k ξ' ↦ ideleValue (φ k) (principal ξ' * (principal ξ * c.out)))
+      (fun ξ' ↦ f (principal ξ' * (principal ξ * c.out))) (fun ξ' ↦ hlim _)
+      (htails _ hξ)).congr fun k ↦ ideleThetaSum_schwartzBruhat (φ k) _
+  rw [hc, tendsto_adelicTheta_of_dominated_invariant] at hconv
+  exact hconv
 
 -- TODO(paper-gap): Relative compactness and nonempty interior do not show
 -- that T ⋅ E₁ is Borel. Use the Borel property of E₁ and the splitting.

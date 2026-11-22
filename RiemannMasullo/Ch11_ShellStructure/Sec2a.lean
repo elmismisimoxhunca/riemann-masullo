@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+
 /-! # Orbital Markushevich bases on the 0-line
 
 Masullo, §11.2 before §11.2.1, pp. 483–487.
@@ -141,7 +143,19 @@ Deviation: The range of the extension must also be closed up. -/
 theorem globalThetaSobolevPrincipalValue_range_closure (S : Finset V) (a : ℝ)
     {s : ℝ} (hs : 0 ≤ s) :
     closure (range (P(S, a, hs))) =
-      closure (range fun f : ℬ₀ ↦ j(a, hs) (theta(pvTest(S, f)))) := by sorry
+      closure (range fun f : ℬ₀ ↦ j(a, hs) (theta(pvTest(S, f)))) := by
+  have closure_image (i : ℬ₀ → H(a, hs)) (p : H(a, hs) → H(a, hs)) (t : ℬ₀ → H(a, hs)) (hi : DenseRange i) (hp : Continuous p)
+      (he : ∀ x, p (i x) = t x) : closure (range p) = closure (range t) := by
+    rw [← show p ∘ i = t from funext he, Set.range_comp p i]
+    exact le_antisymm (closure_minimal (hp.range_subset_closure_image_dense hi) isClosed_closure)
+      (closure_mono (Set.image_subset_range _ _))
+  let q : ℬ₀ → GlobalPolarFreeThetaSpace F := fun f ↦ theta(f)
+  have hq : Surjective q := Submodule.mkQ_surjective
+    ((LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype)
+  exact closure_image (fun f ↦ j(a, hs) (q f)) (P(S, a, hs))
+    (fun f : ℬ₀ ↦ j(a, hs) (theta(pvTest(S, f))))
+    ((globalThetaSobolev_dense (F := F) a hI hs).comp hq.denseRange (j(a, hs)).continuous)
+    (P(S, a, hs)).continuous (globalThetaSobolevPrincipalValue_apply S a hs)
 
 /-- Paper: Theorem 11.2.0.2(1), p. 485. The reciprocal partial Euler
 product is the product of the unramified factors in the phase coordinates
@@ -169,7 +183,27 @@ open Classical in
 one to the multiplicity, including when several places lie over the same prime. -/
 theorem orbitalEulerMultiplicity_eq_card (χ : PontryaginDual C𝔽) (S : Finset V) (z : ℂ) :
     orbitalEulerMultiplicity χ S z =
-      (S.filter fun v ↦ (finiteHeckeEulerFactor χ v z)⁻¹ = 0).card := by sorry
+      (S.filter fun v ↦ (finiteHeckeEulerFactor χ v z)⁻¹ = 0).card := by
+  classical
+  let f (v : V) (w : ℂ) := (finiteHeckeEulerFactor χ v w)⁻¹
+  have hfac (v : V) : meromorphicOrderAt (f v) z = if f v z = 0 then 1 else 0 := by
+    obtain ⟨ha, ho⟩ := reciprocalEulerProduct_over_prime_order_le_factor χ v z
+    change AnalyticAt ℂ (f v) z at ha
+    change analyticOrderAt (f v) z ≤ 1 at ho
+    rw [ha.meromorphicOrderAt_eq]
+    split_ifs with hv
+    · have hone : analyticOrderAt (f v) z = 1 :=
+        le_antisymm ho (Order.one_le_iff_ne_zero.mpr (ha.analyticOrderAt_ne_zero.mpr hv))
+      simp [hone]
+    · simp [ha.analyticOrderAt_eq_zero.mpr hv]
+  have horder : meromorphicOrderAt (reciprocalPartialHeckeEulerProduct χ S) z =
+      ((S.filter fun v ↦ f v z = 0).card : WithTop ℤ) := by
+    change meromorphicOrderAt (fun w ↦ ∏ v ∈ S, f v w) z = _
+    rw [meromorphicOrderAt_fun_prod (f := f) (fun v _ ↦
+      (reciprocalEulerProduct_over_prime_order_le_factor χ v z).1.meromorphicAt)]
+    simp only [hfac, Finset.sum_boole]
+  rw [orbitalEulerMultiplicity, horder]
+  simp [f]
 
 /-- Paper: Theorem 11.2.0.2(1), p. 485. For a unitary character unramified
 at the selected places, every zero of the reciprocal product has real part zero.
