@@ -3326,12 +3326,27 @@ theorem finiteProduct_tailSchwartz_strictLF (S T : Finset (Places(F))) :
 /-- Paper: Proposition 2.1.2.8(2), p. 65. The finite-product and tail Schwartz–Bruhat
 spaces are complete. -/
 theorem finiteProduct_tailSchwartz_complete (S T : Finset (Places(F))) :
-    CompleteSpace ℬ((FinitePlaceProduct F S)) ∧ CompleteSpace ℬ(FiniteAdeleTail F T) := by sorry
+    CompleteSpace ℬ((FinitePlaceProduct F S)) ∧ CompleteSpace ℬ(FiniteAdeleTail F T) := by
+  have h := finiteProduct_tailSchwartz_strictLF F S T
+  exact ⟨completeSpace_of_strictLF h.1, completeSpace_of_strictLF h.2⟩
 
 /-- Paper: Proposition 2.1.2.8(2), p. 65. Both Schwartz–Bruhat spaces are Hausdorff,
 locally convex and nuclear. -/
 theorem finiteProduct_tailSchwartz_nuclear (S T : Finset (Places(F))) :
-    IsNuclearTVS.{v} ℬ((FinitePlaceProduct F S)) ∧ IsNuclearTVS.{v} ℬ(FiniteAdeleTail F T) := by sorry
+    IsNuclearTVS.{v} ℬ((FinitePlaceProduct F S)) ∧ IsNuclearTVS.{v} ℬ(FiniteAdeleTail F T) := by
+  have of_finest (E : Type u) [AddCommGroup E] [Module ℂ E] (t : TopologicalSpace E)
+      (hRank : Module.rank ℂ E ≤ ℵ₀)
+      (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex E))) :
+      @IsNuclearTVS.{v} E _ _ t := by
+    let b := Module.Free.chooseBasis ℂ E
+    let : Countable (Module.Free.ChooseBasisIndex ℂ E) :=
+      Cardinal.mk_le_aleph0_iff.mp (b.mk_eq_rank''.trans_le hRank)
+    exact Eq.mpr (congrArg (fun t' ↦ @IsNuclearTVS.{v} E _ _ t') ht)
+      (finestLocallyConvex_nuclear_of_countable_span E (countable_range b) b.span_eq)
+  have hRank := finiteProduct_tailSchwartz_countableRank F S T
+  have hTop := finiteProduct_tailSchwartz_finestTopology F S T
+  exact ⟨of_finest ℬ((FinitePlaceProduct F S)) _ hRank.1 hTop.1,
+    of_finest ℬ(FiniteAdeleTail F T) _ hRank.2 hTop.2⟩
 
 /-- Paper: Proposition 2.1.2.8(2), p. 65. Both Schwartz–Bruhat spaces are Montel. -/
 theorem finiteProduct_tailSchwartz_montel (S T : Finset (Places(F))) :
@@ -3365,7 +3380,16 @@ theorem finiteProduct_tailSchwartz_strongDual_frechet (S T : Finset (Places(F)))
 /-- Paper: Proposition 2.1.2.8(2), p. 65. Both strong duals are nuclear. -/
 theorem finiteProduct_tailSchwartz_strongDual_nuclear (S T : Finset (Places(F))) :
     IsNuclearTVS.{v} (StrongDual ℂ ℬ((FinitePlaceProduct F S))) ∧
-      IsNuclearTVS.{v} (StrongDual ℂ ℬ(FiniteAdeleTail F T)) := by sorry
+      IsNuclearTVS.{v} (StrongDual ℂ ℬ(FiniteAdeleTail F T)) := by
+  have of_finest (E : Type u) [AddCommGroup E] [Module ℂ E] [t : TopologicalSpace E]
+      (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex E))) :
+      IsNuclearTVS.{v} (StrongDual ℂ E) :=
+    Eq.mpr (congrArg (fun t' : TopologicalSpace E ↦
+      letI := t'
+      IsNuclearTVS.{v} (StrongDual ℂ E)) ht)
+      (finestLocallyConvex_strongDual_nuclear E)
+  have hTop := finiteProduct_tailSchwartz_finestTopology F S T
+  exact ⟨of_finest _ hTop.1, of_finest _ hTop.2⟩
 
 /-- Paper: Proposition 2.1.2.8(3), p. 65. Every linear subspace in either Schwartz–Bruhat
 space has a continuous linear retraction. -/
@@ -3852,6 +3876,13 @@ presentation has nuclear stages by Remark C.1.5.12. -/
 theorem adeleSchwartz_strictLF :
     IsStrictLFSpace ℬ(𝔸ᶠ[F]) ∧ IsStrictLFSpace ℬ(𝔸[F]) := by
   exact ⟨schwartzBruhat_strictLF_of_secondCountable, schwartzBruhat_strictLF_of_secondCountable⟩
+
+/-- A seminorm on the adelic Schwartz–Bruhat space is continuous if it is bounded
+on every von Neumann bounded set. -/
+theorem adeleSchwartz_bornological :
+    ∀ p : Seminorm ℂ ℬ(𝔸[F]),
+      (∀ B : Set ℬ(𝔸[F]), IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p :=
+  schwartzBruhat_bornological (G := Multiplicative 𝔸[F])
 
 /-- Paper: Lemma 2.1.3.2(1), p. 68. The finite and global adelic Schwartz–Bruhat
 spaces are complete. -/
@@ -5136,6 +5167,13 @@ by Remark C.1.5.12. -/
 theorem sAdeleSchwartz_strictLF (S : Finset (Places(F))) :
     IsStrictLFSpace 𝒮(S) := by
   exact schwartzBruhat_strictLF_of_secondCountable
+
+/-- A seminorm on the S-adelic Schwartz–Bruhat space is continuous if it is
+bounded on every von Neumann bounded set. -/
+theorem sAdeleSchwartz_bornological (S : Finset (Places(F))) :
+    ∀ p : Seminorm ℂ 𝒮(S),
+      (∀ B : Set 𝒮(S), IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p :=
+  schwartzBruhat_bornological (G := Multiplicative (SAdeleRing F S))
 
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The S-adelic Schwartz–Bruhat space is complete. -/
 theorem sAdeleSchwartz_complete (S : Finset (Places(F))) :
