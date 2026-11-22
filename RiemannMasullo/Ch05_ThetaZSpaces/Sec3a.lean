@@ -262,12 +262,101 @@ Weil's local principal value is a topological embedding with closed range. -/
 theorem finitePlacePrincipalValue_isClosedEmbedding (v : V) :
     IsClosedEmbedding (finitePlacePrincipalValue v) := by sorry
 
+private theorem finitePlacePrincipalValue_range_integral {G : Type*} [CommGroup G]
+    [MeasurableSpace G] [MeasurableMul G] (μ : Measure G) [μ.IsMulLeftInvariant]
+    (K : Subgroup G) (a : G) (ha : a ∈ K) (f : G → ℂ) :
+    ∫ x in K, f (a * x) ∂μ = ∫ x in K, f x ∂μ := by
+  have he : (fun x : G ↦ a * x) ⁻¹' (K : Set G) = K := by
+    ext x
+    simp only [mem_preimage]
+    constructor
+    · intro h
+      have := K.mul_mem (K.inv_mem ha) h
+      simpa using this
+    · exact K.mul_mem ha
+  have hp := (measurePreserving_mul_left μ a).setIntegral_preimage_emb
+    (MeasurableEquiv.mulLeft a).measurableEmbedding f (K : Set G)
+  rw [he] at hp
+  exact hp
+
+private theorem finitePlacePrincipalValue_range_zero (v : V) (f : ℬ(Fᵥ(v))) :
+    finitePlacePrincipalValue v f (Multiplicative.ofAdd 0) = 0 := by
+  let h := (Valued.v : Valuation Fᵥ(v) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π := Units.mk0 (h.choose : Fᵥ(v)) h.choose_spec.ne_zero
+  rw [finitePlacePrincipalValue_spec v π h.choose_spec]
+  unfold finitePlacePrincipalValueFun
+  simp only [show (Multiplicative.ofAdd (0 : Fᵥ(v))).toAdd = 0 from rfl, mul_zero,
+    setIntegral_const, Complex.real_smul]
+  have hm : (μᵥ(v).real Uᵥ(v) : ℂ) ≠ 0 := by
+    exact_mod_cast (finitePlacePrincipalValue_integrable v π f (Multiplicative.ofAdd 0)).1.ne'
+  field_simp
+  ring
+
+private theorem finitePlacePrincipalValue_range_invariant (v : V) (f : ℬ(Fᵥ(v))) :
+    ∀ u ∈ Uᵥ(v), schwartzBruhatUnitTranslate u (f - finitePlacePrincipalValue v f) =
+      f - finitePlacePrincipalValue v f := by
+  intro u hu
+  let h := (Valued.v : Valuation Fᵥ(v) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π := Units.mk0 (h.choose : Fᵥ(v)) h.choose_spec.ne_zero
+  letI : BorelSpace Fᵥ(v)ˣ := ⟨rfl⟩
+  let : (μᵥ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  apply Subtype.ext
+  funext x
+  change (f - finitePlacePrincipalValue v f) (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * x.toAdd)) = _
+  change f _ - finitePlacePrincipalValue v f _ = f x - finitePlacePrincipalValue v f x
+  have hp1 := finitePlacePrincipalValue_spec v π h.choose_spec f
+    (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * x.toAdd))
+  have hp2 := finitePlacePrincipalValue_spec v π h.choose_spec f x
+  apply (congrArg₂ (fun a b : ℂ ↦
+    f (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * x.toAdd)) - a = f x - b) hp1 hp2).mpr
+  unfold finitePlacePrincipalValueFun
+  have hi := finitePlacePrincipalValue_range_integral (μᵥ(v)) Uᵥ(v) u hu
+    (fun a : Fᵥ(v)ˣ ↦ f (Multiplicative.ofAdd ((↑a⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * x.toAdd))))
+  have hi' : (∫ a : Fᵥ(v)ˣ in Uᵥ(v),
+      f (Multiplicative.ofAdd ((↑a⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * ((↑u⁻¹ : Fᵥ(v)) * x.toAdd)))) ∂μᵥ(v)) =
+      ∫ a : Fᵥ(v)ˣ in Uᵥ(v), f (Multiplicative.ofAdd ((↑a⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * x.toAdd))) ∂μᵥ(v) := by
+    convert hi using 1
+    congr 1
+    funext a
+    simp only [mul_inv_rev, Units.val_mul]
+    ring
+  change _ - (_ - (μᵥ(v).real Uᵥ(v) : ℂ)⁻¹ *
+      (∫ a : Fᵥ(v)ˣ in Uᵥ(v), f (Multiplicative.ofAdd ((↑a⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * ((↑u⁻¹ : Fᵥ(v)) * x.toAdd)))) ∂μᵥ(v))) = _
+  rw [hi']
+  ring
+
 /-- Paper: Lemmas 5.3.1.1 and 5.3.1.3, pp. 240–241.
 Weil's operator maps onto all tests vanishing at zero.
 Deviation: The full evaluation kernel belongs to the averaged operator from (5.3.1.5). -/
 theorem finitePlacePrincipalValue_range (v : V) :
     Set.range (finitePlacePrincipalValue v) =
-      {f : ℬ(Fᵥ(v)) | f (Multiplicative.ofAdd 0) = 0} := by sorry
+      {f : ℬ(Fᵥ(v)) | f (Multiplicative.ofAdd 0) = 0} := by
+  ext f
+  constructor
+  · rintro ⟨g, rfl⟩
+    exact finitePlacePrincipalValue_range_zero v g
+  · intro hf
+    let h := (Valued.v : Valuation Fᵥ(v) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+    let π := Units.mk0 (h.choose : Fᵥ(v)) h.choose_spec.ne_zero
+    have hb : (f - finitePlacePrincipalValue v f) ∈
+        {f | (∀ u ∈ Uᵥ(v), schwartzBruhatUnitTranslate u f = f) ∧ f (Multiplicative.ofAdd 0) = 0} := by
+      refine ⟨finitePlacePrincipalValue_range_invariant v f, ?_⟩
+      change f (Multiplicative.ofAdd 0) - finitePlacePrincipalValue v f (Multiplicative.ofAdd 0) = 0
+      exact sub_eq_zero.mpr (hf.trans (finitePlacePrincipalValue_range_zero v f).symm)
+    have hb' := (Set.ext_iff.mp (finitePlaceDifference_range_on_unitInvariants v π h.choose_spec)
+      (f - finitePlacePrincipalValue v f)).mpr hb
+    obtain ⟨g, hg, hge⟩ := hb'
+    have hP : finitePlacePrincipalValue v g = finitePlaceDifference v π g := by
+      have huniq := (finitePlacePrincipalValue_unique v π h.choose_spec).1 1 g
+      have hh : ∀ u : Uᵥ(v), schwartzBruhatUnitTranslate u.val g = ((1 : PontryaginDual Uᵥ(v)) u : ℂ) • g := by
+        intro u
+        simpa using hg u.val u.property
+      simpa only [if_pos rfl, ite_true] using huniq hh
+    refine ⟨f + g, ?_⟩
+    calc
+      finitePlacePrincipalValue v (f + g) = finitePlacePrincipalValue v f + finitePlacePrincipalValue v g := map_add _ _ _
+      _ = finitePlacePrincipalValue v f + (f - finitePlacePrincipalValue v f) := congrArg (finitePlacePrincipalValue v f + ·) (hP.trans hge)
+      _ = f := by abel
 
 end FinitePlace
 
