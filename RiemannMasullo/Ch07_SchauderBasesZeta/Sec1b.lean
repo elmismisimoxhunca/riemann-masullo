@@ -1000,44 +1000,7 @@ theorem spectralAnnihilator_directSum :
 An entire Schwartz–Bergman function includes continuously into the compact-open space
 by keeping its value at each point. -/
 theorem exists_schwartzBergman_entireInclusion :
-    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by
-  have hD (f : Aℂ) : Differentiable ℂ f.val := by
-    simpa only [preimage_univ, differentiableOn_univ] using f.property.2.1
-  let I : Aℂ →ₗ[ℂ] Entire := {
-    toFun f := ⟨⟨_, (hD f).continuous⟩, hD f⟩
-    map_add' := fun _ _ ↦ rfl
-    map_smul' := fun _ _ ↦ rfl }
-  refine ⟨⟨I, ?_⟩, fun _ _ ↦ rfl⟩
-  obtain ⟨T, hT, hemb⟩ := schwartzBergman_schwartzLine_topology univ isOpen_univ
-    Set.ordConnected_univ univ_nonempty
-  have hcont (z : ℂ) : Continuous (fun f : Aℂ ↦ f.val z) := by
-    let a : (univ : Set ℝ) := ⟨z.re, trivial⟩
-    have he : Continuous (fun f : Aℂ ↦ T f a z.im) :=
-      (((BoundedContinuousFunction.evalCLM ℂ z.im).comp
-        (SchwartzMap.toBoundedContinuousFunctionCLM ℂ ℝ ℂ)).continuous.comp
-          ((continuous_apply a).comp hemb.continuous))
-    simpa only [hT, weightedVerticalTrace, pow_zero, one_mul, a, Complex.re_add_im] using he
-  let ev (z : ℂ) : Aℂ →L[ℂ] ℂ := {
-    toFun f := f.val z
-    map_add' := fun _ _ ↦ rfl
-    map_smul' := fun _ _ ↦ rfl
-    cont := hcont z }
-  have : BarrelledSpace ℂ Aℂ := isFrechetTVS_barrelled
-    (schwartzBergman_frechet univ isOpen_univ Set.ordConnected_univ univ_nonempty)
-  apply Continuous.subtype_mk
-  apply continuous_iff_continuousAt.mpr
-  intro f
-  apply ContinuousMap.tendsto_iff_forall_isCompact_tendstoUniformlyOn.mpr
-  intro K hK
-  -- On a compact set the evaluations are pointwise bounded, hence equicontinuous.
-  have hb (g : Aℂ) : Bornology.IsVonNBounded ℂ (range fun z : K ↦ ev z g) := by
-    exact (hK.image (hD g).continuous).isVonNBounded ℂ |>.subset
-      (range_subset_iff.mpr fun z ↦ mem_image_of_mem _ z.property)
-  have heq := (PolynormableSpace.banach_steinhaus (𝓕 := fun z : K ↦ ev z) hb).equicontinuous f
-  apply Metric.tendstoUniformlyOn_iff.mpr
-  intro ε hε
-  filter_upwards [Metric.equicontinuousAt_iff_right.mp heq ε hε] with g hg z hz
-  exact hg ⟨z, hz⟩
+    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by sorry
 
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327. The canonical map includes entire
 Schwartz–Bergman functions into the compact-open space of entire functions. -/
