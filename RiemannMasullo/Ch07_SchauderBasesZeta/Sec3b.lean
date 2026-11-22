@@ -1,5 +1,7 @@
 module
 
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
+
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
@@ -159,7 +161,9 @@ belongs to the absolute level.
 Deviation: Uses the integer-ring insertion of the cited transition. -/
 theorem sLocalAbsolutePW_mk_mem (hST : S ⊆ T) (X : ℝ) (D : Submodule ℂ (B(T)))
     (ω : PontryaginDual J₁(T)) (f : B(S)) (_hf : inBand(sLocalPWBox S X, f))
-    (_hD : Π(hST) f ∈ D) : q(T, ω) (Π(hST) f) ∈ sLocalAbsolutePW hST X D ω := by sorry
+    (_hD : Π(hST) f ∈ D) : q(T, ω) (Π(hST) f) ∈ sLocalAbsolutePW hST X D ω :=
+  Submodule.le_topologicalClosure _
+    (Submodule.mem_map_of_mem ⟨Submodule.mem_map_of_mem (Submodule.subset_span _hf), _hD⟩)
 
 section AbsoluteLevels
 
@@ -260,13 +264,23 @@ chosen test constraint represents an element of the invariant level.
 Deviation: Uses the integer-ring insertion of the cited transition. -/
 theorem sLocalInvariantPW_mk_mem (hST : S ⊆ T) (Y : ℝ) (D : Submodule ℂ (B(T)))
     (ω : PontryaginDual J₁(T)) (f : B(S)) (_hf : inBand(sLocalPWProductRegion S Y, f))
-    (_hD : Π(hST) f ∈ D) : q(T, ω) (Π(hST) f) ∈ sLocalInvariantPW hST Y D ω := by sorry
+    (_hD : Π(hST) f ∈ D) : q(T, ω) (Π(hST) f) ∈ sLocalInvariantPW hST Y D ω :=
+  Submodule.le_topologicalClosure _
+    (Submodule.mem_map_of_mem ⟨Submodule.mem_map_of_mem (Submodule.subset_span _hf), _hD⟩)
 
 /-- Paper: Proposition 7.3.2.4(1), p. 355.
 Increasing the product bound enlarges each of the two invariant PW levels. -/
 theorem sLocalInvariantPW_mono (hST : S ⊆ T) {Y Y' : ℝ} (_hYY' : Y ≤ Y')
     (D : Submodule ℂ (B(T))) (ω : PontryaginDual J₁(T)) :
-    sLocalInvariantPW hST Y D ω ≤ sLocalInvariantPW hST Y' D ω := by sorry
+    sLocalInvariantPW hST Y D ω ≤ sLocalInvariantPW hST Y' D ω := by
+  have hbox : sLocalPWProductRegion S Y ⊆ sLocalPWProductRegion S Y' :=
+    fun _ hx ↦ le_trans hx _hYY'
+  have hgen : {f : B(S) | inBand(sLocalPWProductRegion S Y, f)} ⊆
+      {f : B(S) | inBand(sLocalPWProductRegion S Y', f)} :=
+    fun _ hf ↦ ⟨hf.1, hf.2.trans (Set.preimage_mono hbox)⟩
+  have htests : sLocalPWTests hST (sLocalPWProductRegion S Y) ≤ sLocalPWTests hST (sLocalPWProductRegion S Y') :=
+    Submodule.map_mono (Submodule.span_mono hgen)
+  exact Submodule.topologicalClosure_mono (Submodule.map_mono (inf_le_inf htests le_rfl))
 
 section InvariantLevels
 
@@ -570,7 +584,145 @@ The zero cutoff selects the trivial quasi-character on the trivial component
 and excludes its shift down by two. -/
 theorem sLocalGammaPoleCutoff_zero :
     (1 : Xₛ) ∈ sLocalGammaPoleCutoff (F := F) (S := S) 1 (fun _ ↦ 0) ∧
-      shift((1 : Xₛ), (-2 : ℂ)) ∉ sLocalGammaPoleCutoff (F := F) (S := S) 1 (fun _ ↦ 0) := by sorry
+      shift((1 : Xₛ), (-2 : ℂ)) ∉ sLocalGammaPoleCutoff (F := F) (S := S) 1 (fun _ ↦ 0) := by
+  classical
+  -- Twisting twice adds the exponents.
+  have htw (a z : ℂ) : shift(shift((1 : Xₛ), a), z) = shift((1 : Xₛ), z + a) := by
+    ext1 g
+    change (1 : Xₛ) g * _ ^ a * _ ^ z = (1 : Xₛ) g * _ ^ (z + a)
+    rw [add_comm, Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr
+      (NNReal.coe_ne_zero.mpr (m(S) g).ne_zero)), mul_assoc]
+  have h10 : shift((1 : Xₛ), 0) = 1 := by
+    ext1 g
+    change (1 : Xₛ) g * _ ^ (0 : ℂ) = (1 : Xₛ) g
+    rw [Complex.cpow_zero, mul_one]
+  -- The archimedean Euler factor along the chart through the trivial character.
+  let G : InfinitePlace F → ℂ → ℂ := fun w s ↦
+    if w.IsReal then Complex.Gammaℝ s else Complex.Gammaℂ s / 2
+  have hres (w : InfinitePlace F) (s : ℂ) (g : w.Completionˣ) :
+      sLocalInfiniteRestriction w (shift((1 : Xₛ), s)) g =
+        ((((Units.map nnNormHom.toMonoidHom ^ w.mult : w.Completionˣ →* ℝ≥0ˣ) g : ℝ≥0) : ℝ) :
+          ℂ) ^ s := by
+    have h1 : shift((1 : Xₛ), s) = quasiCharacterNormTwist (m(S))
+        (isProperMap_sIdeleQuotientNorm F S).continuous
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp
+          (1 : PontryaginDual J(S))) s := by
+      ext1 x
+      change (1 : ℂ) * _ = ((1 : Circle) : ℂ) * _
+      rw [Circle.coe_one]
+      rfl
+    rw [h1]
+    exact sLocalInfiniteRestriction_normTwist w s g
+  have hE (w : InfinitePlace F) (s : ℂ) :
+      infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (shift((1 : Xₛ), s))) = G w s := by
+    by_cases hw : w.IsReal
+    · let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm
+      have hshape : ∀ x : ℝˣ, sLocalInfiniteRestriction w (shift((1 : Xₛ), s))
+          (Units.map e.toMonoidHom x) =
+            (‖(x : ℝ)‖ : ℂ) ^ s * (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ (0 : Fin 2).val := by
+        intro x
+        have hn : ‖(e (x : ℝ) : w.Completion)‖ = ‖(x : ℝ)‖ :=
+          (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+            (map_zero e) (x : ℝ)
+        have hm : (((Units.map nnNormHom.toMonoidHom ^ w.mult : w.Completionˣ →* ℝ≥0ˣ)
+            (Units.map e.toMonoidHom x) : ℝ≥0) : ℝ) = ‖(x : ℝ)‖ := by
+          simp [InfinitePlace.mult, hw, hn]
+        rw [hres, hm, Fin.val_zero, pow_zero, mul_one]
+      have hq := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w
+        (shift((1 : Xₛ), s)))).unique (realLocalEulerParameters w hw
+          (sLocalInfiniteRestriction w (shift((1 : Xₛ), s)))).exists.choose_spec
+        (y₂ := (s, 0)) hshape
+      simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hq, G, ite_true, Fin.val_zero,
+        Nat.cast_zero, add_zero]
+    · have hwc := InfinitePlace.not_isReal_iff_isComplex.mp hw
+      let e := (InfinitePlace.Completion.ringEquivComplexOfIsComplex hwc).symm
+      have hshape : ∀ x : ℂˣ, sLocalInfiniteRestriction w (shift((1 : Xₛ), s))
+          (Units.map e.toMonoidHom x) =
+            ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ s * ((x : ℂ) / (‖(x : ℂ)‖ : ℂ)) ^ (0 : ℤ) := by
+        intro x
+        have hn : ‖(e (x : ℂ) : w.Completion)‖ = ‖(x : ℂ)‖ :=
+          (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+            hwc).symm.isometry.norm_map_of_map_zero (map_zero e) (x : ℂ)
+        have hm : (((Units.map nnNormHom.toMonoidHom ^ w.mult : w.Completionˣ →* ℝ≥0ˣ)
+            (Units.map e.toMonoidHom x) : ℝ≥0) : ℝ) = ‖(x : ℂ)‖ ^ 2 := by
+          simp [InfinitePlace.mult, hw, hn]
+        rw [hres, hm, zpow_zero, mul_one]
+      have hq := (complexLocalEulerParameters w hwc (sLocalInfiniteRestriction w
+        (shift((1 : Xₛ), s)))).unique (complexLocalEulerParameters w hwc
+          (sLocalInfiniteRestriction w (shift((1 : Xₛ), s)))).exists.choose_spec
+        (y₂ := (s, 0)) hshape
+      simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hq, G, ite_false, Int.natAbs_zero,
+        Nat.cast_zero, zero_div, add_zero]
+  -- `G w` has a pole at zero and is regular at every positive real point.
+  have hinv (w : InfinitePlace F) : Differentiable ℂ (fun s ↦ (G w s)⁻¹) := by
+    by_cases hw : w.IsReal
+    · simpa only [G, hw, ite_true] using Complex.differentiable_Gammaℝ_inv
+    · simp only [G, hw, ite_false, inv_div]
+      exact Complex.differentiable_Gammaℂ_inv.const_mul 2
+  have hmer (w : InfinitePlace F) (x : ℂ) : MeromorphicAt (G w) x := by
+    convert ((hinv w).analyticAt x).meromorphicAt.inv using 1
+    funext s
+    simp
+  have hpole (w : InfinitePlace F) : meromorphicOrderAt (G w) 0 < 0 := by
+    have hlim : ∃ c ≠ (0 : ℂ), Tendsto (fun s ↦ s * G w s) (𝓝[≠] 0) (𝓝 c) := by
+      by_cases hw : w.IsReal
+      · exact ⟨2, two_ne_zero, by simpa only [G, hw, ite_true] using Complex.Gammaℝ_residue_zero⟩
+      · refine ⟨1, one_ne_zero, ?_⟩
+        have := Complex.Gammaℂ_residue_zero.div_const 2
+        simp only [div_self (two_ne_zero' ℂ)] at this
+        simpa only [G, hw, ite_false, mul_div_assoc] using this
+    have h0 := (tendsto_ne_zero_iff_meromorphicOrderAt_eq_zero
+      (analyticAt_id.meromorphicAt.mul (hmer w 0))).mp hlim
+    have hm := meromorphicOrderAt_mul (f := id) analyticAt_id.meromorphicAt (hmer w 0)
+    change meromorphicOrderAt (id * G w) 0 = 0 at h0
+    rw [hm, meromorphicOrderAt_id] at h0
+    cases hn : meromorphicOrderAt (G w) 0 with
+    | top => rw [hn] at h0; simp at h0
+    | coe n =>
+      rw [hn] at h0
+      have : 1 + n = 0 := by exact_mod_cast h0
+      exact_mod_cast (by omega : n < 0)
+  have hreg (w : InfinitePlace F) (t : ℝ) (ht : 0 < t) :
+      ¬ meromorphicOrderAt (fun z ↦ G w (z + t)) 0 < 0 := by
+    have hne : (G w t)⁻¹ ≠ 0 := by
+      refine inv_ne_zero ?_
+      by_cases hw : w.IsReal
+      · simpa only [G, hw, ite_true] using Complex.Gammaℝ_ne_zero_of_re_pos (by simpa using ht)
+      · simp only [G, hw, ite_false, Complex.Gammaℂ_def]
+        refine div_ne_zero (mul_ne_zero (mul_ne_zero two_ne_zero ?_) ?_) two_ne_zero
+        · exact (Complex.cpow_ne_zero_iff_of_exponent_ne_zero (by simpa using ht.ne')).mpr
+            (mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero))
+        · exact Complex.Gamma_ne_zero_of_re_pos (by simpa using ht)
+    have han : AnalyticAt ℂ (fun z ↦ ((G w (z + t))⁻¹)⁻¹) 0 :=
+      (((hinv w).analyticAt _).comp (f := fun z : ℂ ↦ z + t) (by fun_prop)).inv
+        (by simpa using hne)
+    simp only [inv_inv] at han
+    exact not_lt.mpr han.meromorphicOrderAt_nonneg
+  have harch (a : ℂ) (w : InfinitePlace F) :
+      w ∈ arch(shift((1 : Xₛ), a)) ↔ meromorphicOrderAt (fun z ↦ G w (z + a)) 0 < 0 := by
+    simp only [sLocalArchPolePlaces, Finset.mem_filter, Finset.mem_univ, true_and]
+    refine iff_of_eq (congrArg (· < 0) (congrArg (meromorphicOrderAt · 0) ?_))
+    funext z
+    rw [htw, hE]
+  have h1 (w : InfinitePlace F) : w ∈ arch((1 : Xₛ)) := by
+    rw [← h10, harch]
+    simpa only [add_zero] using hpole w
+  refine ⟨⟨?_, Classical.arbitrary _, h1 _, ?_⟩, ?_⟩
+  · ext g
+    change (1 : ℂ) = ((1 : Circle) : ℂ)
+    rw [Circle.coe_one]
+  · have hempty : {t : ℝ | 0 < t ∧ Classical.arbitrary (InfinitePlace F) ∈
+        arch(shift((1 : Xₛ), (t : ℂ)))} = ∅ :=
+      Set.eq_empty_of_forall_notMem fun t ⟨ht, hw⟩ ↦ hreg _ t ht ((harch _ _).mp hw)
+    rw [hempty, Set.encard_empty]
+    exact zero_le
+  · rintro ⟨-, w, -, hcard⟩
+    have h2 : (2 : ℝ) ∈ {t : ℝ | 0 < t ∧ w ∈ arch(shift(shift((1 : Xₛ), (-2 : ℂ)), (t : ℂ)))} := by
+      refine ⟨two_pos, ?_⟩
+      rw [htw, show ((2 : ℝ) : ℂ) + -2 = 0 by push_cast; ring, h10]
+      exact h1 w
+    have hc : _ ≤ (0 : ℕ∞) := hcard
+    exact (Set.encard_pos.mpr ⟨2, h2⟩).ne' (nonpos_iff_eq_zero.mp hc)
 
 local notation "ΓIndex(" ω ", " U ")" =>
   {j : Xₛ × ℕ // onComponent(j.1, ω) ∧ j.1 ∈ U ∧ 0 < j.2 ∧ j.2 ≤ (arch(j.1)).card}
@@ -624,7 +776,14 @@ The archimedean polar quotient is Fréchet. -/
 theorem sLocalGammaOrbitalQuotient_frechet (ω : PontryaginDual J₁(S)) :
     let P := Γker(ω)
     @IsFrechetTVS _ (Submodule.Quotient.addCommGroup P) (Submodule.Quotient.module P)
-      (QuotientModule.Quotient.topologicalSpace P) := by sorry
+      (QuotientModule.Quotient.topologicalSpace P) := by
+  intro P
+  have hP : IsClosed (P : Set (fullPV(ω))) :=
+    (sLocalThetaPoleBound_isClosed (F := F) (S := S) ω (fun _ ↦ 0)).preimage continuous_subtype_val
+  have hR := (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding (Finset.Subset.refl S) ω).isClosed_range
+  exact isFrechetTVS_quotient
+    (frechet_of_closed_embedding (fullPV(ω)).subtypeL ((fullPV(ω)).isClosedEmbedding_subtypeL hR)
+      (sLocalHomogeneousThetaSpace_frechet (F := F) (S := S) ω)) P hP
 
 /-- Paper: Notation 7.3.4.1, p. 364.
 The archimedean polar quotient is nuclear. -/
@@ -647,12 +806,25 @@ theorem sLocalGammaOrbitalQuotient_nuclear (ω : PontryaginDual J₁(S)) :
 Increasing all local cutoffs decreases the corresponding subspace.
 Deviation: Uses the pointwise order. Lexicographic order need not give nested stages. -/
 theorem sLocalGammaFiltration_antitone (ω : PontryaginDual J₁(S)) :
-    Antitone (sLocalGammaFiltration ω) := by sorry
+    Antitone (sLocalGammaFiltration ω) := by
+  intro N N' hN
+  unfold sLocalGammaFiltration
+  refine le_iInf fun j ↦ iInf_le_of_le ⟨j.val, j.property.1, ?_, j.property.2.2⟩ le_rfl
+  obtain ⟨hc, w, hw, hcard⟩ := j.property.2.1
+  exact ⟨hc, w, hw, hcard.trans (by exact_mod_cast hN w)⟩
+
+private theorem isClosed_iInf_ker {E ι : Type*} [AddCommMonoid E] [Module ℂ E]
+    [TopologicalSpace E] (f : ι → E →L[ℂ] ℂ) :
+    IsClosed (↑(⨅ i, (f i).ker) : Set E) := by
+  rw [Submodule.coe_iInf]
+  exact isClosed_iInter fun i ↦ (f i).isClosed_ker
 
 /-- Paper: Theorem 7.3.4.1(1), p. 364.
 Each stage of the archimedean pole filtration is closed. -/
 theorem sLocalGammaFiltration_isClosed (ω : PontryaginDual J₁(S)) (N : depths) :
-    IsClosed (sLocalGammaFiltration ω N : Set (fullPV(ω))) := by sorry
+    IsClosed (sLocalGammaFiltration ω N : Set (fullPV(ω))) := by
+  exact isClosed_iInf_ker
+    (fun j : ΓIndex(ω, sLocalGammaPoleCutoff (F := F) (S := S) ω N) ↦ ΓCoeff(ω, j))
 
 -- TODO(paper-gap): The test list (7.3.4.9) does not separate the two coefficients
 -- of a double real pole at cutoff (0,0). See ERRATA I169. Finite interpolation can
