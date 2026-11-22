@@ -423,6 +423,66 @@ theorem sLocalThetaPrincipalValue_toGlobal {S₀ S : Finset V}
     (sLocalThetaToGlobal F S).comp (sLocalThetaPrincipalValue F h₀) =
       (globalThetaPrincipalValue F S₀).comp (sLocalThetaToGlobal F S) := by sorry
 
+open Classical in
+/-- Each selected local principal value and each unselected identity commute with unit pullback. -/
+private theorem sLocalThetaPrincipalValue_equivariant_local (S₀ : Finset V) (v : V)
+    (g : (v.adicCompletion F)ˣ) (f : ℬ(v.adicCompletion F)) :
+    let p := if v ∈ S₀ then (finitePlacePrincipalValue v).toLinearMap else LinearMap.id
+    p (schwartzBruhatUnitTranslate g f) = schwartzBruhatUnitTranslate g (p f) := by
+  intro p
+  by_cases hv : v ∈ S₀
+  · rw [show p = (finitePlacePrincipalValue v).toLinearMap from ite_eq_left hv]
+    apply Subtype.ext
+    funext x
+    have h (π : (v.adicCompletion F)ˣ) (y : v.adicCompletion F) :
+        finitePlacePrincipalValueFun v π (schwartzBruhatUnitTranslate g f) (Multiplicative.ofAdd y) =
+          finitePlacePrincipalValueFun v π f
+            (Multiplicative.ofAdd ((↑g⁻¹ : v.adicCompletion F) * y)) := by
+      simp only [finitePlacePrincipalValueFun, schwartzBruhatUnitTranslate_apply,
+        toAdd_ofAdd, mul_left_comm]
+    exact h _ x.toAdd
+  · rw [show p = LinearMap.id from ite_eq_right hv]
+    rfl
+
+/-- After tensor identification it suffices to commute with translation in each finite factor:
+first check the identity on pure tensors, then use linearity in both tensor products. -/
+private theorem sLocalThetaPrincipalValue_equivariant_tensor
+    {ι A X : Type*} {B : ι → Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [∀ i, AddCommGroup (B i)] [∀ i, Module ℂ (B i)]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, B i)) ≃L[ℂ] X)
+    (t : X →ₗ[ℂ] X) (u : A → A) (v : ∀ i, B i → B i) (p : ∀ i, B i →ₗ[ℂ] B i)
+    (ht : ∀ (a : A) (b : ∀ i, B i), t (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, b i))) =
+      e (u a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, v i (b i)))) (hp : ∀ i b, p i (v i b) = v i (p i b)) (x : X) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, B i)
+    let Q : W →ₗ[ℂ] W := PiTensorProduct.map p
+    let L := e.toLinearMap.comp ((TensorProduct.map (LinearMap.id (R := ℂ) (M := A)) Q).comp
+      e.symm.toLinearMap)
+    L (t x) = t (L x) := by
+  intro W Q L
+  have hL (a : A) (b : ∀ i, B i) : L (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, b i))) =
+      e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, p i (b i))) := by
+    change e (TensorProduct.map LinearMap.id Q (e.symm (e _))) = _
+    erw [e.symm_apply_apply, TensorProduct.map_tmul (LinearMap.id (R := ℂ) (M := A)) Q,
+      LinearMap.id_apply (R := ℂ) a]
+    exact congrArg (fun z : W ↦ e (a ⊗ₜ[ℂ] z)) (PiTensorProduct.map_tprod p b)
+  let E : (A ⊗[ℂ] (⨂[ℂ] i, B i)) ≃ₗ[ℂ] X := e.toLinearEquiv
+  have hcomp : (L.comp t).comp E.toLinearMap = (t.comp L).comp E.toLinearMap := by
+    apply TensorProduct.ext'
+    intro a z
+    let k := TensorProduct.mk ℂ A (⨂[ℂ] i, B i) a
+    have hk : ((L.comp t).comp E.toLinearMap).comp k = ((t.comp L).comp E.toLinearMap).comp k := by
+      apply PiTensorProduct.ext
+      apply MultilinearMap.ext
+      intro b
+      change L (t (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, b i)))) = t (L (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, b i))))
+      erw [ht, hL, hL, ht]
+      simp only [hp]
+    exact LinearMap.congr_fun hk z
+  obtain ⟨z, rfl⟩ := E.surjective x
+  exact LinearMap.congr_fun hcomp z
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The S-local principal value commutes with each S-idele translation on theta classes. -/
 theorem sLocalThetaPrincipalValue_equivariant {S₀ S : Finset V}
@@ -430,7 +490,44 @@ theorem sLocalThetaPrincipalValue_equivariant {S₀ S : Finset V}
     Submodule.Quotient.mk
         (sAdelePrincipalValue F h₀ (schwartzBruhatUnitTranslate g f)) =
       (Submodule.Quotient.mk
-        (schwartzBruhatUnitTranslate g (sAdelePrincipalValue F h₀ f)) : Θₛ(S)) := by sorry
+        (schwartzBruhatUnitTranslate g (sAdelePrincipalValue F h₀ f)) : Θₛ(S)) := by
+  classical
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  let pure (a : ℬ(InfiniteAdeleRing F)) (b : (w : S) → ℬ(w.val.adicCompletion F)) : ℬₛ(S) :=
+    e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))
+  let gArch := Units.map (MonoidHom.fst (InfiniteAdeleRing F) (FinitePlaceProduct F S)) g
+  let gFin (w : S) := Units.map ((Pi.evalRingHom _ w).comp
+    (RingHom.snd (InfiniteAdeleRing F) (FinitePlaceProduct F S))).toMonoidHom g
+  let T : ℬₛ(S) →ₗ[ℂ] ℬₛ(S) :=
+    { toFun := schwartzBruhatUnitTranslate g
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have evalPure (a : ℬ(InfiniteAdeleRing F)) (b : (w : S) → ℬ(w.val.adicCompletion F))
+      (x : SAdeleRing F S) : pure a b (Multiplicative.ofAdd x) =
+        a (Multiplicative.ofAdd x.1) * ∏ w : S, b w (Multiplicative.ofAdd (x.2 w)) := by
+    with_reducible_and_instances exact (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec a b x
+  have translate (a : ℬ(InfiniteAdeleRing F)) (b : (w : S) → ℬ(w.val.adicCompletion F)) :
+      T (pure a b) = pure (schwartzBruhatUnitTranslate gArch a)
+        (fun w ↦ schwartzBruhatUnitTranslate (gFin w) (b w)) := by
+    apply Subtype.ext
+    funext x
+    change pure a b (Multiplicative.ofAdd ((↑g⁻¹ : SAdeleRing F S) * x.toAdd)) =
+      pure (schwartzBruhatUnitTranslate gArch a) _ (Multiplicative.ofAdd x.toAdd)
+    rw [evalPure, evalPure]
+    rfl
+  let p (w : S) : ℬ(w.val.adicCompletion F) →ₗ[ℂ] ℬ(w.val.adicCompletion F) :=
+    if w.val ∈ S₀ then (finitePlacePrincipalValue w.val).toLinearMap else LinearMap.id
+  have commute (w : S) (b : ℬ(w.val.adicCompletion F)) :
+      p w (schwartzBruhatUnitTranslate (gFin w) b) = schwartzBruhatUnitTranslate (gFin w) (p w b) := by
+    with_reducible_and_instances
+      exact sLocalThetaPrincipalValue_equivariant_local (F := F) S₀ w.val (gFin w) b
+  -- In fact the two operators commute before passing to theta classes.
+  apply congrArg Submodule.Quotient.mk
+  unfold sAdelePrincipalValue
+  with_reducible_and_instances
+    exact sLocalThetaPrincipalValue_equivariant_tensor (A := ℬ(InfiniteAdeleRing F))
+      (B := fun w : S ↦ ℬ(w.val.adicCompletion F)) e T (schwartzBruhatUnitTranslate gArch)
+      (fun w ↦ schwartzBruhatUnitTranslate (gFin w)) p translate commute f
 
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The global principal value commutes with each idele translation on theta classes. -/
