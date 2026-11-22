@@ -262,11 +262,84 @@ theorem HasNuclearFrechetPresentation.isLFSpace {E : Type*} [AddCommGroup E] [Mo
   obtain ⟨hE, X, a, m, t, hX, hlim⟩ := h
   exact ⟨hE, X, a, m, t, fun k ↦ (hX k).1, hlim⟩
 
+private theorem nuclearFrechetPresentation_quotient_of_strictLF.{v,u}
+    {E : Type u} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (hs : IsStrictLFSpace E) (hn : IsNuclearTVS.{v} E)
+    (M : Submodule ℂ E) (hM : IsClosed (M : Set E)) :
+    HasNuclearFrechetPresentation.{v} (E ⧸ M) := by
+  obtain ⟨_, V, hV, hF, hex, ht⟩ := hs
+  have hN (k : ℕ) : IsNuclearTVS.{v} (V k) := isNuclearTVS_submodule hn (V k)
+  let j (k : ℕ) := (V k).subtypeL.codRestrict (V (k+1)) fun x ↦ hV k.le_succ x.property
+  let i (k : ℕ) := (V k).subtypeL
+  have h : IsInjectiveLCLimit j i := by
+    refine ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, ?_, ht⟩
+    intro x
+    obtain ⟨k, hk⟩ := hex x
+    exact ⟨k, ⟨x, hk⟩, rfl⟩
+  have hP : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ (i k).toLinearMap)} →
+        Seminorm ℂ E) := ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hP.isTopologicalAddGroup
+  let : T2Space (E ⧸ M) := inferInstance
+  let f (k : ℕ) := M.mkQL.comp (i k)
+  let K (k : ℕ) := (f k).ker
+  have hf (k : ℕ) (x : V k) : f (k+1) (j k x) = f k x :=
+    congrArg M.mkQ (DFunLike.congr_fun (h.compatible k) x)
+  let iQ (k : ℕ) : V k ⧸ K k →L[ℂ] E ⧸ M := (K k).liftQL (f k) le_rfl
+  let jQ (k : ℕ) : V k ⧸ K k →L[ℂ] V (k+1) ⧸ K (k+1) :=
+    (K k).liftQL ((K (k+1)).mkQL.comp (j k)) (by
+      intro x hx
+      change (K (k+1)).mkQ (j k x) = 0
+      rw [Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero]
+      change f (k+1) (j k x) = 0
+      rwa [hf])
+  have hiQ (k : ℕ) (x : V k) : iQ k ((K k).mkQ x) = f k x := rfl
+  have hjQ (k : ℕ) (x : V k) : jQ k ((K k).mkQ x) = (K (k+1)).mkQ (j k x) := rfl
+  refine ⟨inferInstance, fun k ↦ V k ⧸ K k, _, _, _, fun k ↦
+    ⟨isFrechetTVS_quotient (hF k) (K k) (f k).isClosed_ker, by
+      let : IsClosed (K k : Set (V k)) := (f k).isClosed_ker
+      exact isNuclearTVS_quotient (hN k) (K k)⟩, jQ, iQ, ⟨?_, ?_, ?_, ?_⟩⟩
+  · intro k
+    apply (LinearMap.ker_eq_bot (f := (iQ k).toLinearMap)).mp
+    exact (K k).ker_liftQ_eq_bot' (f k).toLinearMap rfl
+  · intro k
+    ext y
+    obtain ⟨x, rfl⟩ := (K k).mkQ_surjective y
+    change iQ (k+1) (jQ k ((K k).mkQ x)) = iQ k ((K k).mkQ x)
+    rw [hjQ, hiQ, hiQ, hf]
+  · intro y
+    obtain ⟨x, rfl⟩ := M.mkQ_surjective y
+    obtain ⟨k, z, rfl⟩ := h.exhaustive x
+    exact ⟨k, (K k).mkQ z, hiQ k z⟩
+  · let : PolynormableSpace ℂ E := hP.toPolynormableSpace
+    let : PolynormableSpace ℂ (E ⧸ M) := (isNuclearTVS_quotient hn M).2.1
+    have hseminorms : (fun p : Seminorm ℂ (E ⧸ M) ↦
+        ∀ k, Continuous (p ∘ (iQ k).toLinearMap)) =
+        (fun p : Seminorm ℂ (E ⧸ M) ↦ Continuous p) := by
+      funext p
+      apply propext
+      refine ⟨fun hp ↦ M.isQuotientMap_mkQL.continuous_iff.mpr ?_,
+        fun hp k ↦ hp.comp (iQ k).continuous⟩
+      apply hP.continuous_seminorm (⟨p.comp M.mkQ, fun k ↦ ?_⟩ : _)
+      change Continuous (fun x : V k ↦ p (f k x))
+      simpa only [Function.comp_def, ContinuousLinearMap.coe_coe, Submodule.coe_mkQL, hiQ] using
+        (hp k).comp (K k).mkQL.continuous
+    change (inferInstance : TopologicalSpace (E ⧸ M)) =
+      (SeminormFamily.moduleFilterBasis
+        (Subtype.val : {p : Seminorm ℂ (E ⧸ M) // ∀ k, Continuous (p ∘ (iQ k).toLinearMap)} →
+          Seminorm ℂ (E ⧸ M))).topology
+    rw [hseminorms]
+    exact (PolynormableSpace.withSeminorms ℂ (E ⧸ M)).withSeminorms_eq
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous theta quotient is a locally convex inductive limit of nuclear
 Fréchet spaces. The test-function stages can be quotiented by the restricted kernel. -/
 theorem globalHomogeneousThetaSpace_nuclearFrechetPresentation :
-    HasNuclearFrechetPresentation Θ𝔽ω(ω) := by sorry
+    HasNuclearFrechetPresentation Θ𝔽ω(ω) := by
+  apply nuclearFrechetPresentation_quotient_of_strictLF
+  · exact (adeleSchwartz_strictLF (F := F)).2
+  · exact (adeleSchwartz_nuclear (F := F)).2
+  · exact homogeneousAdelicTheta_ker_isClosed ω
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The S-local homogeneous theta quotient is a locally convex inductive limit of nuclear
