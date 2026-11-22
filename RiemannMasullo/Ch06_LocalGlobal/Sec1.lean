@@ -104,6 +104,50 @@ theorem sLocalThetaTransition_range_eq_invariants (hST : S ⊂ T)
       {x : Θₛ(T) | ∀ g : relativeIntegralIdeleUnits F S T,
         ρ (QuotientGroup.mk g.val) x = x} := by sorry
 
+private theorem sLocalThetaToGlobal_range_eq_invariants_intertwine
+    (g : IdeleGroup (𝓞 F) F) (hg : g ∈ (integralIdeleInsertion F T).range) (y : Θₛ(T)) :
+    let ρ := (existsUnique_globalThetaAction (F := F)).exists.choose
+    let ρT := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose
+    sLocalThetaToGlobal F T
+        (ρT (QuotientGroup.mk (Units.map (adeleProjection F T).toMonoidHom g)) y) =
+      ρ (QuotientGroup.mk g) (sLocalThetaToGlobal F T y) := by
+  obtain ⟨u, rfl⟩ := hg
+  refine Submodule.Quotient.induction_on (LinearMap.ker (sLocalAdelicTheta F T)) y ?_
+  intro f
+  let g := integralIdeleInsertion F T u
+  have hT := (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose_spec.2
+    (Units.map (adeleProjection F T).toMonoidHom g) f
+  have hF := (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 g
+    (sAdeleSchwartzToGlobal F T f)
+  have h₁ := congrArg (sLocalThetaToGlobal F T) hT
+  have h₂ := sLocalThetaToGlobal_equivariant (F := F) (S := T) u f
+  have h₃ := congrArg ((existsUnique_globalThetaAction (F := F)).exists.choose (QuotientGroup.mk g))
+    (sLocalThetaToGlobal_mk (F := F) (S := T) f)
+  with_reducible exact h₁.trans (h₂.trans (h₃.trans hF).symm)
+
+private theorem sLocalThetaToGlobal_range_eq_invariants_one {G V : Type*} [Group G]
+    {N : Subgroup G} [N.Normal] [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    (ρ : G ⧸ N →* (V →L[ℂ] V)) {g : G} (hg : g = 1) (v : V) :
+    ρ (QuotientGroup.mk g) v = v := by
+  subst g
+  rw [QuotientGroup.mk_one, map_one]
+  rfl
+
+private theorem sLocalThetaToGlobal_range_eq_invariants_comp_apply
+    (hST : S ⊆ T) (y : Θₛ(S)) :
+    sLocalThetaToGlobal F T (sLocalThetaTransition hST y) = sLocalThetaToGlobal F S y :=
+  LinearMap.congr_fun (sLocalThetaToGlobal_comp (F := F) hST) y
+
+private theorem sLocalThetaToGlobal_range_eq_invariants_stage (x : Θ𝔽) :
+    ∃ (T : Finset Places), S ⊆ T ∧ ∃ z : Θₛ(T), sLocalThetaToGlobal F T z = x := by
+  have he := sLocalThetaToGlobal_exhaustive (F := F) x
+  rcases he with ⟨U, y, hy⟩
+  classical
+  have hUT : U ⊆ S ∪ U := Finset.subset_union_right
+  have hz := sLocalThetaToGlobal_range_eq_invariants_comp_apply (F := F) hUT y
+  with_reducible exact ⟨S ∪ U, Finset.subset_union_left, sLocalThetaTransition (F := F) hUT y,
+    hz.trans hy⟩
+
 /-- Paper: Theorem 6.1.2.1(2), p. 288.
 When the S-integers have trivial Picard group, the range of the global insertion is the fixed
 subspace for the complementary integral units in the global theta quotient of (5.1.1.3). -/
@@ -111,7 +155,46 @@ theorem sLocalThetaToGlobal_range_eq_invariants
     (_hPic : Subsingleton (CommRing.Pic ((S : Set Places).integer F))) :
     let ρ := (existsUnique_globalThetaAction (F := F)).exists.choose
     Set.range (sLocalThetaToGlobal F S) =
-      {x : Θ𝔽 | ∀ g : outsideIntegralIdeleUnits F S, ρ (QuotientGroup.mk g.val) x = x} := by sorry
+      {x : Θ𝔽 | ∀ g : outsideIntegralIdeleUnits F S, ρ (QuotientGroup.mk g.val) x = x} := by
+  apply Set.ext
+  intro x
+  constructor
+  · rintro ⟨y, rfl⟩ g
+    -- On the S-stage the projection of every complementary unit is one.
+    have h := sLocalThetaToGlobal_range_eq_invariants_intertwine (F := F) (T := S)
+      g.val g.property.1 y
+    have hp : Units.map (adeleProjection F S).toMonoidHom g.val = 1 := g.property.2
+    have hid := sLocalThetaToGlobal_range_eq_invariants_one
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose hp y
+    have h₂ := congrArg (sLocalThetaToGlobal F S) hid
+    with_reducible exact h.symm.trans h₂
+  · intro hx
+    -- Take a finite stage containing S and representing the fixed global class.
+    have he := sLocalThetaToGlobal_range_eq_invariants_stage (F := F) (S := S) x
+    rcases he with ⟨T, hST, z, hz⟩
+    by_cases heq : T = S
+    · have hy : x ∈ Set.range (sLocalThetaToGlobal F T) := ⟨z, hz⟩
+      exact (congrArg (fun V ↦ x ∈ Set.range (sLocalThetaToGlobal F V)) heq).mp hy
+    · have hlt : S ⊂ T := Finset.ssubset_iff_subset_ne.mpr ⟨hST, Ne.symm heq⟩
+      -- Lift each relative unit to a complementary unit and use injectivity at T.
+      have hfixed : ∀ k : relativeIntegralIdeleUnits F S T,
+          (existsUnique_sLocalThetaAction (F := F) (S := T)).exists.choose
+            (QuotientGroup.mk k.val) z = z := by
+        rintro ⟨k, g, hg, rfl⟩
+        apply (sLocalThetaToGlobal_isEmbedding (F := F) (S := T)).injective
+        have hgT : g ∈ (integralIdeleInsertion F T).range :=
+          (integralIdeleInsertion_exhaustive F).1 hST hg.1
+        have hi := sLocalThetaToGlobal_range_eq_invariants_intertwine (F := F) (T := T) g hgT z
+        have ha := congrArg
+          ((existsUnique_globalThetaAction (F := F)).exists.choose (QuotientGroup.mk g)) hz
+        have hgx := hx ⟨g, hg⟩
+        with_reducible exact hi.trans (ha.trans (hgx.trans hz.symm))
+      have hr := Set.ext_iff.mp (sLocalThetaTransition_range_eq_invariants (F := F) hlt _hPic) z
+      have hmem := hr.mpr (Set.mem_ofPred.mpr hfixed)
+      rcases hmem with ⟨w, hw⟩
+      have h := sLocalThetaToGlobal_range_eq_invariants_comp_apply (F := F) hlt.le w
+      have h' := congrArg (sLocalThetaToGlobal F T) hw
+      with_reducible exact Set.mem_range.mpr ⟨w, h.symm.trans (h'.trans hz)⟩
 
 end Ranges
 
