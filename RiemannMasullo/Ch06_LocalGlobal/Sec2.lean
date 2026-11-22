@@ -8,6 +8,8 @@ import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Topology.Algebra.IsOpenUnits
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+
 /-! # Structure Theorem V: isotypic exhaustiveness
 
 Masullo, §6.2, pp. 295–302. Finite sets of places index only the finite factors.
@@ -270,7 +272,54 @@ theorem finiteStandardGaussian_zeta_of_ramified (v : V) (c d : QuasiCharacter (L
       (Multiplicative.ofAdd g.val) * d g) (μ(v)) ∧
     (localIdelicZetaIntegral (μ(v)) (fun x ↦ finiteStandardGaussian v c
       (Multiplicative.ofAdd x)) d =
-      if (∀ u ∈ U(v), d u = c u) then ((μ(v)) (U(v))).toReal else 0) := by sorry
+      if (∀ u ∈ U(v), d u = c u) then ((μ(v)) (U(v))).toReal else 0) := by
+  classical
+  let : BorelSpace (L(v))ˣ := ⟨rfl⟩
+  let : (μ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  let q (g : (L(v))ˣ) := d g / c g
+  have hc (g : (L(v))ˣ) : c g ≠ 0 := ((Group.isUnit g).map c).ne_zero
+  have hram : ¬ ∀ u ∈ U(v), c u = 1 := fun h ↦
+    _hc.elim fun u hu ↦ hu.2 (h u hu.1)
+  have hfun : (fun g : (L(v))ˣ ↦ finiteStandardGaussian v c (Multiplicative.ofAdd g.val) * d g) =
+      (U(v)).indicator q := by
+    funext g
+    by_cases hg : g ∈ U(v)
+    · rw [Set.indicator_of_mem hg, finiteStandardGaussian_integerUnit v c g hg]
+      exact (mul_comm _ _).trans (div_eq_mul_inv _ _).symm
+    · rw [Set.indicator_of_notMem hg]
+      have hv : g.val ∉ Units.val '' U(v) := fun ⟨u, hu, h⟩ ↦ hg ((Units.ext h) ▸ hu)
+      have hz : finiteStandardGaussian v c (Multiplicative.ofAdd g.val) = 0 :=
+        (ite_eq_right hram).trans (Set.indicator_of_notMem hv _)
+      rw [hz, zero_mul]
+  have hopen : IsOpen (U(v)) := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hcompact : IsCompact (U(v)) := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hq : Continuous q := d.continuous.div c.continuous hc
+  constructor
+  · rw [hfun, integrable_indicator_iff hopen.measurableSet]
+    exact hq.continuousOn.integrableOn_compact hcompact
+  · change (∫ g : (L(v))ˣ, finiteStandardGaussian v c (Multiplicative.ofAdd g.val) * d g ∂μ(v)) = _
+    rw [hfun, integral_indicator hopen.measurableSet]
+    split_ifs with hmatch
+    · have eqOne : Set.EqOn q (fun _ ↦ (1 : ℂ)) (U(v)) := fun u hu ↦
+        (div_eq_one_iff_eq (hc u)).mpr (hmatch u hu)
+      rw [setIntegral_congr_fun hopen.measurableSet eqOne, setIntegral_const]
+      simp [measureReal_def]
+    · push Not at hmatch
+      obtain ⟨a, ha, hne⟩ := hmatch
+      have hpre : (fun y : (L(v))ˣ ↦ a * y) ⁻¹' U(v) = U(v) := by
+        ext y
+        exact (O(v)).units.mul_mem_cancel_left ha
+      have hI := (measurePreserving_mul_left (μ(v)) a).setIntegral_preimage_emb
+        (Homeomorph.mulLeft a).toMeasurableEquiv.measurableEmbedding q (U(v))
+      rw [hpre] at hI
+      change (∫ y in U(v), q (a * y) ∂μ(v)) = ∫ y in U(v), q y ∂μ(v) at hI
+      have hmul (y : (L(v))ˣ) : q (a * y) = q a * q y := by
+        simp only [q, map_mul, mul_div_mul_comm]
+      simp_rw [hmul] at hI
+      rw [integral_const_mul, ← sub_eq_zero, ← sub_one_mul] at hI
+      exact (mul_eq_zero.mp hI).resolve_left
+        (sub_ne_zero.mpr (fun h ↦ hne ((div_eq_one_iff_eq (hc a)).mp h)))
 
 /-- Paper: Theorem 6.2.2.1, p. 298.
 Tensoring an archimedean test with the fixed standard tests at the finite places
@@ -383,12 +432,53 @@ theorem mem_finitePuncturedThetaTestSpace (v : V) (f : ℬ(L(v))) :
 
 local notation "ℬ₀(" v ")" => ↥(finitePuncturedThetaTestSpace v)
 
+/-- A locally constant compactly supported field test vanishing at zero is integrable
+after inverse translation on the unit group and multiplication by a continuous factor. -/
+private theorem finiteStandardThetaAverage_integrable_of_locallyConstant
+    {K : Type*} [NormedField K] [MeasurableSpace Kˣ] [BorelSpace Kˣ]
+    (μ : Measure Kˣ) [IsFiniteMeasureOnCompacts μ] (test : K → ℂ)
+    (hloc : IsLocallyConstant test) (hcompact : HasCompactSupport test) (hzero : test 0 = 0)
+    (c : Kˣ → ℂ) (hc : Continuous c) (x : Kˣ) :
+    Integrable (fun g : Kˣ ↦ test (g⁻¹ * x).val * c g) μ := by
+  have hclosed : IsClosed (Function.support test) := (hloc.isClopen_fiber 0).2.isClosed_compl
+  have hrange : tsupport test ⊆ Set.range (Units.val : Kˣ → K) := by
+    intro y hy
+    have hmem : y ∈ Function.support test := by
+      rwa [tsupport, hclosed.closure_eq] at hy
+    have hy0 : y ≠ 0 := by
+      rintro rfl
+      exact hmem hzero
+    exact ⟨Units.mk0 y hy0, rfl⟩
+  have hpre : IsCompact (Units.val ⁻¹' tsupport test : Set Kˣ) := by
+    rw [(Units.isEmbedding_val₀ (G₀ := K)).isCompact_iff,
+      Set.image_preimage_eq_of_subset hrange]
+    exact hcompact
+  let unitTest : Kˣ → ℂ := test ∘ Units.val
+  have hsupport : HasCompactSupport unitTest :=
+    hpre.of_isClosed_subset (isClosed_tsupport _)
+      (tsupport_comp_subset_preimage test Units.continuous_val)
+  let shift : Kˣ ≃ₜ Kˣ := (Homeomorph.inv Kˣ).trans (Homeomorph.mulRight x)
+  have hcont : Continuous (unitTest ∘ shift) :=
+    (hloc.continuous.comp Units.continuous_val).comp shift.continuous
+  change Integrable (fun g : Kˣ ↦ (unitTest ∘ shift) g * c g) μ
+  exact (hcont.mul hc).integrable_of_hasCompactSupport (hsupport.comp_homeomorph shift).mul_right
+
 /-- Paper: (6.2.2.4), p. 299.
 The finite-place integral of a compactly supported test on the punctured field is absolutely
 integrable for every translation and unitary character. -/
 theorem finiteStandardThetaAverage_integrable (v : V) (χ : PontryaginDual (L(v))ˣ)
     (f : ℬ₀(v)) (x : (L(v))ˣ) :
-    Integrable (fun g : (L(v))ˣ ↦ f.val (Multiplicative.ofAdd (g⁻¹ * x).val) * (χ g : ℂ)) (μ(v)) := by sorry
+    Integrable (fun g : (L(v))ˣ ↦ f.val (Multiplicative.ofAdd (g⁻¹ * x).val) * (χ g : ℂ)) (μ(v)) := by
+  let test (y : L(v)) : ℂ := f.val (Multiplicative.ofAdd y)
+  have htest : IsLocallyConstant test ∧ HasCompactSupport test :=
+    (mem_finitePlaceSchwartz_iff F v test).mp ⟨f.val, fun _ ↦ rfl⟩
+  have hzero : test 0 = 0 := (mem_finitePuncturedThetaTestSpace v f.val).mp f.property
+  have hχ : Continuous (fun g : (L(v))ˣ ↦ (χ g : ℂ)) :=
+    continuous_subtype_val.comp χ.continuous
+  let : BorelSpace (L(v))ˣ := ⟨rfl⟩
+  let : (μ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  exact finiteStandardThetaAverage_integrable_of_locallyConstant (μ(v)) test htest.1 htest.2 hzero
+    (fun g : (L(v))ˣ ↦ (χ g : ℂ)) hχ x
 
 /-- Paper: (6.2.2.4), p. 299.
 The finite-place convolution formula specifies a continuous linear map on
