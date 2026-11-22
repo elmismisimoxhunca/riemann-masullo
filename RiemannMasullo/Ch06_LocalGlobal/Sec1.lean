@@ -9,6 +9,7 @@ public import Mathlib.Topology.ContinuousMap.CompactlySupported
 public import Mathlib.MeasureTheory.Integral.Pi
 
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.RepresentationTheory.Coinvariants
 
 /-! # Structure Theorem IV: local within global
 
@@ -481,12 +482,91 @@ theorem finitePlaceUnitAverage_continuous_schwartzBruhat (w : Places) :
     ∃ A : ℬᵥ(w) →L[ℂ] ℬᵥ(w),
       ∀ f x, A f (Multiplicative.ofAdd x) = finitePlaceUnitAverage w f x := by sorry
 
+private theorem finitePlaceUnitAverage_eq_zero_iff_translate (w : Places) (g : U(w))
+    (f : ℬᵥ(w)) (x : L(w)) : finitePlaceUnitAverage w ((ρ(w)) g f) x =
+      finitePlaceUnitAverage w f x := by
+  let : (μ(w)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure w
+  let a : (L(w))ˣ := (g : (L(w))ˣ)⁻¹
+  have ha : a ∈ U(w) := (U(w)).inv_mem g.property
+  have hpre : (fun u ↦ a * u) ⁻¹' (U(w) : Set (L(w))ˣ) = U(w) :=
+    Set.ext fun _ ↦ (U(w)).mul_mem_cancel_left ha
+  have he := (measurePreserving_mul_left (μ(w)) a).setIntegral_preimage_emb
+    (measurableEmbedding_mulLeft a) (fun u ↦ f (Multiplicative.ofAdd (x * u.val))) (U(w))
+  rw [hpre] at he
+  refine Eq.trans ?_ he
+  unfold finitePlaceUnitAverage
+  apply integral_congr_ae
+  exact Filter.Eventually.of_forall fun u ↦ congrArg (fun y ↦ f (Multiplicative.ofAdd y))
+    (mul_left_comm a.val x u.val)
+
+private theorem finitePlaceUnitAverage_eq_zero_iff_fixed (w : Places) (f : ℬᵥ(w))
+    (hfix : ∀ g : U(w), (ρ(w)) g f = f) (hz : ∀ x, finitePlaceUnitAverage w f x = 0) :
+    f = 0 := by
+  let : (μ(w)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure w
+  have hm : (μ(w)).real (U(w)) ≠ 0 := ENNReal.toReal_ne_zero.mpr
+    ⟨(units_isOpen w).measure_ne_zero (μ(w)) ⟨1, (U(w)).one_mem⟩, (units_isCompact w).measure_ne_top⟩
+  apply Subtype.ext
+  funext x
+  have he : finitePlaceUnitAverage w f x.toAdd = (μ(w)).real (U(w)) • f x := by
+    refine (setIntegral_congr_fun (units_isOpen w).measurableSet ?_).trans (setIntegral_const (f x))
+    intro u hu
+    have hh := congrArg (fun h : ℬᵥ(w) ↦ h x) (hfix (⟨u, hu⟩ : U(w))⁻¹)
+    change f (Multiplicative.ofAdd (x.toAdd * u.val)) = f x
+    rw [mul_comm]
+    exact hh
+  exact (smul_eq_zero.mp (he.symm.trans (hz x.toAdd))).resolve_left hm
+
+private theorem finitePlaceUnitAverage_eq_zero_iff_congr (w : Places) (f h : ℬᵥ(w))
+    (he : Representation.Coinvariants.mk (ρ(w)) f = Representation.Coinvariants.mk (ρ(w)) h)
+    (x : L(w)) : finitePlaceUnitAverage w f x = finitePlaceUnitAverage w h x := by
+  let A : ℬᵥ(w) →ₗ[ℂ] ℂ :=
+    { toFun := fun k ↦ finitePlaceUnitAverage w k x
+      map_add' := fun a b ↦ integral_add (finitePlaceUnitAverage_integrable w a x)
+        (finitePlaceUnitAverage_integrable w b x)
+      map_smul' := fun c k ↦ integral_const_mul c
+        (fun u : (L(w))ˣ ↦ k (Multiplicative.ofAdd (x * u.val))) }
+  have hA (u : U(w)) : A ∘ₗ (ρ(w)) u = A :=
+    LinearMap.ext fun k ↦ finitePlaceUnitAverage_eq_zero_iff_translate w u k x
+  change A f = A h
+  simpa only [Representation.Coinvariants.lift_mk] using
+    congrArg (Representation.Coinvariants.lift (ρ(w)) A hA) he
+
+private theorem finitePlaceUnitAverage_eq_zero_iff_representative (w : Places) (f : ℬᵥ(w)) :
+    ∃ s ∈ Representation.invariants (ρ(w)),
+      Representation.Coinvariants.mk (ρ(w)) s = Representation.Coinvariants.mk (ρ(w)) f := by
+  have hO := finitePlaceSchwartz_average_dilation w f
+  exact exists_invariant_mk_eq_of_finite_orbit (ρ(w)) f hO.choose hO.choose_spec.1
+
 /-- Paper: Lemma 6.1.2.4(2), p. 292.
 A test function averages to zero exactly when it belongs to the span of unit
 translation differences. -/
 theorem finitePlaceUnitAverage_eq_zero_iff (w : Places) (f : ℬᵥ(w)) :
     (∀ x, finitePlaceUnitAverage w f x = 0) ↔
-      f ∈ Representation.Coinvariants.ker (ρ(w)) := by sorry
+      f ∈ Representation.Coinvariants.ker (ρ(w)) := by
+  constructor
+  · intro hz
+    apply (finitePlaceUnitAverage_eq_zero_iff_representative w f).elim
+    intro s hsrep
+    have hfix := hsrep.1
+    have he := hsrep.2
+    have hzs (x : L(w)) : finitePlaceUnitAverage w s x = 0 := by
+      calc
+        _ = finitePlaceUnitAverage w f x := by
+          apply finitePlaceUnitAverage_eq_zero_iff_congr
+          exact he
+        _ = 0 := hz x
+    have hs : s = 0 := finitePlaceUnitAverage_eq_zero_iff_fixed (F := F) w s hfix hzs
+    apply (Representation.Coinvariants.mk_eq_zero (ρ(w)) (x := f)).mp
+    calc
+      _ = Representation.Coinvariants.mk (ρ(w)) s := he.symm
+      _ = 0 := (congrArg (Representation.Coinvariants.mk (ρ(w))) hs).trans (map_zero _)
+  · intro hf x
+    calc
+      _ = finitePlaceUnitAverage w (0 : ℬᵥ(w)) x := by
+        apply finitePlaceUnitAverage_eq_zero_iff_congr
+        exact ((Representation.Coinvariants.mk_eq_zero (ρ(w)) (x := f)).mpr hf).trans
+          (map_zero (Representation.Coinvariants.mk (ρ(w)))).symm
+      _ = 0 := integral_zero (μ := (μ(w)).restrict (U(w))) (L(w))ˣ ℂ
 
 -- TODO(paper-gap): The proof on p. 292 identifies multiplicative unit averaging
 -- with additive convolution and deduces vanishing of the function from unramified
