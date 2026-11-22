@@ -14,10 +14,8 @@
 
 • Assume $G$ is a second-countable $\mathbf R_{>0}$-modulated group. For $I\subset\mathbf R$ a non-empty interval, $\mathcal S_I(G)$ is the space of *$I$-exponentially decaying* Schwartz-Bruhat functions, i.e. $\phi\in C^\infty(G)$ such that $\lvert\cdot\rvert_G^a\phi\in\mathcal S(G)$ for all $a\in I$. We topologize $\mathcal S_I(G)$ with the locally convex inductive limit topology of the nuclear Fréchet topologies on $\mathcal S_I(k,G)$ for $k\subset G$ varying over the compact subgroups of $G$ whose orthogonal $k^\perp\subset\widehat G$ is compactly generated. The topology on $\mathcal S_I(k,G)$ is the subspace topology induced by the linear injection
 
-(1.1.2.1)
-
 $$
-T:\mathcal S_I(k,G)\to\prod_{a\in I}\mathcal S(k,G)
+T:\mathcal S_I(k,G)\to\prod_{a\in I}\mathcal S(k,G) \tag{1.1.2.1}
 $$
 
 sending $\phi$ to $(\lvert\cdot\rvert_G^a\phi)_{a\in I}$. This is also $\mathcal S_I(\mathbf R_{>0})\widehat{\otimes}_\pi\mathcal S(G^1/k)$.
@@ -204,10 +202,8 @@ The convergence of the above displayed sum is in the sense of trace-class operat
 
 Since $\delta^{(m)}_z$ is the functional obtained by integration (with respect to $\bar\mu$ on $C_F$) of functions in $W_I^{s,2}(C_F)$ against the functions $\lvert\cdot\rvert_F^{z-1/2}(\log\lvert\cdot\rvert_F)^m$, the finite rank kernels given by finite sums of $\lvert\cdot\rvert_F^{z-1/2}(\log\lvert\cdot\rvert_F)^m\otimes\psi_{z,m}$ are actual smooth functions of two variables on $C_F\times C_F$, and their sum converges in $L^2(C_F\times C_F,\nu\otimes\nu^\vee)$, where
 
-(1.2.1.1)
-
 $$
-\nu=\max\{\lvert\cdot\rvert_F^{-2a},\lvert\cdot\rvert_F^{2a}\}(1+\lvert\log\lvert\cdot\rvert_F\rvert^2)^{s/2}\bar\mu,\quad\nu^\vee=\frac{1}{\max\{\lvert\cdot\rvert_F^{-2a},\lvert\cdot\rvert_F^{2a}\}(1+\lvert\log\lvert\cdot\rvert_F\rvert^2)^{s/2}}\bar\mu.
+\nu=\max\{\lvert\cdot\rvert_F^{-2a},\lvert\cdot\rvert_F^{2a}\}(1+\lvert\log\lvert\cdot\rvert_F\rvert^2)^{s/2}\bar\mu,\quad\nu^\vee=\frac{1}{\max\{\lvert\cdot\rvert_F^{-2a},\lvert\cdot\rvert_F^{2a}\}(1+\lvert\log\lvert\cdot\rvert_F\rvert^2)^{s/2}}\bar\mu. \tag{1.2.1.1}
 $$
 
 Such limit is, in particular, a measurable function of two variables on $C_F\times C_F$, which we call the “spectral” kernel and we denote by:
@@ -553,9 +549,9 @@ and its suquotients $\mathscr{E}_{S,S_\infty}(\chi_S|_{J^1_{F,S}})$ and $\mathsc
 & \mathscr{E}_{S,S_\infty}\bigl(\chi_S|_{J^1_{F,S}}\bigr)\times\prod'_{p:S_p\subset S}\mathscr{E}_{S,S_p}\bigl(\chi_S|_{J^1_{F,S}}\bigr)
   \arrow[d]
 \\
-[D_{S,1}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]
+{[D_{S,1}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]}
   \arrow[r,"j" below] \arrow[d,"\simeq" left]
-& [D_{F,S}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]
+& {[D_{F,S}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]}
 & \coprod'_{v\in S}[D_{S,v}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]
   \arrow[l,"i" below] \arrow[d,"\simeq" right]
 \\
@@ -653,7 +649,7 @@ $^{3}$P. Sarnak. *Asymptotic Behavior of Periodic Orbits of the Horocycle Flow a
 (3) For all $x\in G$, the integral:
 
 $$
-\mathrm{(1.3.1.1)}\qquad\int_H u_0(h^{-1}x)\,\mathrm{d}\mu_H(h)
+\int_H u_0(h^{-1}x)\,\mathrm{d}\mu_H(h) \tag{1.3.1.1}
 $$
 
 converges, and upon denoting $u_0^H$ its value function on $G$, we have that $u_0^H$ is continuous on $G$, invariant under the continuous left-translation action by $H$ on $G$, and identically $1$ as a function on $G/H$.
@@ -661,7 +657,7 @@ converges, and upon denoting $u_0^H$ its value function on $G$, we have that $u_
 For every continuous function $u\in C(G/H)$, we have that for all $x\in G$, the integral
 
 $$
-\mathrm{(1.3.1.2)}\qquad\int_H\bigl(u_0\cdot(u\circ\pi)\bigr)(h^{-1}x)\,\mathrm{d}\mu_H(h)
+\int_H\bigl(u_0\cdot(u\circ\pi)\bigr)(h^{-1}x)\,\mathrm{d}\mu_H(h) \tag{1.3.1.2}
 $$
 
 converges, and its value is $u(\pi(x))$.
@@ -1520,7 +1516,7 @@ Such topologies, however, render *all* point-masses (and their derivatives) at a
 
 Now look at the situation with our chosen Schwartz-Bruhat function. We choose an enumeration $\{v_k\}_{k\ge 0}$ of all the places of $F$ outside $S$.
 
-Assume we have fixed a continuous (unitary) character $\chi\in\widehat{C_F}$, and that $S$ contains all the Archimedean places, all the primes at which $\chi$ is ramified, and all the ramified places of $F$ over $\mathbf Q$ (for other technical reasons it is also important in the main work to make $S$ big enough to ensure $\mathrm{Pic}(\mathcal O_{F,S})=1$, but the need for this isn't addressed here). Going from $f=f_S\otimes(\bigotimes_{v\notin S}1_{\mathcal O_{F_v}})$ restricted to the idele group to
+Assume we have fixed a continuous (unitary) character $\chi\in\widehat{C_F}$, and that $S$ contains all the Archimedean places, all the primes at which $\chi$ is ramified, and all the ramified places of $F$ over $\mathbf Q$ (for other technical reasons it is also important in the main work to make $S$ big enough to ensure $\mathrm{Pic}(\mathcal O_{F,S})=1$, but the need for this isn't addressed here). Going from $f=f_S\otimes(\otimes_{v\notin S}1_{\mathcal O_{F_v}})$ restricted to the idele group to
 
 $$
 f':=f_S\otimes\otimes\bigotimes_{k\ge 0}1_{\mathcal O_{F_{v_k}}^\times} \tag{1.8.1.1}
@@ -2120,10 +2116,8 @@ $$
 
 But now the subquotient:
 
-(1.8.3.9)
-
 $$
-\mathrm{PV}_{P_k}\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C_F^1},\mathcal{S}_0(\mathbf{A}_F))/\mathrm{PV}_{P_{k+1}}\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C_F^1},\mathcal{S}_0(\mathbf{A}_F))
+\mathrm{PV}_{P_k}\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C_F^1},\mathcal{S}_0(\mathbf{A}_F))/\mathrm{PV}_{P_{k+1}}\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C_F^1},\mathcal{S}_0(\mathbf{A}_F)) \tag{1.8.3.9}
 $$
 
 carries a Schauder basis that is analogous to the exponential system from the toy example (see Example 1.8.1.1)!
@@ -2244,7 +2238,7 @@ The assumptions on the test function are as follows:
 
 (2) $\varphi(C_F^1)=0$.
 
-**1.8.4.1. Character by character.** For $\varphi$ homogeneous with respect to the right-translation action of $C_F^1$ on $\mathcal D(C_F)$, with weight $\overline{\chi}|_{C_F^1}$, for $\chi\in\widehat{C_F}$ fixed, and satisfying assumptions (a) and (b) above, the Trace Formula turns into:
+1.8.4.1. *Character by character.* For $\varphi$ homogeneous with respect to the right-translation action of $C_F^1$ on $\mathcal D(C_F)$, with weight $\overline{\chi}|_{C_F^1}$, for $\chi\in\widehat{C_F}$ fixed, and satisfying assumptions (a) and (b) above, the Trace Formula turns into:
 
 $$
 \begin{aligned}
@@ -2256,7 +2250,7 @@ $$
 
 where $M(\varphi)(\lvert\cdot\rvert_F^{1/2})+M(\varphi)(\lvert\cdot\rvert_F^{-1/2})$ vanishes if $\varphi$ is not $C_F^1$-invariant.
 
-**1.8.4.2. An explicit holomorphic family of test functions.** The idea now is to consider the following holomorphic family of piece-wise smooth functions on $C_F$:
+1.8.4.2. *An explicit holomorphic family of test functions.* The idea now is to consider the following holomorphic family of piece-wise smooth functions on $C_F$:
 
 $$
 \varphi_z(t):=t^{-z}
@@ -2278,7 +2272,7 @@ $$
 
 tends to $\varphi_z(t)$ point-wise (for $t\neq1$) as $\varepsilon\to 0$ and $h\to 1_{(1,+\infty)}$ pointwise, as $h$ (which will be an explicit collection of bump functions) remains valued in $[0,1]$ and below $1_{(1,+\infty)}$, converging point-wise monotonically.
 
-**1.8.4.3. Montel’s Theorem.** Fix a compact subset $K\subset\mathbf C_{>\sup(I)}$ with nonempty interior intersecting with nonempty interior the half-plane $\mathbf C_{>1}$.
+1.8.4.3. *Montel’s Theorem.* Fix a compact subset $K\subset\mathbf C_{>\sup(I)}$ with nonempty interior intersecting with nonempty interior the half-plane $\mathbf C_{>1}$.
 
 Write $\varphi=\chi\cdot(\varphi_{h,\varepsilon,z}\circ\lvert\cdot\rvert_F)$; note the dependence on $z\in\mathbf C$.
 
@@ -2326,12 +2320,10 @@ $$
 
 1.8. A VIEW FROM THE SKY: FROM A LETTER TO PETER SARNAK    55
 
-**1.8.5.1. Putting everything together.** Putting everything together from §5.1, we obtain that for $I=[-a,a]$ for a fixed real number $a>0$, the logarithmic derivative of $L_f(s,\chi)$ satisfies, over the interior of $K$:
-
-(1.8.5.1)
+1.8.5.1. *Putting everything together.* Putting everything together from §5.1, we obtain that for $I=[-a,a]$ for a fixed real number $a>0$, the logarithmic derivative of $L_f(s,\chi)$ satisfies, over the interior of $K$:
 
 $$
-\mathrm{holomorphic\ over\ Int}(K)+\frac{L_f'(s+1/2,\chi)}{L_f(s+1/2,\chi)}=\delta\cdot\left(\frac1{s+1/2}+\frac1{s-1/2}\right)-\mathrm{holomorphic\ over\ }\mathbf C_{>a}
+\mathrm{holomorphic\ over\ Int}(K)+\frac{L_f'(s+1/2,\chi)}{L_f(s+1/2,\chi)}=\delta\cdot\left(\frac1{s+1/2}+\frac1{s-1/2}\right)-\mathrm{holomorphic\ over\ }\mathbf C_{>a} \tag{1.8.5.1}
 $$
 
 with $\delta=0$ if $\chi|_{C_F^1}\neq1$ and $\delta=1$ otherwise. This is, ultimately, the main consequence of the Trace Formula. Everything else follows from this.

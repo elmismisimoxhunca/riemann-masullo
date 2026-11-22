@@ -13,6 +13,9 @@ one, because provers will build on it.
 1. Read the whole section (`scripts/paper.sh <first> <last>`) and the issue's comments, which may
    hold a scout's list of what already exists. Look at the page image for every formula you
    formalize: the transcription that `paper.sh` prints is good but not exact, and the PDF decides.
+   Cover the whole section the issue names, in this one pass. If it is really too long to
+   finish, say in your report exactly where you stopped (page and item), so that a
+   continuation can be issued; do not stop early for any other reason.
 2. Write `RiemannMasullo/<Chapter>/Sec<N>.lean` (the issue gives the path). Follow the paper's
    order. Each numbered Definition, Lemma, Proposition, Theorem and Corollary becomes one
    declaration. Definitions are written out in full; every proof is `by sorry`. A definition
@@ -56,8 +59,15 @@ one, because provers will build on it.
 The draft has placeholders ("Insert statement"), footnotes such as "Correct statement", and
 references to results that are not there. Do not fill these in from your own judgment. Leave a
 comment `-- TODO(paper-gap): <what is wrong or missing>` at that point in the file and list it
-in the report; these go into the project's errata log. If you find a statement that is false,
-give the counterexample.
+in the report; these go into the project's errata log.
+
+If you find a statement that is false as printed, do three things (`AGENTS.md`, "False
+statements and gaps"). State the repaired form in the section file, with a `Deviation:` line.
+Keep the printed claim in `Sec<N>_Printed.lean` as `def Printed.<name> : Prop`, exactly as
+printed and with its quantifiers, followed by
+`theorem Printed.<name>_false : ¬ Printed.<name> := by sorry`. And give the counterexample, with
+explicit objects, in that theorem's docstring and in your report. Never state a claim you know
+to be false as a `theorem`.
 
 A statement that only has to wait for a later section (it uses a notion defined there) is not a
 gap in the paper. Mark it `-- TODO(later): needs §<section>` and list it in the report, so it

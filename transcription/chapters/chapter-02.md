@@ -142,26 +142,20 @@ The space of *tempered distributions* on $\mathbf R$ is defined to be the Hausdo
 
 We define, for every $\alpha\in\mathbf N^m$, the $\mathbf C$-linear operator
 
-(2.1.1.1)
-
 $$
-D^\alpha_x:=\frac{\partial^{|\alpha|}}{\partial x_1^{\alpha_1}\cdots\partial x_m^{\alpha_m}}:C^\infty(\mathbf R^m)\to C^\infty(\mathbf R^m)
+D^\alpha_x:=\frac{\partial^{|\alpha|}}{\partial x_1^{\alpha_1}\cdots\partial x_m^{\alpha_m}}:C^\infty(\mathbf R^m)\to C^\infty(\mathbf R^m) \tag{2.1.1.1}
 $$
 
 with $|\alpha|:=\sum_{i=1}^m\alpha_i$. We write, for any $x\in\mathbf R^m$ and $\alpha\in\mathbf N^m$
 
-(2.1.1.2)
-
 $$
-x^\alpha:=\prod_{i=1}^m x_i^{\alpha_i}.
+x^\alpha:=\prod_{i=1}^m x_i^{\alpha_i}. \tag{2.1.1.2}
 $$
 
 **DEFINITION 2.1.1.4.** Let $f:\mathbf R^m\to\mathbf C$ be a smooth function. We say $f$ is of *rapid decay at infinity* if and only if for every $\alpha,\beta\in\mathbf N^m$, the function
 
-(2.1.1.3)
-
 $$
-\|\cdot\|_{\alpha,\beta}:C^\infty(\mathbf R^m)\to[0,+\infty]
+\|\cdot\|_{\alpha,\beta}:C^\infty(\mathbf R^m)\to[0,+\infty] \tag{2.1.1.3}
 $$
 
 ## PDF page 61
@@ -170,10 +164,8 @@ $$
 
 defined as
 
-(2.1.1.4)
-
 $$
-\|f\|_{\alpha,\beta}:\sup_{x\in\mathbf R^m}(1+|x^\alpha|)|D^\beta_x f(x)|
+\|f\|_{\alpha,\beta}:\sup_{x\in\mathbf R^m}(1+|x^\alpha|)|D^\beta_x f(x)| \tag{2.1.1.4}
 $$
 
 is finite on $f$.
@@ -422,10 +414,8 @@ As for the case of the $p$-adic rationals, and, in fact, as a consequence of the
 
 There is a canonical linear isomorphism
 
-(2.1.3.1)
-
 $$
-\mathcal S(\mathbf R)\otimes\mathcal S(\mathbf A^f_{\mathbf Q})\to\mathcal S(\mathbf A_{\mathbf Q})
+\mathcal S(\mathbf R)\otimes\mathcal S(\mathbf A^f_{\mathbf Q})\to\mathcal S(\mathbf A_{\mathbf Q}) \tag{2.1.3.1}
 $$
 
 leading to a description of the generic element of $\mathcal S(\mathbf A_{\mathbf Q})$: it is a finite linear combination of functions of the form:
@@ -452,10 +442,8 @@ Suffices here to say that inductive tensor products behave well with respect to 
 
 (2) *The canonical linear map*
 
-(2.1.3.2)
-
 $$
-\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota\mathcal S(\mathbf A^f_F)\to\mathcal S(\mathbf A_F)
+\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota\mathcal S(\mathbf A^f_F)\to\mathcal S(\mathbf A_F) \tag{2.1.3.2}
 $$
 
 *is a linear topological isomorphism. In particular, the inductive tensor product on the left side of (2.1.3.2) is complete.*
@@ -516,10 +504,8 @@ We call $\{V_m\}_{m\ge 0}$ a choice of sequence of finite dimensional $\mathbf C
 
 The induced $\mathbf C$-linear operators between inductive tensor products
 
-(2.1.3.3)
-
 $$
-\alpha_{\mathcal{S},m}:\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota V_m\to\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota V_{m+1}
+\alpha_{\mathcal{S},m}:\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota V_m\to\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota V_{m+1} \tag{2.1.3.3}
 $$
 
 are injective, since $\mathcal S(\mathbf A_{F,S_\infty})$ is a $\mathbf C$-linear space and the $\mathbf C$-linear spaces underlying the tensor products are algebraic tensor products, and continuous by [Jar, Part III,Ch.15,§15.2,Prop.1].
@@ -754,7 +740,13 @@ $$
 \Pi_S : \mathcal{S}(\mathbf{A}_F) \to \pi_S(\mathcal{S}(\mathbf{A}_{F,S})) \tag{2.1.4.14}
 $$
 
-*be any continuous projection onto the linear image of $\pi_S$ from (2.1.4.5) satisfying $\Pi_S\circ\pi_S = \pi_S$. Then the net $\{\Pi_S\}_{S\subset\Sigma_F}\subset \mathscr{L}_\beta(\mathcal{S}(\mathbf{A}_F))$ indexed by the finite subsets of $\Sigma_F$ containing $S_\infty$, converges to the identity on $\mathcal{S}(\mathbf{A}_F)$ with respect to the topology of uniform convergence on bounded susbsets.*
+*be any continuous projection onto the linear image of $\pi_S$ from (2.1.4.5) satisfying $\Pi_S\circ\pi_S = \pi_S$. Then the net*
+
+$$
+\{\Pi_S\}_{S\subset\Sigma_F}\subset \mathscr{L}_\beta(\mathcal{S}(\mathbf{A}_F))
+$$
+
+*indexed by the finite subsets of $\Sigma_F$ containing $S_\infty$, converges to the identity on $\mathcal{S}(\mathbf{A}_F)$ with respect to the topology of uniform convergence on bounded susbsets.*
 
 PROOF. To see this, we let $B\subset\mathcal{S}(\mathbf{A}_F)$ be a bounded subset. By Proposition 2.1.4.1(4), and by [Scha, Ch.II,§6,6.5], there exits $B_0\subset\mathcal{S}(\mathbf{A}_{F,S_0})$ bounded, for $S_0$ large enough, such that $B = \pi_{S_0}(B_0)$.
 
@@ -1441,17 +1433,17 @@ LEMMA 2.2.4.1. *Let $F$ be a number field. Let $\gamma:\mathbf{R}_{>0}\to\mathrm
 
 **2.2. GLOBAL ADELIC $\theta$-FUNCTIONS** · **87**
 
-Then $\gamma(\mathbf{R}_{>0})$ is contained in the closed subgroup:
+*Then $\gamma(\mathbf{R}_{>0})$ is contained in the closed subgroup:*
 
 $$
 \mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times\{1\}\subset \mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times \mathrm{GL}_1(\mathbf{A}_F^f)=\mathrm{GL}_1(\mathbf{A}_F). \tag{2.2.4.1}
 $$
 
-Then $\gamma$ satisfies exactly one of the following two conditions:
+*Then $\gamma$ satisfies exactly one of the following two conditions:*
 
-(1) The composition $\lvert\cdot\rvert_F\circ\gamma$ is a smooth automorphism of the abelian Lie group $\mathbf{R}_{>0}$, and there exists a unique nonzero real number $\alpha$ such that $\lvert\gamma(t)\rvert_F=t^{\alpha}$ for all $t\in\mathbf{R}_{>0}$.
+(1) *The composition $\lvert\cdot\rvert_F\circ\gamma$ is a smooth automorphism of the abelian Lie group $\mathbf{R}_{>0}$, and there exists a unique nonzero real number $\alpha$ such that $\lvert\gamma(t)\rvert_F=t^{\alpha}$ for all $t\in\mathbf{R}_{>0}$.*
 
-(2) The image of $\gamma$ is contained in the closed subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1\times\{1\}$ of $\mathrm{GL}_1(\mathbf{A}_F)$.
+(2) *The image of $\gamma$ is contained in the closed subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1\times\{1\}$ of $\mathrm{GL}_1(\mathbf{A}_F)$.*
 
 PROOF. Since $\mathrm{GL}_1(\mathbf{A}_F)=\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times \mathrm{GL}_1(\mathbf{A}_F^f)$ as Hausdorff locally compact topological abelian groups, and $\mathrm{GL}_1(\mathbf{A}_F^f)$ is totally disconnected, then, as $\mathbf{R}_{>0}$ is connected, $\gamma(\mathbf{R}_{>0})$ is connected and hence contained in the identity component of $\mathrm{GL}_1(\mathbf{A}_F)$, which is indeed contained within the closed subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times\{1\}$ from (2.2.4.1).
 
@@ -1459,7 +1451,7 @@ The composition $\lvert\cdot\rvert_F\circ\gamma$ is a continuous group endomorph
 
 If $\alpha=0$, then $\gamma(\mathbf{R}_{>0})\subset \mathrm{GL}_1(\mathbf{A}_F)^1\cap(\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times\{1\})=\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1\times\{1\}$. $\square$
 
-LEMMA 2.2.4.2. Let $F$ be a number field, $\gamma:\mathbf{R}_{>0}\to\mathrm{GL}_1(\mathbf{A}_F)$ a continuous $1$-parameter subgroup, $f\in\mathcal{S}(\mathbf{A}_F)$ a Schwartz-Bruhat function.
+LEMMA 2.2.4.2. *Let $F$ be a number field, $\gamma:\mathbf{R}_{>0}\to\mathrm{GL}_1(\mathbf{A}_F)$ a continuous $1$-parameter subgroup, $f\in\mathcal{S}(\mathbf{A}_F)$ a Schwartz-Bruhat function.*
 
 Then the limit:
 
@@ -1467,7 +1459,7 @@ $$
 (\partial_{\gamma}f)(x):=\lim_{t\to 1}\frac{f(\gamma(t)x)-f(x)}{t-1} \tag{2.2.4.2}
 $$
 
-exists for every $x\in\mathbf{A}_F$, and it is a Schwartz-Bruhat function on $\mathbf{A}_F$. Moreover, $\partial_{\gamma}:\mathcal{S}(\mathbf{A}_F)\to\mathcal{S}(\mathbf{A}_F)$ is continuous with respect to the Hausdorff locally convex topology on $\mathcal{S}(\mathbf{A}_F)$.
+*exists for every $x\in\mathbf{A}_F$, and it is a Schwartz-Bruhat function on $\mathbf{A}_F$. Moreover, $\partial_{\gamma}:\mathcal{S}(\mathbf{A}_F)\to\mathcal{S}(\mathbf{A}_F)$ is continuous with respect to the Hausdorff locally convex topology on $\mathcal{S}(\mathbf{A}_F)$.*
 
 PROOF. Since the continuous linear operator from (2.1.3.2) is a linear topological isomorphism by Proposition 2.1.3.2, for each Schwartz-Bruhat function $f\in\mathcal{S}(\mathbf{A}_F)$, there exist Schwartz-Bruhat functions $f_1,\ldots,f_m\in\mathcal{S}(\mathbf{A}_F)$, each of the form:
 
@@ -1531,7 +1523,7 @@ as linear endomorphisms of $\mathcal{S}(\mathbf{A}_F)$. Since $T$ and $T^{-1}$ a
 
 The identity in (2.2.4.6) as $\mathbf{C}$-linear endomorphisms of $\mathcal{S}(\mathbf{A}_F)$, holds because the composition $\gamma_\infty$ of $\gamma$ with the continuous homomorphism $\mathrm{GL}_1(\mathbf{A}_F)\to\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})$ remains injective by Lemma 2.2.4.1. $\square$
 
-LEMMA 2.2.4.3 (Existence of directional derivatives - global adelic $\theta$-functions). Let $f\in\mathcal{S}(\mathbf{A}_F)$ be a Schwartz-Bruhat function on $\mathbf{A}_F$. Let $\gamma:\mathbf{R}_{>0}\to\mathrm{GL}_1(\mathbf{A}_F)$ be a continuous $1$-parameter subgroup. The directional derivative $\partial_{\gamma}\Phi_F(f)$ exists, it is continuous, and we have
+LEMMA 2.2.4.3 (Existence of directional derivatives - global adelic $\theta$-functions). *Let $f\in\mathcal{S}(\mathbf{A}_F)$ be a Schwartz-Bruhat function on $\mathbf{A}_F$. Let $\gamma:\mathbf{R}_{>0}\to\mathrm{GL}_1(\mathbf{A}_F)$ be a continuous $1$-parameter subgroup. The directional derivative $\partial_{\gamma}\Phi_F(f)$ exists, it is continuous, and we have*
 
 $$
 \Phi_F(\partial_{\gamma}f)=\partial_{\gamma}\Phi_F(f) \tag{2.2.4.7}
@@ -2537,7 +2529,7 @@ $$
 
 as functions of $g\in\mathrm{GL}_1(\mathbf{A}_{F,S})$. We refer to $\Phi_{F,S,\omega}$ as the *$\omega$-homogeneous $S$-local adelic $\theta$-function of $f$*.
 
-2.3.1.3. *Estimates over $J_{F,S}/J^1_{F,S}$.* It is indeed a consequence of Proposition 2.3.1.4 below, that formation of $\Phi_{F,S,\omega}$ is well-defined, linear and valued in continuous functions on $\mathrm{GL}_1(\mathbf{A}_{F,S})$, $\tilde{\omega}$-homogeneous under the left-translation action by the closed abelian subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$, for $\tilde{\omega}$ the composition of $\omega$ with the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S})^1\to J^1_{F,S}$. Equivalently, $\mathcal{O}_{F,S}^{\times}$-invariant and $\omega$-homogeneous, as continuous functions on $J_{F,S}$, under the continuous left-translation action of $J^1_{F,S}$.
+2.3.1.3. *Estimates over $J_{F,S}/J^1_{F,S}$.* It is indeed a consequence of Proposition 2.3.1.4 below, that formation of $\Phi_{F,S,\omega}$ is well-defined, linear and valued in continuous functions on $\mathrm{GL}_1(\mathbf{A}_{F,S})$, $\widetilde{\omega}$-homogeneous under the left-translation action by the closed abelian subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$, for $\widetilde{\omega}$ the composition of $\omega$ with the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S})^1\to J^1_{F,S}$. Equivalently, $\mathcal{O}_{F,S}^{\times}$-invariant and $\omega$-homogeneous, as continuous functions on $J_{F,S}$, under the continuous left-translation action of $J^1_{F,S}$.
 
 PROPOSITION 2.3.1.4 (Estimates over the $S$-idele classes - II). *Let $F$ be a number field, $S$ a finite set of places containing all the Archimedean places. Let $\omega$ be a continuous character of $\mathrm{GL}_1(\mathbf{A}_{F,S})^1/\mathcal{O}_{F,S}^{\times}$. We denote by $\widetilde{\omega}\in\widehat{\mathrm{GL}_1(\mathbf{A}_{F,S})^1}$ the composition of $\omega$ with the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S})^1\to J^1_{F,S}$.*
 

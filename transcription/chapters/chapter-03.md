@@ -228,7 +228,7 @@ defined by composition, i.e. $\psi_v(c):=c_v=c\circ j_v$.
 
 We will collect the following basic facts into a Lemma for future reference:
 
-LEMMA 3.1.2.1. Let $F$ be a number field. For every $v\in\Sigma_F$ the continuous map $\psi_v$ is a local analytic isomorphism.
+LEMMA 3.1.2.1. *Let $F$ be a number field. For every $v\in\Sigma_F$ the continuous map $\psi_v$ is a local analytic isomorphism.*
 
 3.1.2.3. *Open convering of $\Omega(C_F)$ by analytic covers of the $S$-local Riemann surfaces.* We now fix a finite set $S$ of places of $F$ containing all of the Archimedean places. As for $C_F$, the quasi-characters of $J_{F,S}$ are a Riemann surface whose (countably many, since $J_{F,S}^1$ is second-countable) connected components are copies of the complex plane. Fixing a continuous homomorphic section to the $S$-idelic norm gives a bi-holomorphism
 
@@ -264,7 +264,7 @@ $$
 
 We record the following basic facts about $\psi_{F,S}$ in a lemma for future reference:
 
-LEMMA 3.1.2.2. Let $F$ be a number field $S$ a finite set of places containing all the Archimedean places. The continuous map $\psi_{F,S}$ of (3.1.2.9) is a surjective local analytic isomorphism.
+LEMMA 3.1.2.2. *Let $F$ be a number field $S$ a finite set of places containing all the Archimedean places. The continuous map $\psi_{F,S}$ of (3.1.2.9) is a surjective local analytic isomorphism.*
 
 ## PDF page 122
 
@@ -318,7 +318,7 @@ We recall the the following classical fact:
 
 **3.2. GLOBAL IDELIC ZETA FUNCTIONS** · **123**
 
-LEMMA 3.2.1.1. Let $F$ be a number field, $\chi\in\widehat{C_F}$ a continuous character. The following product is absolutely convergent over $\Omega(C_F)(\chi|_{C_F^1})_{>1}$, uniformly on compact subsets:
+LEMMA 3.2.1.1. *Let $F$ be a number field, $\chi\in\widehat{C_F}$ a continuous character. The following product is absolutely convergent over $\Omega(C_F)(\chi|_{C_F^1})_{>1}$, uniformly on compact subsets:*
 
 $$
 \Gamma_F(s,\chi)\prod_{v\in\Sigma_F-(S_{\chi}\cup S_{\infty})}(1-c_v(\pi_v))^{-1} \tag{3.2.1.2}
@@ -336,7 +336,7 @@ $$
 L(\lvert\cdot\rvert_v^s):=\pi^{-s/2}\Gamma(s/2),\; L(\mathrm{sgn}\lvert\cdot\rvert_v^s)=\pi^{-(s+1)/2}\Gamma\left(\frac{s+1}{2}\right) \tag{3.2.1.4}
 $$
 
-and, for $v$ complex and $\chi_v\lvert\cdot\rvert_v^s=\chi_{n,s}$, for $n\in\mathbf{Z}$, the continuous quasi-character character of $\mathbf{C}^{\times}$ defined as $(r,\theta)\mapsto r^se^{in\theta}$
+*and, for $v$ complex and $\chi_v\lvert\cdot\rvert_v^s=\chi_{n,s}$, for $n\in\mathbf{Z}$, the continuous quasi-character character of $\mathbf{C}^{\times}$ defined as $(r,\theta)\mapsto r^se^{in\theta}$*
 
 $$
 L(\chi_v\lvert\cdot\rvert_v^s):=(2\pi)^{-(s+\frac{|n|}{2})}\Gamma\left(s+\frac{|n|}{2}\right). \tag{3.2.1.5}
@@ -348,13 +348,13 @@ DEFINITION 3.2.1.2. Let $F$ be a number field, $\chi\in\widehat{C_F}$ a continuo
 
 We recall here below the key properties of Hecke $L$-functions.
 
-PROPOSITION 3.2.1.3 (Regularity and symmetries of Hecke $L$-functions). Let $F$ be a number field, $\chi\in\widehat{C_F}$ a continuous character. The function $L(s,\chi)$ defined on $\mathbf{C}_{>1}$ in (3.2.1.2) admits a meromorphic continuation to the complex $s$-plane, satisfying the following conditions:
+PROPOSITION 3.2.1.3 (Regularity and symmetries of Hecke $L$-functions). *Let $F$ be a number field, $\chi\in\widehat{C_F}$ a continuous character. The function $L(s,\chi)$ defined on $\mathbf{C}_{>1}$ in (3.2.1.2) admits a meromorphic continuation to the complex $s$-plane, satisfying the following conditions:*
 
-(1) If $\chi|_{C_F^1}$ is non-trivial, $L(s,\chi)$ is entire.
+(1) *If $\chi|_{C_F^1}$ is non-trivial, $L(s,\chi)$ is entire.*
 
-(2) If $\chi|_{C_F^1}$ is trivial, $L(s,\chi)$ is meromorphic with simple poles at $s=it_0,1+it_0$, for a unique real number $t_0\in\mathbf{R}$ such that $\chi=\lvert\cdot\rvert_F^{-it_0}$, whose residues are, respectively, $-\bar{\mu}_1(C_F^1)$ and $|N(\mathfrak{d}_{F/\mathbf{Q}})|^{-1/2}\bar{\mu}_1(C_F^1)$.
+(2) *If $\chi|_{C_F^1}$ is trivial, $L(s,\chi)$ is meromorphic with simple poles at $s=it_0,1+it_0$, for a unique real number $t_0\in\mathbf{R}$ such that $\chi=\lvert\cdot\rvert_F^{-it_0}$, whose residues are, respectively, $-\bar{\mu}_1(C_F^1)$ and $|N(\mathfrak{d}_{F/\mathbf{Q}})|^{-1/2}\bar{\mu}_1(C_F^1)$.*
 
-(3) As meromorphic functions on the complex $s$-plane, $L(s,\chi)$ and $L(s,\bar{\chi})$ are related by the following functional equation:
+(3) *As meromorphic functions on the complex $s$-plane, $L(s,\chi)$ and $L(s,\bar{\chi})$ are related by the following functional equation:*
 
 $$
 L(1-s,\bar{\chi})=\epsilon(s,\chi)L(s,\chi) \tag{3.2.1.6}
@@ -416,7 +416,7 @@ $$
 
 The following Theorem is partly contained within [CF, Ch.XV,Thm.4.4.1].
 
-THEOREM 3.2.2.1 (Idelic Mellin transform of global adelic $\theta$-functions). We let $f\in\mathcal{S}(\mathbf{A}_F)$ be a Schwartz-Bruhat function and $c\in\Omega(C_F)$. Then:
+THEOREM 3.2.2.1 (Idelic Mellin transform of global adelic $\theta$-functions). *We let $f\in\mathcal{S}(\mathbf{A}_F)$ be a Schwartz-Bruhat function and $c\in\Omega(C_F)$. Then:*
 
 (1) *the integral*
 
@@ -480,7 +480,7 @@ converges uniformly as $c$ varies in any compact subset of $\Omega(C_F)_{>1}$. T
 
 We briefly digress to discuss continuity of the formation of $Z(f,c)$ for each fixed $c\in\Omega(C_F)_{>1}$, as $f$ varies over $\mathcal{S}(\mathbf{A}_F)$.
 
-LEMMA 3.2.2.3 ($Z(\cdot,c)$ is valued in tempered distributions for each $c\in\Omega(C_F)_{>1}$). Let $F$ be a number field. Then for each fixed $c\in\Omega(C_F)_{>1}$, formation of $Z(f,c)$ is continuous in $f$ with respect to the Hausdorff locally convex topology on $\mathcal{S}(\mathbf{A}_F)$.
+LEMMA 3.2.2.3 ($Z(\cdot,c)$ is valued in tempered distributions for each $c\in\Omega(C_F)_{>1}$). *Let $F$ be a number field. Then for each fixed $c\in\Omega(C_F)_{>1}$, formation of $Z(f,c)$ is continuous in $f$ with respect to the Hausdorff locally convex topology on $\mathcal{S}(\mathbf{A}_F)$.*
 
 PROOF. We prove that for any Cauchy sequence $\{f_k\}_{k\ge 0}$ with limit $f$, $Z(f_k,c)\to Z(f,c)$, i.e. $Z(\cdot,c)$ is sequentially continuous as a linear form on $\mathcal{S}(\mathbf{A}_F)$. Although $\mathcal{S}(\mathbf{A}_F)$ is not second-countable, sequential continuity on it still implies continuity because such an implication is a property of continuous linear functionals on bornlogical locally convex spaces [Scha, Ch.II, 8.3] and $\mathcal{S}(\mathbf{A}_F)$ is an LF-space (by Lemma 2.1.3.2(1)) so it is also bornological (see [Scha, Ch.II, Cor. 2 to 8.2]).
 
@@ -851,7 +851,7 @@ and since $\chi(-1)\ne 0$, we deduce from (3.3.1.14) that (3.3.1.9) holds. It fo
 (3) : We fix a real number $\sigma>0$. Upon choosing an enumeration for the finitely many places of $F$ contained in $S$, i.e. $S=\{v_1,\dots,v_N\}$, we have, as meromorphic functions of $s\in\mathbf{C}$:
 
 $$
-\frac{\partial^k}{\partial s^k}\rho_S(\chi\lvert\cdot\rvert_{F,S}^s)=\sum_{(i_1,\dots,i_N)\in\mathbf{N}^N,k=i_1+\dots+i_N}\binom{k}{i_1,\dots,i_N}\prod_{1\le j\le N}\frac{\partial^{i_j}}{\partial s^{i_j}}\rho_{v_j}(\chi_{v_j}\lvert\cdot\rvert_{v_j}^s) \tag{3.3.1.15}
+\frac{\partial^k}{\partial s^k}\rho_S(\chi\lvert\cdot\rvert_{F,S}^s)=\sum_{(i_1,\dots,i_N)\in\mathbf{N}^N,k=i_1+\ldots+i_N}\binom{k}{i_1,\dots,i_N}\prod_{1\le j\le N}\frac{\partial^{i_j}}{\partial s^{i_j}}\rho_{v_j}(\chi_{v_j}\lvert\cdot\rvert_{v_j}^s) \tag{3.3.1.15}
 $$
 
 the sum in (3.3.1.15) being finite.
@@ -992,11 +992,11 @@ REMARK 3.3.1.6 (On partial Euler products). For any choice of connected componen
 
 Indeed, upon calling $\chi_S$ such composition, this is a continuous character of the open, hence closed (by [DE, Lemma 1.1.7(c)]) subgroup $C_{F,S}\subset C_F$, and by [DE, Cor.3.6.2], there exists a continuous character $\chi'\in\widehat{C_F}$ extending $\chi_S$ from $C_{F,S}$ to $C_F$. There therefore exists a finite set of places $S'$ of $F$ containing $S$ such that $\chi'$ is unramified outside $S'$, and large enough so as to have that $\mathrm{Pic}(\mathcal{O}_{F,S'})=1$ holds.
 
-3.3.1.2. $\epsilon_S$-factors and the $S$-local functional equation. In the Lemma below, we revisit the $S$-local functional equation from Theorem 3.3.1.1, and rewrite it in terms of $\epsilon_S$-factors.
+3.3.1.2. *$\epsilon_S$-factors and the $S$-local functional equation.* In the Lemma below, we revisit the $S$-local functional equation from Theorem 3.3.1.1, and rewrite it in terms of $\epsilon_S$-factors.
 
-LEMMA 3.3.1.7 ($\epsilon_S$-factors and the $S$-local functional equation). Let $F$ be a number field, $S$ a finite set of places containing all Archimedean places. Let $\omega$ be a continuous unitary character of $J_{F,S}^1$.
+LEMMA 3.3.1.7 ($\epsilon_S$-factors and the $S$-local functional equation). *Let $F$ be a number field, $S$ a finite set of places containing all Archimedean places. Let $\omega$ be a continuous unitary character of $J_{F,S}^1$.*
 
-(1) For every $f\in\mathcal{S}(\mathbf{A}_{F,S})$, $Z_S(f,c)$ is Schwartz on every vertical line of $\Omega(J_{F,S})_{>0}$, and for each $\varepsilon>0$ it is uniformly Schwartz on vertical strips within $\Omega(J_{F,S})_{>\varepsilon}$ of bounded width (in the sense that the vertical decay constants can be chosen uniformly over such strips).
+(1) *For every $f\in\mathcal{S}(\mathbf{A}_{F,S})$, $Z_S(f,c)$ is Schwartz on every vertical line of $\Omega(J_{F,S})_{>0}$, and for each $\varepsilon>0$ it is uniformly Schwartz on vertical strips within $\Omega(J_{F,S})_{>\varepsilon}$ of bounded width (in the sense that the vertical decay constants can be chosen uniformly over such strips).*
 
 (2) The meromorphic function
 
@@ -1004,15 +1004,15 @@ $$
 \frac{Z_S(f,c)}{L_S(c)} \tag{3.3.1.26}
 $$
 
-on $\Omega(J_{F,S})$ is entire and satisfies the following growth condition for every continuous unitary character $\chi$ of $J_{F,S}$:
+*on $\Omega(J_{F,S})$ is entire and satisfies the following growth condition for every continuous unitary character $\chi$ of $J_{F,S}$:*
 
 $$
 \frac{Z_S(f,\chi\lvert\cdot\rvert_{F,S}^{\sigma+it})}{L_S(\chi\lvert\cdot\rvert_{F,S}^{\sigma+it})}\ll_{N,a,b}|t|^{-\{N+(\sigma-\frac12)(\frac{r_1}{2}+r_2)\}}\cdot e^{\frac{\pi t}{2}(\frac{r_1}{2}+r_2)} \tag{3.3.1.27}
 $$
 
-for each integer $N\ge 1$ as $|t|\to+\infty$, and uniformly as $\sigma$ varies over the arbitrary bounded interval $[a,b]$ of $\mathbf{R}_{>0}$.
+*for each integer $N\ge 1$ as $|t|\to+\infty$, and uniformly as $\sigma$ varies over the arbitrary bounded interval $[a,b]$ of $\mathbf{R}_{>0}$.*
 
-(3) There exists an entire function $\epsilon_S$ on $\Omega(J_{F,S})$, such that:
+(3) *There exists an entire function $\epsilon_S$ on $\Omega(J_{F,S})$, such that:*
 
 (a) As meromorphic functions of $c\in\Omega(J_{F,S})$,
 
@@ -1020,13 +1020,13 @@ $$
 \epsilon_S(c)=\prod_{v\in S}\epsilon_v(c_v) \tag{3.3.1.28}
 $$
 
-where $\epsilon_v$ is the entire function on $\Omega(F_v^{\times})$ defined by:
+*where $\epsilon_v$ is the entire function on $\Omega(F_v^{\times})$ defined by:*
 
 (i) ($v$ real) $\epsilon_v(c_v)=1$ if $c_v\in\Omega(F_v^{\times})(1)$, $\epsilon_v(c_v)=-i$ if $c_v\in\Omega(F_v^{\times})(\mathrm{sgn})$,
 
-(ii) ($v$ complex) $\epsilon_v(c_v)=(-i)^{|n|}$ if $c_v\in\Omega(F_v^{\times})(\chi_n)$ with $\chi_n:z\mapsto e^{in\theta}$ for $z=re^{i\theta}$ with $r>0$ and $n\in\mathbf{Z}$,
+(ii) *($v$ complex) $\epsilon_v(c_v)=(-i)^{|n|}$ if $c_v\in\Omega(F_v^{\times})(\chi_n)$ with $\chi_n:z\mapsto e^{in\theta}$ for $z=re^{i\theta}$ with $r>0$ and $n\in\mathbf{Z}$,*
 
-(iii) ($v$ is non-Archimedean of residue characteristic $p$) on unramified $c_v$ we have
+(iii) *($v$ is non-Archimedean of residue characteristic $p$) on unramified $c_v$ we have*
 
 $$
 \epsilon_v(\lvert\cdot\rvert_v^s):=N(\mathfrak{d}_{F_v/\mathbf{Q}_p})^{s-1/2} \tag{3.3.1.29}
@@ -1036,23 +1036,23 @@ $$
 
 **136** · **CHAPTER 3. IDELIC ZETA FUNCTIONS**
 
-and if $c_v=\chi_v\lvert\cdot\rvert_v^s$ is ramified at $v$, with $\chi_v$ normalized to satisfy $\chi_v(\pi_v)=1$ for a choice of local uniformizer $\pi_v$ at $v$ then
+*and if $c_v=\chi_v\lvert\cdot\rvert_v^s$ is ramified at $v$, with $\chi_v$ normalized to satisfy $\chi_v(\pi_v)=1$ for a choice of local uniformizer $\pi_v$ at $v$ then*
 
 $$
 \epsilon_v(\chi_v\lvert\cdot\rvert_v^s):=N(\mathfrak{d}_{F_v/\mathbf{Q}_p})^{s-1/2}\rho_0(\chi_v\lvert\cdot\rvert_v^s) \tag{3.3.1.30}
 $$
 
-where $\rho_0(\chi_v\lvert\cdot\rvert_v^s)$ is the Gauss sum $N(\mathfrak{f})^{-1/2}\sum_u\chi_v(u)e^{2\pi i\Lambda_v(u/\pi_v^{m_v})}$, with $\mathfrak{f}$ the conductor of $\chi_v$, $m_v:=v(\mathfrak{d}_{F_v/\mathbf{Q}_p}\mathfrak{f})$, and the sum over any set of representatives for the finite coset space $\mathcal{O}_{F_v}^{\times}/(1+\mathfrak{f})$.
+*where $\rho_0(\chi_v\lvert\cdot\rvert_v^s)$ is the Gauss sum $N(\mathfrak{f})^{-1/2}\sum_u\chi_v(u)e^{2\pi i\Lambda_v(u/\pi_v^{m_v})}$, with $\mathfrak{f}$ the conductor of $\chi_v$, $m_v:=v(\mathfrak{d}_{F_v/\mathbf{Q}_p}\mathfrak{f})$, and the sum over any set of representatives for the finite coset space $\mathcal{O}_{F_v}^{\times}/(1+\mathfrak{f})$.*
 
-(b) $\epsilon_S$ is entire over $\Omega(J_{F,S})$ and nowhere-vanishing, and we have $|\epsilon_S(c)|=1$ for $\sigma(c)=1/2$.
+(b) *$\epsilon_S$ is entire over $\Omega(J_{F,S})$ and nowhere-vanishing, and we have $|\epsilon_S(c)|=1$ for $\sigma(c)=1/2$.*
 
-(c) The following identity of entire functions over $\Omega(J_{F,S})$:
+(c) *The following identity of entire functions over $\Omega(J_{F,S})$:*
 
 $$
 \frac{Z_S(f,c)}{L_S(c)}=\epsilon_S(c)\frac{L_S(\widehat{f},\widehat{c})}{L_S(\widehat{c})} \tag{3.3.1.31}
 $$
 
-holds for all Schwartz-Bruhat functions $f\in\mathcal{S}(\mathbf{A}_{F,S})$.
+*holds for all Schwartz-Bruhat functions $f\in\mathcal{S}(\mathbf{A}_{F,S})$.*
 
 (d) The meromorphic function $\rho_S$ from (3.3.1.3) satisfies
 
@@ -1138,7 +1138,7 @@ We have denoted in §3.1.1 by $\Omega(G)(c)$ the connected component of $\Omega(
 
 We recall here the following result on local $Z$-functions:
 
-LEMMA 3.3.2.1 (Poles and Residues of the local $Z$-functions - Archimedean places). Let $F$ be a number field, $v$ an Archimedean place.
+LEMMA 3.3.2.1 (Poles and Residues of the local $Z$-functions - Archimedean places). *Let $F$ be a number field, $v$ an Archimedean place.*
 
 (1) *The poles of the meromorphic function $Z_v$ on $\Omega(F_v^{\times})$ valued in tempered distributions are simple and located at the following quasi-characters:*
 
@@ -1171,7 +1171,7 @@ $$
 (1) *If $v$ is real:*
 
 $$
-\operatorname{Res}_{c=c_{a,m}}Z_v(\cdot,c)=A_{v,a,m}D^{a+m}\delta_0,\; a\in\{0,1\},\; m\in 2\mathbf{N} \tag{3.3.2.6}
+\mathop{\mathrm{Res}}\limits_{c=c_{a,m}}Z_v(\cdot,c)=A_{v,a,m}D^{a+m}\delta_0,\; a\in\{0,1\},\; m\in 2\mathbf{N} \tag{3.3.2.6}
 $$
 
 *where $D:\mathcal{S}(F_v)\to\mathcal{S}(F_v)$ is the differential operator $\frac{1}{2\pi i}\partial_x$ on $\mathcal{S}(\mathbf{R})$, where $A_{v,a,m}\in\mathbf{C}^{\times}$ is a constant depending only on the quasi-character, given by the following formula:*
@@ -1183,20 +1183,20 @@ $$
 (2) *If $v$ is complex, for $r\ge 0$, and:*
 
 $$
-\operatorname{Res}_{c=c_{r,m}}Z_v(\cdot,c)=A_{v,r,m}\overline{D}^{\,r+m}D^{m}\delta_0 \tag{3.3.2.8}
+\mathop{\mathrm{Res}}\limits_{c=c_{r,m}}Z_v(\cdot,c)=A_{v,r,m}\overline{D}^{\,r+m}D^{m}\delta_0 \tag{3.3.2.8}
 $$
 
 *and:*
 
 $$
-\operatorname{Res}_{c=c_{-r,m}}Z_v(\cdot,c)=A_{v,r,m}D^{r+m}\overline{D}^{\,m}\delta_0 \tag{3.3.2.9}
+\mathop{\mathrm{Res}}\limits_{c=c_{-r,m}}Z_v(\cdot,c)=A_{v,r,m}D^{r+m}\overline{D}^{\,m}\delta_0 \tag{3.3.2.9}
 $$
 
 ## PDF page 139
 
 **3.3. S-LOCAL IDELIC ZETA FUNCTIONS** · **139**
 
-for the differential operators $D:=\frac{1}{2\pi i}\partial_z$ and $\overline{D}:=\frac{1}{2\pi i}\partial_{\bar{z}}$ on $\mathcal{S}(\mathbf{C})$ for $v$ complex, where $A\in\mathbf{C}^{\times}$ is a constant depending only on the quasi-character, given by the following formula:
+*for the differential operators $D:=\frac{1}{2\pi i}\partial_z$ and $\overline{D}:=\frac{1}{2\pi i}\partial_{\bar{z}}$ on $\mathcal{S}(\mathbf{C})$ for $v$ complex, where $A\in\mathbf{C}^{\times}$ is a constant depending only on the quasi-character, given by the following formula:*
 
 $$
 A_{v,r,m}=(-i)^{\lvert r\rvert}(2\pi)^{1+\lvert r\rvert+2m}\frac{(-1)^m}{\Gamma(1+\lvert r\rvert+m)m!}. \tag{3.3.2.10}
@@ -1317,19 +1317,15 @@ $$
 **3.4. EIGENDISTRIBUTIONS AND WEIL'S IDENTITY** · **141**
 
 and upon choosing an isomorphism of topological fields $F_v\simeq\mathbf{C}$, we have:
-(3.3.2.21)
-
 $$
-\int_{F_v^{\times}}\widehat{f}(g)\widehat{c_{r,m}}(g)\,\mathrm{d}\mu_v(g)=\int_{\mathbf{C}}\widehat{f}(z)\bar{z}^r\lvert z\rvert_v^{1+m}\frac{\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert}{\lvert z\rvert_v}=\int_{\mathbf{C}}\widehat{f}(z)\bar{z}^{r+m}z^m\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert=\frac{1}{(2\pi i)^{2m+r}}(\partial_{\bar{z}}^{r+m}\partial_z^m\delta_0)(f)
+\int_{F_v^{\times}}\widehat{f}(g)\widehat{c_{r,m}}(g)\,\mathrm{d}\mu_v(g)=\int_{\mathbf{C}}\widehat{f}(z)\bar{z}^r\lvert z\rvert_v^{1+m}\frac{\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert}{\lvert z\rvert_v}=\int_{\mathbf{C}}\widehat{f}(z)\bar{z}^{r+m}z^m\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert=\frac{1}{(2\pi i)^{2m+r}}(\partial_{\bar{z}}^{r+m}\partial_z^m\delta_0)(f) \tag{3.3.2.21}
 $$
 
 which reads $(\overline{D}^{r+m}D^m\delta_0)(f)$.
 
 For $c=c_{-r,m}$ we have:
-(3.3.2.22)
-
 $$
-\int_{F_v^{\times}}\widehat{f}(g)\widehat{c_{-r,m}}(g)\,\mathrm{d}\mu_v(g)=\int_{\mathbf{C}}\widehat{f}(z)z^r\lvert z\rvert_v^{1+m}\frac{\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert}{\lvert z\rvert_v}=\int_{\mathbf{C}}\widehat{f}(z)z^{r+m}\bar{z}^m\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert=\frac{1}{(2\pi i)^{2m+r}}(\partial_z^{r+m}\partial_{\bar{z}}^m\delta_0)(f)
+\int_{F_v^{\times}}\widehat{f}(g)\widehat{c_{-r,m}}(g)\,\mathrm{d}\mu_v(g)=\int_{\mathbf{C}}\widehat{f}(z)z^r\lvert z\rvert_v^{1+m}\frac{\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert}{\lvert z\rvert_v}=\int_{\mathbf{C}}\widehat{f}(z)z^{r+m}\bar{z}^m\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert=\frac{1}{(2\pi i)^{2m+r}}(\partial_z^{r+m}\partial_{\bar{z}}^m\delta_0)(f) \tag{3.3.2.22}
 $$
 
 which reads $(D^{r+m}\overline{D}^m\delta_0)(f)$. $\square$
@@ -1524,7 +1520,7 @@ $^{3}$Why do such identities hold? Must say more about how this follows.
 
 **3.4. EIGENDISTRIBUTIONS AND WEIL’S IDENTITY** · **145**
 
-3.4.2.1. Convergence on the relative 1-line. We record here below an application of Weil’s Identity from Theorem 3.4.1.1: an observation that, while not used throughout this work, we find opportune to mention here. It concerns the validity of the identity in (3.2.2.1) from Theorem 3.2.2.1, which is taken as the definition of $Z(f, c)$ over $\Omega(C_F)_{>1}$, over the relative 1-line, i.e. the discretely-parametrized family of vertical lines:
+3.4.2.1. *Convergence on the relative 1-line.* We record here below an application of Weil’s Identity from Theorem 3.4.1.1: an observation that, while not used throughout this work, we find opportune to mention here. It concerns the validity of the identity in (3.2.2.1) from Theorem 3.2.2.1, which is taken as the definition of $Z(f, c)$ over $\Omega(C_F)_{>1}$, over the relative 1-line, i.e. the discretely-parametrized family of vertical lines:
 
 $$
 \{\sigma(c) = 1, c \in \Omega(C_F)\} \subset \Omega(C_F)
@@ -1532,19 +1528,19 @@ $$
 
 over the discrete parameter space $\widehat{C^1_F}$.
 
-Proposition 3.4.2.1 (Convergence on the relative 1-line). Let $F$ be a number field. For any real number $A > 0$, we define the subset:
+Proposition 3.4.2.1 (Convergence on the relative 1-line). *Let $F$ be a number field. For any real number $A > 0$, we define the subset:*
 
 $$
 L_A := \{\sigma(c) = 1, c \in \Omega(C_F), c|_{C^1_F} \ne 1\} \cup \{|\cdot|^{1+ix}_F, x \in \mathbf{R} - (-A, A)\} \subset \Omega(C_F).
 $$
 
-For any Schwartz-Bruhat function $f \in \mathcal{S}(\mathbf{A}_F)$, as a function of $c \in L_A$ the Lebesgue integral
+*For any Schwartz-Bruhat function $f \in \mathcal{S}(\mathbf{A}_F)$, as a function of $c \in L_A$ the Lebesgue integral*
 
 $$
 \int_{\mathrm{GL}_1(\mathbf{A}_F)} f(g)c(g)\,\mathrm{d}\mu(g) \tag{3.4.2.1}
 $$
 
-is finite and varies continuously in such $c$. As a function of $c$, it equals the restriction of $Z(f, c)$ to $L_A$.
+*is finite and varies continuously in such $c$. As a function of $c$, it equals the restriction of $Z(f, c)$ to $L_A$.*
 
 Proof. The complex measure $c\mu$ on $\mathrm{GL}_1(\mathbf{A}_F)$ is Radon, and formation of the integral in (3.4.2.1) is $\mathbf{C}$-linear with respect to $f \in \mathcal{S}(\mathbf{A}_F)$. By Proposition 2.1.3.2(3), it is therefore sufficient to prove the assertions of the Proposition in the special case $f$ is of the form $f = f_\infty \otimes \bigotimes_{v \in \Sigma_{F,f}} f_v$, with $f_\infty \in \mathcal{S}(\mathbf{A}_{F,S_\infty})$ and $f_v \in \mathcal{S}(F_v)$ for every finite place $v$ of $F$, and with $f_v = 1_{\mathcal{O}_{F_v}}$ for all but finitely many finite places of $F$.
 
@@ -1570,7 +1566,7 @@ for the Hecke $L$-function $L(s, \chi)$, as $S'$ varies over all finite sets of 
 
 This is indeed the case by Corollary B.7.2.5 (a consequence of Perron’s Formula; see also [T2, Ch.III, §3.15, p.66] for the special case $F = \mathbf{Q}$ and $\chi = 1$). $\square$
 
-3.4.2.2. Estimates on adelic $\theta$-functions, uniformly on Schwartz-Bruhat-bounded subsets. We record here the following result as another application of Theorem 3.4.1.1, presenting a different method to establish some
+3.4.2.2. *Estimates on adelic $\theta$-functions, uniformly on Schwartz-Bruhat-bounded subsets.* We record here the following result as another application of Theorem 3.4.1.1, presenting a different method to establish some
 
 ## PDF page 146
 
@@ -1582,9 +1578,9 @@ The Theorem below was already established in Theorem 2.2.5.4. The proof we provi
 
 The idelic Mellin transform in the proof below reveals the nature of those constants, and why they can be rendered uniform on bounded subsets of $\mathcal{S}(\mathbf{A}_F)$.
 
-Theorem 3.4.2.2 (Estimates over the Idele classes - III). Let $F$ be a number field, $f \in \mathcal{S}(\mathbf{A}_F)$ a Schwartz-Bruhat function. Let $\omega \in \widehat{C^1_F}$ be a fixed continuous character. The continuous function $\Phi_{F,\omega}(f)$ on $C_F$ satisfies the following conditions:
+Theorem 3.4.2.2 (Estimates over the Idele classes - III). *Let $F$ be a number field, $f \in \mathcal{S}(\mathbf{A}_F)$ a Schwartz-Bruhat function. Let $\omega \in \widehat{C^1_F}$ be a fixed continuous character. The continuous function $\Phi_{F,\omega}(f)$ on $C_F$ satisfies the following conditions:*
 
-(1) For every integer $N \ge 0$, there exists a real number $C_N > 0$ depending on $N$ and $f$, such that for every $g \in C_F$, we have
+(1) *For every integer $N \ge 0$, there exists a real number $C_N > 0$ depending on $N$ and $f$, such that for every $g \in C_F$, we have*
 
 $$
 |\Phi_{F,\omega}(f)(g)| \le C_N|g|^{-N}_F \tag{3.4.2.3}
@@ -1592,10 +1588,10 @@ $$
 
 as $g \in C_F$ is such that $|g|_F \to +\infty$.
 
-(2) For every integer $N \ge 0$, there exists a real number $C_N > 0$ depending on $N$ and $f$, such that for every $g \in C_F$, we have
+(2) *For every integer $N \ge 0$, there exists a real number $C_N > 0$ depending on $N$ and $f$, such that for every $g \in C_F$, we have*
 
 $$
-|\Phi_{F,\omega}(f)(g) - (|g|^{-1}_F \hat{f}(0) - f(0)) \delta_\omega(g)| \le C_N |g|^N_F \tag{3.4.2.4}
+|\Phi_{F,\omega}(f)(g) - (|g|^{-1}_F \widehat{f}(0) - f(0)) \delta_\omega(g)| \le C_N |g|^N_F \tag{3.4.2.4}
 $$
 
 as $g \in C_F$ is such that $|g|_F \to 0^+$, where
@@ -1604,7 +1600,7 @@ $$
 \delta_\omega : C_F \to \mathbf{C} \tag{3.4.2.5}
 $$
 
-is the bounded function on $C_F$ defined as:
+*is the bounded function on $C_F$ defined as:*
 
 $$
 \delta_\omega(g) := 1_{\{x \in C_F : |x|_F \le 1\}}(g), \quad g \in C_F \tag{3.4.2.6}
@@ -1612,7 +1608,7 @@ $$
 
 if $\omega = 1$, and identically zero otherwise.
 
-Moreover, the constants $C_N$ from (3.4.2.3) and (3.4.2.4) can be made to be uniform with respect to $f$ varying over a fixed arbitrary bounded subset $\mathcal{B} \subset \mathcal{S}(\mathbf{A}_F)$.
+*Moreover, the constants $C_N$ from (3.4.2.3) and (3.4.2.4) can be made to be uniform with respect to $f$ varying over a fixed arbitrary bounded subset $\mathcal{B} \subset \mathcal{S}(\mathbf{A}_F)$.*
 
 Remark 3.4.2.3 (On the nature of the uniform constants $C_{\mathcal{B},N}$ from Theorem 2.2.5.4). The main points of the argument that follows, are two. Let $f \in \mathcal{S}(\mathbf{A}_F)$ be of the form $\pi_S(f_S)$ for some $f_S \in \mathcal{S}(\mathbf{A}_{F,S})$. Recall that $\pi_S : \mathcal{S}(\mathbf{A}_{F,S}) \to \mathcal{S}(\mathbf{A}_F)$ is the transition operator from (2.1.4.5) defined by sending $f_S$ to $f_S \otimes 1_K$ with $K = \prod_{v \notin S} \mathcal{O}_{F_v}$.
 
@@ -1642,19 +1638,19 @@ adhering to the notation $M(\phi)(s) := \int_{\mathbf{R}_{>0}} \phi(t) t^s \,\fr
 
 By Theorem 3.2.2.1(3), we know that, for $\phi := \Phi_{F,\omega=1}(f)\circ\tau$, $M(\phi)(s)$ converges absolutely and uniformly on the compact subsets of $\mathbf{C}_{>1}$.
 
-By Theorem 3.2.2.1(1), the Mellin transform $M(\phi)(s)$ extends to a meromorphic function over the entire complex $s$-plane, with simple poles at most at $s = 0, 1$, whose residues are $-\overline{\mu}_1(C_F)f(0)$ and $\overline{\mu}_1(C_F)\hat{f}(0)$, respectively.
+By Theorem 3.2.2.1(1), the Mellin transform $M(\phi)(s)$ extends to a meromorphic function over the entire complex $s$-plane, with simple poles at most at $s = 0, 1$, whose residues are $-\overline{\mu}_1(C_F)f(0)$ and $\overline{\mu}_1(C_F)\widehat{f}(0)$, respectively.
 
 We now use Weil’s Identity. Let $S$ be a finite set of places of $F$ containing all the Archimedean places. We fix $f \in \mathcal{S}(\mathbf{A}_F)$ of the form $f = f_\infty \otimes \bigotimes_{v \in \Sigma_{F,f}} f_v$ with $f_v = 1_{K_v}$ for $K_v \subset F_v$ a compact open subset for every finite place $v$, and $K_v = \mathcal{O}_{F_v}$ for every $v \notin S$. This we can arrange once such $f$ is chosen, up to enlarging $S$.
 
 We denote by $f_S$ the Schwartz-Bruhat function in $\mathcal{S}(\mathbf{A}_{F,S})$ defined as $f_S := f_\infty \otimes \bigotimes_{v \in S_f} 1_{K_v}$. For simplicity, we choose $S$ containing $S_\infty$ and minimal with respect to the above property (i.e. that $K_v \ne \mathcal{O}_{F_v}$ should occur for $v \in S$).
 
-As a consequence of (3.4.1.6) from Theorem 3.4.1.1 (applied to a large enough finite set of places $S$ of $F$ containing all the Archimedean places), we have, as meromorphic functions on the complex $s$-plane, away from the zeros of $\prod_{v \in S_f} (1 - q_v^{-s})$ and the poles of $\zeta_F(s)$ and $\tilde{Z}_v(1_{K_v}, |\cdot|^s_v)$ (if any):
+As a consequence of (3.4.1.6) from Theorem 3.4.1.1 (applied to a large enough finite set of places $S$ of $F$ containing all the Archimedean places), we have, as meromorphic functions on the complex $s$-plane, away from the zeros of $\prod_{v \in S_f} (1 - q_v^{-s})$ and the poles of $\zeta_F(s)$ and $\widetilde{Z}_v(1_{K_v}, |\cdot|^s_v)$ (if any):
 
 $$
-Z(f, |\cdot|^s_F) = Z_S(f_S, |\cdot|^s_{F,S}) \prod_{v \in S_f} (1 - q_v^{-s}) \zeta_F(s) \prod_{v \in S_f} \tilde{Z}_v(1_{K_v}, |\cdot|^s_v) \tag{3.4.2.7}
+Z(f, |\cdot|^s_F) = Z_S(f_S, |\cdot|^s_{F,S}) \prod_{v \in S_f} (1 - q_v^{-s}) \zeta_F(s) \prod_{v \in S_f} \widetilde{Z}_v(1_{K_v}, |\cdot|^s_v) \tag{3.4.2.7}
 $$
 
-where $\zeta_F(s)$ is the Dedekind zeta function of $F$, $q_v := N(\mathfrak{p}_v)$ and $\mathfrak{p}_v$ the prime ideal of $\mathcal{O}_F$ corresponding to the finite place $v$, and $\tilde{Z}_v$ was defined in (3.4.1.3). It is the meromorphic function $\frac{Z_v(1_{K_v}, |\cdot|^s_v)}{1-q_v^{-s}}$ (which turns out to be entire).
+where $\zeta_F(s)$ is the Dedekind zeta function of $F$, $q_v := N(\mathfrak{p}_v)$ and $\mathfrak{p}_v$ the prime ideal of $\mathcal{O}_F$ corresponding to the finite place $v$, and $\widetilde{Z}_v$ was defined in (3.4.1.3). It is the meromorphic function $\frac{Z_v(1_{K_v}, |\cdot|^s_v)}{1-q_v^{-s}}$ (which turns out to be entire).
 
 ## PDF page 148
 
@@ -1662,11 +1658,23 @@ where $\zeta_F(s)$ is the Dedekind zeta function of $F$, $q_v := N(\mathfrak{p}_
 
 The idea now is to show that, in light of the identity from (3.4.2.7), $Z(f, |\cdot|^s_F)$ satisfies the assumptions of the Asymptotic Residue Theorem (see Theorem B.3.2.1). This will lead, through Mellin Inversion, to all the estimates stated in the Theorem, and to new information on the constants $C_N$.
 
-We now apply the Asymptotic Residue Theorem (see Theorem B.3.2.1) to the meromorphic function $Z(f, |\cdot|^s_F)t^{-s} = M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}$ of $s \in \mathbf{C} - \{0, 1\}$.
+We now apply the Asymptotic Residue Theorem (see Theorem B.3.2.1) to the meromorphic function
 
-In order to apply the Asymptotic Residue Theorem over a vertical strip of bounded width $\mathbf{C}_I$, for $I \subset \mathbf{R}$ a connected open non-empty interval, it is sufficient to show the following (compare with the statement of Theorem B.3.2.1). We must show that $Z(f, |\cdot|^s_F)$ can be written as a product $\Phi(s)u(s)$ over a slightly larger open vertical strip $\mathbf{C}_J$ of bounded width containing $\mathbf{C}_I$, with $\Phi$ holomorphic over $\mathbf{C}_J$ and $u$ meromorphic on $\mathbf{C}_J$ with slow growth near its poles (for this concept, the reader is referred to Definition B.3.1.1). The function $\Phi$ must further satisfy the assumption that $\Phi$ is Schwartz uniformly on any open vertical strip of bounded width contained within $\mathbf{C}_J$.
+$$
+Z(f, |\cdot|^s_F)t^{-s} = M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}
+$$
 
-Indeed, $\prod_{v \in S_f} (1 - q_v^{-s})$ is bounded uniformly on vertical strips of bounded width, together with all of its derivatives, and its zeros resolve the singularities of $Z_S(f_S, |\cdot|^s_{F,S})$ located on the imaginary line of the complex $s$-plane, with the sole possible exception of a single point, i.e. $s = 0$. The meromorphic function $\zeta_F(s)$ grows polynomially uniformly over the vertical strips of bounded width of the complex $s$-plane (see Proposition B.1.1.3), and it has simple poles at $s = 0$ and $s = 1$. The functions $\tilde{Z}_v(1_{K_v}, |\cdot|^s_v)$ are, for each $v \in S_f$, entire (by (3.4.1.3) combined with the local functional equation, see [CF, Ch.XV, Thm.2.4.1] and [CF, Ch.XV, §2.5]) and bounded uniformly on vertical strips (by vertical periodicity) together with all of their derivatives.
+of $s \in \mathbf{C} - \{0, 1\}$.
+
+In order to apply the Asymptotic Residue Theorem over a vertical strip of bounded width $\mathbf{C}_I$, for $I \subset \mathbf{R}$ a connected open non-empty interval, it is sufficient to show the following (compare with the statement of Theorem B.3.2.1). We must show that $Z(f, |\cdot|^s_F)$ can be written as a product
+
+$$
+\Phi(s)u(s)
+$$
+
+over a slightly larger open vertical strip $\mathbf{C}_J$ of bounded width containing $\mathbf{C}_I$, with $\Phi$ holomorphic over $\mathbf{C}_J$ and $u$ meromorphic on $\mathbf{C}_J$ with slow growth near its poles (for this concept, the reader is referred to Definition B.3.1.1). The function $\Phi$ must further satisfy the assumption that $\Phi$ is Schwartz uniformly on any open vertical strip of bounded width contained within $\mathbf{C}_J$.
+
+Indeed, $\prod_{v \in S_f} (1 - q_v^{-s})$ is bounded uniformly on vertical strips of bounded width, together with all of its derivatives, and its zeros resolve the singularities of $Z_S(f_S, |\cdot|^s_{F,S})$ located on the imaginary line of the complex $s$-plane, with the sole possible exception of a single point, i.e. $s = 0$. The meromorphic function $\zeta_F(s)$ grows polynomially uniformly over the vertical strips of bounded width of the complex $s$-plane (see Proposition B.1.1.3), and it has simple poles at $s = 0$ and $s = 1$. The functions $\widetilde{Z}_v(1_{K_v}, |\cdot|^s_v)$ are, for each $v \in S_f$, entire (by (3.4.1.3) combined with the local functional equation, see [CF, Ch.XV, Thm.2.4.1] and [CF, Ch.XV, §2.5]) and bounded uniformly on vertical strips (by vertical periodicity) together with all of their derivatives.
 
 Finally, $Z_S(f_S, |\cdot|^s_{F,S})$ is Schwartz uniformly over the vertical strips of bounded width of the complex half-plane $\mathbf{C}_{>0}$ by the Uniform Riemann-Lebesgue Lemma of Proposition B.2.2.3, which applies as a consequence of Theorem 2.3.1.4 and Proposition 2.3.2.2. The $S$-local functional equation (see (3.3.1.3) from Theorem 3.3.1.1) together with the estimates on $\rho_S$ and its derivatives from Proposition 3.3.1.5) then exhibit $Z_S(f_S, |\cdot|^s_{F,S})$ as being indeed of the form $\Phi(s)u(s)$ with $\Phi$ Schwartz uniformly on the vertical strips of bounded width of the complex half-plane $\mathbf{C}_{>-N}$ for each fixed $N > 0$, and $u$ meromorphic with slow growth near its poles therein.
 
@@ -1684,64 +1692,50 @@ with $p_N$ any entire polynomial function on $\mathbf{C}$ whose zeros are locate
 
 The identity from (3.4.2.7) then implies that the Asymptotic Residue Theorem applies to $Z(f,\lvert\cdot\rvert_F^s)$. We obtain, for every fixed real number $\sigma>1$, and every integer $N>0$:
 
-(3.4.2.8)
-
 $$
-\frac{1}{2\pi i}\int_{\sigma-i\infty}^{\sigma+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s=t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)-\bar{\mu}_1(C_F)f(0)+\frac{1}{2\pi i}\int_{-N-i\infty}^{-N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s.
+\frac{1}{2\pi i}\int_{\sigma-i\infty}^{\sigma+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s=t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)-\bar{\mu}_1(C_F)f(0)+\frac{1}{2\pi i}\int_{-N-i\infty}^{-N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s. \tag{3.4.2.8}
 $$
 
 The leftmost side of (3.4.2.8) reads $\Phi_{F,\omega=1}(f)(\tau(t))$ by Fourier-Mellin inversion. We therefore deduce from (3.4.2.8) that the following identity holds:
 
-(3.4.2.9)
-
 $$
-\Phi_{F,\omega=1}(f)(\tau(t))-t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)+\bar{\mu}_1(C_F)f(0)=\frac{1}{2\pi i}\int_{-N-i\infty}^{-N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s.
+\Phi_{F,\omega=1}(f)(\tau(t))-t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)+\bar{\mu}_1(C_F)f(0)=\frac{1}{2\pi i}\int_{-N-i\infty}^{-N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s. \tag{3.4.2.9}
 $$
 
 The following estimate therefore holds:
 
-(3.4.2.10)
-
 $$
-\lvert\Phi_{F,\omega=1}(f)(\tau(t))-t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)+\bar{\mu}_1(C_F)f(0)\rvert\le\frac{t^N}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(-N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}
+\lvert\Phi_{F,\omega=1}(f)(\tau(t))-t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)+\bar{\mu}_1(C_F)f(0)\rvert\le\frac{t^N}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(-N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)} \tag{3.4.2.10}
 $$
 
 as $t\to 0^+$ (the only regime in which the bound is useful). Note that the estimate in (3.4.2.10) does not depend on $\sigma$.
 
 We now apply the Asymptotic Residue Theorem (see Theorem B.3.2.1) one more time, to obtain, for every integer $N>1$ and for every real number $\sigma\in(1,N)$:
 
-(3.4.2.11)
-
 $$
-\frac{1}{2\pi i}\int_{\sigma-i\infty}^{\sigma+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s=\frac{1}{2\pi i}\int_{N-i\infty}^{N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s
+\frac{1}{2\pi i}\int_{\sigma-i\infty}^{\sigma+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s=\frac{1}{2\pi i}\int_{N-i\infty}^{N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s \tag{3.4.2.11}
 $$
 
 since $Z(f,\lvert\cdot\rvert_F^s)$ has no poles in the vertical strip $\mathbf{C}_{(\sigma-\varepsilon,N+\varepsilon)}$ for all small enough $\varepsilon>0$ and hence the same can be said about $Z(f,\lvert\cdot\rvert_F^s)t^{-s}$.
 
 The leftmost side of (3.4.2.11) is $\Phi_{F,\omega=1}(f)(\tau(t))$ by Mellin inversion (see Theorem B.2.1.7 and Proposition B.2.1.8), and the rightmost side is bounded above by $\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}$, leading to the estimate:
 
-(3.4.2.12)
-
 $$
-\lvert\Phi_{F,\omega=1}(f)(\tau(t))\rvert\le\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}
+\lvert\Phi_{F,\omega=1}(f)(\tau(t))\rvert\le\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)} \tag{3.4.2.12}
 $$
 
 as $t\to+\infty$. Once again we observe that the estimate in (3.4.2.12) does not depend on $\sigma$.
 
 For $\omega\ne 1$, the meromorphic function $Z(f,c)$ restricted to $\Omega(C_F)(\omega)$ has no poles, and the same argument as in the foregoing shows that the Asymptotic Residue Theorem applies to it, leading to the estimates, for each integer $N>1$:
 
-(3.4.2.13)
-
 $$
-\lvert\Phi_{F,\omega}(f)(\tau(t))\rvert\le\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}
+\lvert\Phi_{F,\omega}(f)(\tau(t))\rvert\le\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)} \tag{3.4.2.13}
 $$
 
 as $t\to+\infty$, and, for every integer $N>0$:
 
-(3.4.2.14)
-
 $$
-\lvert\Phi_{F,\omega}(f)(\tau(t))\rvert\le\frac{t^N}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(-N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}
+\lvert\Phi_{F,\omega}(f)(\tau(t))\rvert\le\frac{t^N}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(-N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)} \tag{3.4.2.14}
 $$
 
 as $t\to 0^+$. We established the Theorem for $N>1$, so we are done. $\square$
@@ -1750,10 +1744,8 @@ REMARK 3.4.2.4. Using compatibility of the global $\theta$-function operator $\P
 
 This reads, for any fixed integer $N\ge 0$, for any $f\in\mathcal{S}(\mathbf{A}_F)$:
 
-(3.4.2.15)
-
 $$
-\lvert\Phi_{F,\omega}(f)(g)\rvert\le C_N\lvert g\rvert_F^{-N}
+\lvert\Phi_{F,\omega}(f)(g)\rvert\le C_N\lvert g\rvert_F^{-N} \tag{3.4.2.15}
 $$
 
 ## PDF page 150
@@ -1762,10 +1754,8 @@ $$
 
 as $\lvert g\rvert_F\to+\infty$ for some real number $C_N>0$, and
 
-(3.4.2.16)
-
 $$
-\lvert\Phi_F(f)(g)-(\lvert g\rvert_F^{-1}\widehat{f}(0)-f(0))\delta(g)\rvert\le C_N\lvert g\rvert_F^N
+\lvert\Phi_F(f)(g)-(\lvert g\rvert_F^{-1}\widehat{f}(0)-f(0))\delta(g)\rvert\le C_N\lvert g\rvert_F^N \tag{3.4.2.16}
 $$
 
 for some real number $C_N>0$ and as $\lvert g\rvert_F\to 0^+$, where
@@ -1796,18 +1786,14 @@ are integrable with respect to the Plancherel measure to the Haar measure $\bar{
 
 We observe that it implies (3.4.2.15) and (3.4.2.16). Indeed, from (3.4.2.10), (3.4.2.12), (3.4.2.13) and (3.4.2.14), and using the Hausdorff-Young inequality applied to the Fourier transform on $C_F^1$, we obtain the estimates
 
-(3.4.2.17)
-
 $$
-\lvert\Phi_F(f)(g)\rvert\le\frac{\lvert g\rvert_F^N}{2\pi}\lVert M(\Phi_{F,\bar{\omega}}(\widehat{f})\circ\tau)(1+N-ix)\rVert_{L^1(\mathbf{R}\times\widehat{C_F^1},\mathrm{d}x\otimes\mathrm{d}\widehat{\overline{\mu}}_1)}
+\lvert\Phi_F(f)(g)\rvert\le\frac{\lvert g\rvert_F^N}{2\pi}\lVert M(\Phi_{F,\bar{\omega}}(\widehat{f})\circ\tau)(1+N-ix)\rVert_{L^1(\mathbf{R}\times\widehat{C_F^1},\mathrm{d}x\otimes\mathrm{d}\widehat{\overline{\mu}}_1)} \tag{3.4.2.17}
 $$
 
 as $\lvert g\rvert_F<1$, and
 
-(3.4.2.18)
-
 $$
-\lvert\Phi_F(f)(g)-(\lvert g\rvert_F^{-1}\widehat{f}(0)-f(0))\delta(g)\rvert\le\frac{\lvert g\rvert_F^{-N}}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R}\times\widehat{C_F^1},\mathrm{d}x\otimes\mathrm{d}\widehat{\overline{\mu}}_1)}.
+\lvert\Phi_F(f)(g)-(\lvert g\rvert_F^{-1}\widehat{f}(0)-f(0))\delta(g)\rvert\le\frac{\lvert g\rvert_F^{-N}}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R}\times\widehat{C_F^1},\mathrm{d}x\otimes\mathrm{d}\widehat{\overline{\mu}}_1)}. \tag{3.4.2.18}
 $$
 
 as $\lvert g\rvert_F>1$.
@@ -1844,20 +1830,16 @@ DEFINITION 3.4.3.1. Let $F$ be a number field, $v$ a place of $F$, $F_v$ the com
 
 (1) Let $c\in\Omega(F_v^{\times})$ be a quasi-character. We say $T\in\mathcal{S}(F_v)'_{\beta}$ is an *eigendistribution of weight $c$* if and only if:
 
-(3.4.3.1)
-
 $$
-\rho_v'(g,T)=c(g)T
+\rho_v'(g,T)=c(g)T \tag{3.4.3.1}
 $$
 
 for all $g\in F_v^{\times}$, where $\rho_v'$ is the dual of the continuous right-translation action $\rho_v:F_v^{\times}\times\mathcal{S}(F_v)\to\mathcal{S}(F_v)$; i.e., $(\rho_v'(g,T))(f)=T(f\circ m_g)$ where $m_g$ is $g$-multiplication on $F_v$. We denote by $\mathcal{S}(F_v)'_{\beta}(c)$ the closed subspace of $\mathcal{S}(F_v)'_{\beta}$ of eigendistributions on $F_v$ of weight $c$.
 
 (2) For $c\in\Omega(C_F)$ an idelic quasi-character, say $T\in\mathcal{S}(\mathbf{A}_F)'_{\beta}$ is a *global eigendistribution of weight $c$* if
 
-(3.4.3.2)
-
 $$
-\rho_F'(g,T)=c(g)T
+\rho_F'(g,T)=c(g)T \tag{3.4.3.2}
 $$
 
 for all $g\in\mathrm{GL}_1(\mathbf{A}_F)$, where $\rho_F'$ is the dual of the continuous right-translation action $\rho_F:\mathrm{GL}_1(\mathbf{A}_F)\times\mathcal{S}(\mathbf{A}_F)\to\mathcal{S}(\mathbf{A}_F)$.
@@ -1880,60 +1862,46 @@ We define Schwartz-Bruhat functions $E_{\omega_v,v}$ on $F_v$, for each place $v
 
 (a) if $\omega_v=1$
 
-(3.4.3.3)
-
 $$
-E_{1,v}(x):=e^{-\pi x^2}.
+E_{1,v}(x):=e^{-\pi x^2}. \tag{3.4.3.3}
 $$
 
 (b) if $\omega_v=\mathrm{sgn}$, the sign character
 
-(3.4.3.4)
-
 $$
-E_{\mathrm{sgn},v}(x):=xe^{-\pi x^2}.
+E_{\mathrm{sgn},v}(x):=xe^{-\pi x^2}. \tag{3.4.3.4}
 $$
 
 (2) For $v$ complex Archimedean, if $\omega_v=\omega_{t,m}:re^{i\theta}\mapsto r^te^{im\theta}$
 
 (a) for $m\ge 0$
 
-(3.4.3.5)
-
 $$
-E_{m,v}(z):=\frac{1}{2\pi}z^me^{-2\pi z\bar{z}}.
+E_{m,v}(z):=\frac{1}{2\pi}z^me^{-2\pi z\bar{z}}. \tag{3.4.3.5}
 $$
 
 (b) For $m<0$
 
-(3.4.3.6)
-
 $$
-E_{m,v}(z):=\frac{1}{2\pi}\bar{z}^{-m}e^{-2\pi z\bar{z}}
+E_{m,v}(z):=\frac{1}{2\pi}\bar{z}^{-m}e^{-2\pi z\bar{z}} \tag{3.4.3.6}
 $$
 
 (3) For $v$ non-Archimedean:
 
-(3.4.3.7)
-
 $$
-E_v(x):=1_{\mathcal{O}_{F_v}}.
+E_v(x):=1_{\mathcal{O}_{F_v}}. \tag{3.4.3.7}
 $$
 
 For $S_{\omega}$ the finite set of finite places of $F$ at which $\omega$ is ramified, we further define for $v\in S_{\omega}$:
 
-(3.4.3.8)
-
 $$
-E_{\omega_v,v}(x):=\omega_v^{-1}1_{\mathcal{O}_{F_v}^{\times}}.
+E_{\omega_v,v}(x):=\omega_v^{-1}1_{\mathcal{O}_{F_v}^{\times}}. \tag{3.4.3.8}
 $$
 
 For $c\in\Omega(C_F)$ a fixed quasi-character we denote by $E_{c,v}$, abbreviating to $E_v$ if no confusion can arise, the local Schwartz-Bruhat function defined above associated to the character $c|_{C_F^1}$ of $C_F^1$. We define the global Schwartz-Bruhat function:
 
-(3.4.3.9)
-
 $$
-E_c:=\bigotimes_{v\in\Sigma_F}E_{c_v,v}.
+E_c:=\bigotimes_{v\in\Sigma_F}E_{c_v,v}. \tag{3.4.3.9}
 $$
 
 We abbreviate the notation for $E_c$ to $E$ when no confusion can arise.
@@ -1954,52 +1922,40 @@ THEOREM 3.4.3.3 (Weil's Identity - II). *Let $F$ be a number field, $v$ a place 
 
 (1) *If $v$ is non-Archimedean and $c$ is unramified at $v$:*
 
-(3.4.3.10)
-
 $$
-\langle\Delta_v'(c),E_v\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1.
+\langle\Delta_v'(c),E_v\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1. \tag{3.4.3.10}
 $$
 
 (2) *If $v$ is non-Archimedean and $c$ is ramified at $v$:*
 
-(3.4.3.11)
-
 $$
-\langle\Delta_v'(c),c^{-1}1_{\mathcal{O}_{F_v}^{\times}}\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1.
+\langle\Delta_v'(c),c^{-1}1_{\mathcal{O}_{F_v}^{\times}}\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1. \tag{3.4.3.11}
 $$
 
 (3) *If $v$ is Archimedean:*
 
-(3.4.3.12)
-
 $$
-\langle\Delta_v'(c),E_{c_v,v}\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1.
+\langle\Delta_v'(c),E_{c_v,v}\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1. \tag{3.4.3.12}
 $$
 
 *For any place $v$ of $F$, the function $c\mapsto\Delta_v'(c)$ is a holomorphic function $\Omega(F_v^{\times})\to\mathcal{S}(F_v)'_{\beta}$. The following identity holds, as meromorphic $\mathcal{S}(F_v)'_{\beta}$-valued functions on $\Omega(F_v^{\times})$:*
 
-(3.4.3.13)
-
 $$
-Z_v(\cdot,c)=L_v(c)\Delta_v'(c)
+Z_v(\cdot,c)=L_v(c)\Delta_v'(c) \tag{3.4.3.13}
 $$
 
 *where $L_v$ is the local factor at $v$ of the completed Hecke $L$-function.*
 
 *(2) For every $c\in\Omega(C_F)$, we have $\dim_{\mathbf{C}}\mathcal{S}(\mathbf{A}_F)'(c)=1$. The following tempered distribution in $\mathcal{S}(\mathbf{A}_F)'$*
 
-(3.4.3.14)
-
 $$
-\Delta'(c):=\bigotimes_{v\in\Sigma_F}\Delta_v'(c)
+\Delta'(c):=\bigotimes_{v\in\Sigma_F}\Delta_v'(c) \tag{3.4.3.14}
 $$
 
 *is a global eigendistribution of weight $c$ (see Remark 3.4.3.4 for the meaning of the right side as a continuous linear functional on $\mathcal{S}(\mathbf{A}_F)$). The function $c\mapsto\Delta'(c)$ is a holomorphic function $\Omega(C_F)\to\mathcal{S}(\mathbf{A}_F)'_{\beta}$. The following identity holds, as meromorphic $\mathcal{S}(\mathbf{A}_F)'_{\beta}$-valued functions on $\Omega(C_F)$:*
 
-(3.4.3.15)
-
 $$
-Z(\cdot,c)=L(c)\Delta'(c)
+Z(\cdot,c)=L(c)\Delta'(c) \tag{3.4.3.15}
 $$
 
 *where $c\mapsto L(c)$ is the completed Hecke $L$-function.*

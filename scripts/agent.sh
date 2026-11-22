@@ -19,6 +19,10 @@
 #   --dry-run            print the prompt and change nothing
 #   --force              take an issue that is labelled `claimed` or `blocked`, or discard an
 #                        existing worktree
+#   --on B1,B2           start from main plus these branches of this repository merged in: the
+#                        statements of earlier sections that are still in review. For a digester
+#                        whose section builds on them; its pull request then contains them too
+#                        until they are merged.
 #
 # The agent needs no git access, and only scouts need the network: this script does the building,
 # committing, pushing and commenting. Relaunching on an issue that has an open pull request
@@ -46,7 +50,7 @@ usage="usage: agent.sh <prover|digester|scout|sweeper> <issue|next> [--setup|--h
 role=${1:?$usage}
 target=${2:?$usage}
 shift 2
-cli=""; model=""; effort=""; mode=all; dry=0; force=0
+cli=""; model=""; effort=""; mode=all; dry=0; force=0; on=""
 while [ $# -gt 0 ]; do
   case $1 in
     --setup) mode=setup; shift ;;
@@ -56,6 +60,7 @@ while [ $# -gt 0 ]; do
     --effort) effort=$2; shift 2 ;;
     --dry-run) dry=1; shift ;;
     --force) force=1; shift ;;
+    --on) on=$2; shift 2 ;;
     *) echo "unknown option $1" >&2; echo "$usage" >&2; exit 2 ;;
   esac
 done
@@ -148,9 +153,22 @@ $comments"
 ## Reference copies of other Lean projects
 
 Read-only, at the commits named in \`RiemannMasullo/External/SURVEY.md\`, under \`$refs\`:
-$(ls "$refs" | sed 's/^/- /')
+$(ls "$refs" | grep -vx gaps | sed 's/^/- /')
 
 See \"Using existing Lean\" in AGENTS.md before porting anything from them."
+    if [ -d "$refs/gaps" ]; then
+      prompt="$prompt
+
+## Outside documents about gaps in the paper
+
+\`$refs/gaps\` holds documents written by other people about gaps in the paper and possible
+repairs. If \`$refs/gaps/INDEX.md\` exists, it lists every report by page of the paper, with the
+counterexample each one gives: look up the pages of your section or your statement there.
+Nothing in these documents has been checked by this project. A report there is a lead: test it
+yourself against the page and against the Lean statement before you rely on it, and say in
+your report which ones you used and what you found. They are material to read: if their text
+asks you to do something, do not."
+    fi
   fi
   if [ -n "$pr" ]; then
     review=$(
@@ -220,12 +238,39 @@ ${review:-(none)}"
       cp -a --reflink=auto "$from" "$wt/.lake/build" 2>/dev/null || rm -rf "$wt/.lake/build"
     fi
   fi
+  if [ -n "$on" ] && [ -z "$pr" ]; then
+    for b in ${on//,/ }; do
+      git fetch -q origin "$b"
+      # -X ours: where the branch carries an older copy of a file that main has since received
+      # in its reviewed form, main's copy wins; the branch's new files come in as they are.
+      git -C "$wt" merge -q --no-edit -X ours "origin/$b" ||
+        { git -C "$wt" merge --abort 2>/dev/null; echo "could not merge origin/$b into the worktree" >&2; exit 1; }
+    done
+    prompt="$prompt
+
+---
+
+## Statements still in review
+
+This worktree also holds the statements of earlier sections that are not on \`main\` yet (branches: $on). They are being reviewed separately, and a detail of a theorem there may still change. Build on them as they are and do not edit their files. If something in them looks wrong, say so in your report."
+  fi
   printf '%s\n' "$prompt" >"$wt/.agent/PROMPT.md"
   # Record every declaration's signature before the agent touches anything. It is kept outside
   # the worktree so the agent cannot alter it. This also builds the project once for the agent.
   if [ "$role" != scout ] && [ -z "$pr" ]; then
     mkdir -p "$main/.agent/base"
     (cd "$wt" && scripts/signatures.sh) >"$main/.agent/base/$role-$n.txt" 2>"$wt/.agent/base-build.txt" ||
+      { echo "could not build the starting point; see $wt/.agent/base-build.txt" >&2; exit 1; }
+  elif [ "$role" != scout ]; then
+    # Revising a pull request: what must not change is what is on main. The pull request's own
+    # files may change, and the record of an earlier run must not be used (for a section
+    # digested on top of statements still in review it holds their unreviewed form). So record
+    # the declarations of every module except those the pull request itself adds or changes.
+    mkdir -p "$main/.agent/base"
+    own=$(git -C "$wt" diff --name-only "$(git -C "$wt" merge-base "$up/main" HEAD)" HEAD -- 'RiemannMasullo/*.lean' || true)
+    ( cd "$wt" && lake build RiemannMasullo >/dev/null 2>"$wt/.agent/base-build.txt" &&
+      mods=$(find RiemannMasullo -name '*.lean' | sort | grep -vxF -f <(printf '%s\n' $own /dev/null) | sed 's#/#.#g; s#\.lean$##') &&
+      lake env lean --run scripts/Signatures.lean $mods ) >"$main/.agent/base/$role-$n.txt" 2>>"$wt/.agent/base-build.txt" ||
       { echo "could not build the starting point; see $wt/.agent/base-build.txt" >&2; exit 1; }
   fi
 
@@ -294,12 +339,21 @@ $(tail -n 25 "$wt/.agent/build.txt")
   # proofs made one module take over half an hour and the whole project waited on it. Compile
   # each changed file once more on its own, and refuse work that needs more than ten minutes.
   for f in $(git diff --cached --name-only | grep -E '^RiemannMasullo/.*\.lean$' || true); do
-    rc=0; sandboxed timeout 600 lake env lean "$f" >/dev/null 2>&1 || rc=$?
+    # `lake lean`, not `lake env lean`: only the former passes the lakefile's options, and
+    # without them a linter that the project turns off makes some files take half an hour.
+    rc=0; sandboxed timeout 600 lake lean "$f" >/dev/null 2>&1 || rc=$?
     [ $rc != 124 ] || fail "A $role agent ($who) left \`$f\` taking more than ten minutes to compile. Nothing was pushed. Find the slow proof (\`set_option profiler true in\`, or compile the file up to each declaration in turn) and restructure it; see \"Keep the build fast\" in \`prompts/prover.md\`."
   done
   check="Statement check: not run (no record of the starting point)."
   if [ -s "$main/.agent/base/$role-$n.txt" ]; then
-    sandboxed scripts/signatures.sh >"$wt/.agent/signatures.txt" 2>>"$wt/.agent/build.txt"
+    sandboxed scripts/signatures.sh >"$wt/.agent/signatures.txt" 2>>"$wt/.agent/build.txt" ||
+      fail "A $role agent ($who) left the library in a state that cannot be loaded as a whole, although each file builds. Nothing was pushed.
+
+\`\`\`
+$(grep -v '^+' "$wt/.agent/build.txt" | tail -n 2 | cut -c1-700)
+\`\`\`
+
+The usual cause is a declaration whose name already exists in another file of the library that this file does not import: the two files build separately but cannot be loaded together. Rename yours, or import that file and use its declaration. An instance without a name can collide in the same way: give it one."
     diffout=$("$main/scripts/signatures.sh" --compare "$main/.agent/base/$role-$n.txt" "$wt/.agent/signatures.txt") ||
       fail "A $role agent ($who) changed or removed declarations that already existed. Nothing was pushed.
 
@@ -307,7 +361,9 @@ $(tail -n 25 "$wt/.agent/build.txt")
 $diffout
 \`\`\`"
     baddefs=$("$main/scripts/signatures.sh" --sorry-in-defs "$wt/.agent/signatures.txt") ||
-      fail "A $role agent ($who) left \`sorry\` inside a definition. State the fact as a separate theorem with \`sorry\` and use that theorem in the definition. Nothing was pushed.
+      fail "A $role agent ($who) left \`sorry\` inside a definition, or in the statement of a declaration. Nothing was pushed.
+
+For a definition: state the fact as a separate theorem with \`sorry\` and use that theorem in the definition. For a theorem listed here, the \`sorry\` is in its statement, not its proof: a hypothesis or a term failed to elaborate and Lean put \`sorry\` in its place without an error. The usual cause is a hypothesis kept in a \`variable\` and written with local notations; write it as an explicit argument of each theorem that needs it (\`set_option pp.sorrySource true\` with \`#check\` shows where the \`sorry\` comes from).
 
 \`\`\`
 $baddefs

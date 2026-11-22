@@ -160,3 +160,204 @@ and a random sample by eye. All the checks in the README were run again afterwar
   four displayed formulas that had been run into the text (pp. 365, 367, 379, 552), the italic
   of Proposition B.6.1.1 running on into the next paragraph (p. 636), and italics and punctuation
   on pp. 354, 824.
+
+## 9. After the merge
+
+From the maintainers' spot check in #2471 and the checks it suggested.
+
+- **Hat over a subscripted symbol.** The print has $\widehat{\mathbf Q_p}$ (the hat over all of
+  Q_p) where the transcription had `\widehat{\mathbf{Q}}_p`: p. 558 (twice) and p. 557 (once;
+  the other `\widehat{\mathbf{Q}}_p` on p. 557 is as printed).
+- **Misprints kept as printed.** p. 634: the print ends `1-\chi_v(\pi_v)q_v^{-s}|` with one
+  stray bar, not `|\cdot|`; p. 733: the glyph after x in the excluded point is a ß (CMR), not a
+  β, so `\{x\text{ß}_0\}`.
+- **Diagrams that did not compile.** Every `latex` block was compiled with pdflatex and tikz-cd
+  (`tools/diagrams.py`): 11 of 84 failed, because of commas inside arrow labels (pp. 276, 899,
+  904) or a cell starting with `[`, which tikz-cd reads as options (pp. 20, 390, 391, 393, 930).
+  Such labels are now braced (`"{(a,b)}"`), and such cells are wrapped in `{…}`. All 84 compile.
+  The 11 were compared with the page image after rendering: labels drawn on the wrong side of
+  their arrow are fixed (pp. 276, 899, 904).
+- **Label sides.** For every diagram, the side of its arrow that each label is on was read from
+  the PDF (the arrows are drawn as line segments, the labels are small text beside them) and
+  compared with the compiled tikz-cd, with every arrow drawn in its own colour so that each
+  label could be traced back to its `\arrow`. 34 labels were on the other side and are moved
+  (pp. 200, 218, 236, 239, 270, 358, 415, 418, 437, 465, 546, 795, 812, 858, 863, 901, 911, 912);
+  the diagrams with changes were compared with the page image after rendering.
+- **Displayed formulas.** A formula displayed on its own line in the print had sometimes been
+  run into the sentence. Display lines were found in the PDF (centred, made of maths glyphs, with
+  extra space above and below) and matched with the transcription; 50 that were inline are now
+  `$$` blocks (pp. 148–852), each checked on the page image first. Punctuation after the formula
+  moves into the display, as printed.
+- **Italic paragraphs.** Each paragraph was aligned word by word with the PDF text and its font
+  (italic SFTI or upright SFRM) read off: 825 statement paragraphs that are italic in the print
+  are now in `*…*`, and 157 paragraphs that were in `*…*` but are upright in the print (whole
+  proofs on pp. 258–263, 796–800 and elsewhere) are not. 98.7% of paragraphs now agree with the
+  print; the rest mix italic and upright. Literal `(*)` in citations is escaped as `(\*)`.
+
+
+## 10. Follow-up checks
+
+- **More displayed formulas.** A looser search for run-in displays, with every candidate checked on
+  the page image, found 18 more: pp. 328, 334, 340, 363, 371, 422, 443, 446, 476 (two), 543, 549,
+  553 (two), 637, 638, 728, 873.
+- **More italic paragraphs.** Theorems whose numbers start with a letter (THEOREM A.5.1.3, Lemma
+  D.3.6.1, …) had been skipped by the italics pass: 12 more statements are now in `*…*`. 8 more
+  paragraphs that were in `*…*` but are upright in the print, mostly definitions (pp. 542, 593,
+  600, 619, 685, 704), are not. 98.9% of paragraphs now agree with the print.
+- **Unaligned math glyphs.** Every run of 3 or more PDF math glyphs that does not align with the
+  transcription, outside the diagrams, was looked at. Apart from the display on p. 873, they are
+  differences in how the glyphs are read, not in the formulas: words set in math ("for all",
+  "holomorphic over"), `\varinjlim`/`\varprojlim`, limits and subscripts read in a different order,
+  footnote numbers, and figure labels.
+- **Small accents.** The print uses only the wide accents (`\widehat`, `\widetilde`, from the CMEX
+  font; it has no CMR accent glyph at all). 244 `\hat` and 163 `\tilde` are now `\widehat` and
+  `\widetilde`; with this, the number of hats and of tildes on every page matches the PDF, apart
+  from accents inside diagrams.
+- **Hat or tilde over a subscripted symbol.** TeX picks the widest accent that fits what it covers,
+  so the size of the printed hat (small, medium or large CMEX glyph) tells whether it covers the
+  letter alone or the letter with its subscript. Each of the 680 accents over a one-letter base
+  with a subscript was paired with its PDF glyph: 495 agree with the transcription, 167 cannot be
+  told apart this way (both readings give the same hat), and the 5 that disagreed were looked at
+  on the page image: 2 are fixed (`\widehat{F}_v`, p. 619), the other 3 (pp. 391, 558) are right
+  as they are.
+- **Section titles.** Sub-subsection titles (four-part numbers such as 9.3.3.2 or B.5.3.4) are
+  italic in the print: 40 that were upright and 39 that were bold are now `*…*`, like the other
+  132. One statement on p. 493 that the print italicizes after a colon is marked too.
+- **Figures.** The four contour figures (pp. 596, 602, 605, 798) are redrawn as TikZ pictures, with
+  the points, labels and direction of every edge as printed, instead of a placeholder;
+  `tools/diagrams.py` now compiles them with the diagrams (88 blocks).
+- **Accents in diagrams.** With the diagram blocks included, the number of hats and of tildes
+  matches the PDF on every page.
+- **Second random sample.** 50 tagged equations drawn at random from the 2,261 (seed 20261122)
+  after all the corrections above, each compiled and compared with the page image symbol by
+  symbol: 49 exact. The wrong one, (9.2.1.15) p. 407, had `|\phi(t)(\log t)^k|^2` where the print
+  has no square: a misprint of the paper silently "corrected" in the transcription, now as
+  printed. One displayed formula ((B.4.4.9), p. 621) had its tag on the second line instead of the
+  first. Read this as a residual error rate of about 2% per equation (95% interval roughly
+  0.05–11%).
+- **What the sample suggested.** The glyph alignment never flagged a single extra or missing glyph
+  (it only reports substitutions), which is how the square in (9.2.1.15) got through. All
+  one- and two-glyph insertions and deletions in the alignment were therefore listed and those
+  in sub- and superscripts and the operators (−, +, ′, ×, ⊂, …) were reviewed: apart from
+  (9.2.1.15), they are reading order, `≠`/`∉` read as `=`/`∈`, footnote numbers and numbers set
+  in text, except `S\setminus S_0` for the printed `S-S_0` (p. 242), now fixed. Tags on the
+  continuation line of a multi-line display were also listed: two more ((B.4.2.4) p. 615,
+  (B.4.4.8) p. 621), now on the first line as printed.
+
+- **Symbol counts per page.** Each maths symbol was counted on every page of the PDF and of the
+  transcription (running heads and diagram pages left out), which catches an extra or missing
+  symbol whatever the reading order. Two formulas had more than the print: on p. 244 the Mackey
+  dual was written `F_\tau'=F_{\tau(F',F)}'` where the print has only `F'_{\tau(F',F)}`, and on
+  p. 354 a trailing `\subset \mathbf A_{F,S}` had been added to the definition of
+  `\widetilde{Q}_Y`. Both are now as printed.
+- **Third random sample.** 100 more tagged equations (seed 777) and 40 untagged displays (seed
+  2026112202), each compiled and compared with the page image: all 140 agree with the print,
+  apart from where a multi-line display breaks its lines.
+- **Sub- and superscript levels.** Every page's maths was compiled and each glyph's size (normal,
+  script, scriptscript) and position (raised or lowered) compared with the same glyph in the PDF.
+  This finds structure the glyph alignment cannot see, such as an exponent ending one symbol
+  early. No formula had a glyph on the wrong level. It did find notation that differs from the
+  print: `\frac{\mathrm d t}{t}` where the print has `\mathrm dt/t` (pp. 178–180, 16 places)
+  and the other way round (pp. 400, 424, 428, 5 places); `[F:\mathbf Q]/2` and
+  `|a_m|/(m^{\sigma+c}\ldots)` printed as fractions (pp. 642, 644, 645). All now as printed.
+- **Displays run into the text, third pass.** The same comparison showed formulas set in display
+  style in the print but inline in the transcription, so the search for run-in displays was redone
+  on every centred line of maths in the PDF, matched glyph by glyph with the transcription. Every
+  candidate was checked on the page image: 89 more formulas displayed in the print are now `$$`
+  blocks (pp. 74–854, most of them in Chapters 5–7 and 9). Where one printed display holds two
+  formulas separated by a comma (pp. 363, 473), they are one block.
+- **Limits of operators.** For every big operator (∑, ∏, ∫, ⋃, ⨁, …) and every lim, sup, inf,
+  max, min and det, the glyphs set as its limits were read off the PDF and off the compiled
+  transcription and compared page by page. Two inductive limits had a subscript the print does not
+  have: `\varinjlim_i` twice on p. 685 and `\varinjlim_m` on p. 816, now plain `\varinjlim` as
+  printed. With the big operators read from their font codes (4,254 operators in all), three
+  more differ in notation only: `\prod_j z_j^{a_j}` on p. 628 is `\prod z_j^{a_j}`, inline, in the
+  print; the print has a small `\otimes_{v\notin S}` on p. 39 and a large `\bigotimes_{v\notin S'}`
+  on p. 352, the other way round from the transcription. All three now as printed. The rest agree.
+  The reverse check, formulas displayed in the transcription but run into the text in the print,
+  found only p. 628.
+- **Cross-references.** Every dotted number in the text (equation, theorem and section numbers,
+  and the numbers in citations such as `[DE, Thm. 3.6.3]`) was compared page by page with the PDF
+  text: they all agree. The only differences are footnote marks that the PDF text runs into the
+  preceding number.
+- **Inline formulas.** 96 inline formulas of 40 or more characters, drawn at random (seed 4242),
+  were compiled and compared with the page image: all 96 agree with the print.
+- **Small differences at every level.** With every page's maths compiled, each glyph of the PDF
+  was aligned with the compiled transcription (same fonts on both sides), and every insertion,
+  deletion or replacement of up to three glyphs was listed, on the baseline as well as in scripts
+  (the earlier pass had only looked at scripts and operators). After removing what is set as text
+  in one and as maths in the other (footnote marks, `§`, `id`, punctuation, running heads), each
+  remaining case was checked on the page image. Fixed:
+  - p. 349: `\sigma(E', E)` where the print has `\sigma(E, E')` (the prime was on the wrong
+    argument of the weak topology);
+  - p. 353: `|\tau(t)|_{v_0}` where the print has `|\xi\tau(t)|_{v_0}`;
+  - p. 553: `\to` where the print has `\hookrightarrow`;
+  - p. 449: `m'_{k',j'}` (twice) where the print has `m_{k',j'}`;
+  - p. 244: `(F_k)'_\beta` where the print has `(F'_k)_\beta` (one of four places; the other
+    three are as printed);
+  - p. 327: the prime on the restricted product now on the `\prod`, as printed;
+  - pp. 540, 556: `\sqcup` where the print has `\coprod`;
+  - p. 631: `\mathrm dx_1\cdot\ldots\cdot\mathrm dx_N` where the print has `\mathrm dx_1\cdots\mathrm dx_N`.
+- **Following up each kind of error.** Every kind found was searched for across the whole
+  transcription. Insertions of four or more glyphs in the transcription that are not in the print
+  (the kind on pp. 244 and 354): none apart from text set as maths, and the two equation numbers
+  on p. 22 that were written into the formula as `\mathrm{(1.3.1.1)}` instead of `\tag`, now
+  tags. Arrows (`\hookrightarrow`, `\mapsto`, `\to` and the others), counted on every page: they
+  agree outside the diagrams. `\sqcup`: no other occurrence.
+- **Diagrams, glyph by glyph.** Each of the 88 diagram blocks was compiled on its own (on a page
+  wide enough for the widest one) and its glyphs, with their alphabet, were matched against the
+  glyphs of the PDF page that the rest of the transcription does not account for. Every glyph of
+  every diagram is in the print, and every print glyph left over is accounted for: running heads,
+  numbers set in maths in the text ("2-morphism", "1-parameter"), `\mathrm{id}`/`\mathrm{Hom}`
+  set in the text font in the print. The three diagrams where a glyph count was off by one
+  (pp. 273, 276, 361) were compared with the page image again and agree.
+- **Punctuation at the end of displays.** The same pass showed two displays on p. 270 without the
+  full stop that ends them in the print. Every display was then checked for a trailing full stop
+  or comma, against the print: also fixed, p. 371 (`,` for the printed `.`) and p. 650 (a comma
+  that is not in the print).
+
+
+## 11. After the second merge
+
+- **Positions inside displays.** For every displayed formula (4,003), each PDF glyph's height
+  relative to its neighbours was compared with the compiled transcription, which catches a
+  numerator and denominator, or upper and lower limits, swapped. No formula had its parts swapped.
+  The comparison did show limits typeset beside the operator where the print sets them below: the
+  restricted product `\widehat{\prod}` (8 displays, pp. 7, 290, 539, 540, 541; written
+  `\mathop{\widehat{\prod}}\limits`) and `\mathrm{Res}` (5 displays, pp. 138, 606); the prime of
+  the restricted product on p. 327 now beside the `\prod` with the index below, as printed.
+- **Low and centred dots.** Counted on every page: where the print has low dots between binary
+  operators (`+\ldots+`, `\cup\ldots\cup`, `\cap\ldots\cap`) the transcription had centred ones on
+  pp. 133, 213, 243, 336, 342, 450, 549, 571, 583, 631 (17 places), now `\ldots`.
+- **Digits.** Every difference of digits only inside a formula was listed (the earlier pass had
+  set digits aside with the footnote marks): none apart from footnote marks.
+- p. 628: `\varepsilon/2` (twice) printed as a fraction.
+- **Words, one to three at a time.** The prose was aligned word by word with the PDF text (words
+  in `\text{…}` inside formulas included), and every difference of one to three words was listed;
+  the earlier check had looked at runs of two or more words in context. Apart from words the
+  print sets in maths, there were four: "as" missing on p. 606 ("tend to 0 as |k|→∞"), the
+  print's doubled "is" on p. 345 that the transcription had tidied, and two misspellings of the
+  print ("neighorhood" p. 794, "completness" p. 797) that the transcription had corrected. All
+  four now as printed.
+- **Diagram layout.** Each diagram's glyphs were grouped into rows and compared, row by row and
+  left to right, with the print, to catch two nodes or labels swapped. Every diagram whose rows
+  did not match exactly (pages with several diagrams, mostly) was compared with the page image
+  again: none has a node or label in the wrong place.
+- **Equation numbers on the right formula.** For every equation number printed in the margin, the
+  formula on that line of the PDF was located in the transcription and checked to carry that
+  `\tag`. All do. Two numbered displays that hold two formulas on one line in the print had been
+  split into two displays (pp. 507, 639): each is one display again, with its number. 140 equation
+  numbers that had been written as a line of text above the display, `(D.1.4.15)`, are now
+  `\tag{D.1.4.15}` like the other 2,300; numbers of diagrams stay as text above the diagram.
+- **Fourth random sample.** 96 more inline formulas of 22 or more characters (seed 99) and 60
+  more numbered equations not drawn before (seed 4243), compiled and compared with the page image:
+  all agree with the print. The one layout difference, the index of a hatted direct sum set beside
+  it where the print sets it below (p. 178), is fixed, and the other two displayed hatted direct
+  sums (pp. 131, 179) are beside, as printed. The 17 displays with matrices, cases or several
+  aligned lines were also each compared with the page image: all agree.
+- **A figure that had not been redrawn.** Glyph runs of four or more that differ between the PDF and
+  the compiled transcription were listed; outside running heads, citation keys and words set in
+  maths, they showed that Figure 4 (p. 646, the rectangle for the contour shift in §B.7) was still
+  three lines of labels. It is now a TikZ picture with the points, labels and the direction of
+  every edge as printed, like the other four figures. Every page of the PDF with line drawings was
+  checked for a figure or diagram in the transcription: there are no others.
