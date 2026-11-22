@@ -408,13 +408,127 @@ The global principal value on theta classes is a closed topological embedding. -
 theorem globalThetaPrincipalValue_isClosedEmbedding {S₀ : Finset V} (hn : S₀.Nonempty) :
     IsClosedEmbedding (globalThetaPrincipalValue F S₀) := by sorry
 
+private theorem sLocalThetaPrincipalValue_transition_ext {ι A X Y : Type*} {M : ι → Type*}
+    [TopologicalSpace A] [AddCommGroup A] [Module ℂ A] [TopologicalSpace X]
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup Y] [Module ℂ Y]
+    [∀ i, AddCommGroup (M i)] [∀ i, Module ℂ (M i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, M i)) ≃L[ℂ] X)
+    (i : X →ₗ[ℂ] Y) (p : X →ₗ[ℂ] X) (q : Y →ₗ[ℂ] Y)
+    (h : ∀ (a : A) (g : ∀ i, M i),
+      i (p (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)))) = q (i (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))))) :
+    i.comp p = q.comp i := by
+  apply (LinearMap.cancel_right (g := e.toLinearMap) e.surjective).mp
+  apply TensorProduct.ext
+  exact LinearMap.ext fun a ↦ LinearMap.ext_on_range PiTensorProduct.span_tprod_eq_top (h a)
+
+private theorem sLocalThetaPrincipalValue_transition_tmul {ι A X : Type*} {M : ι → Type*}
+    [TopologicalSpace A] [AddCommGroup A] [Module ℂ A] [TopologicalSpace X]
+    [AddCommGroup X] [Module ℂ X] [∀ i, AddCommGroup (M i)] [∀ i, Module ℂ (M i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, M i)) ≃L[ℂ] X)
+    (P : ∀ i, M i →ₗ[ℂ] M i) (a : A) (b : ∀ i, M i) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, M i)
+    let Q : W →ₗ[ℂ] W := PiTensorProduct.map P
+    (e.toLinearMap.comp ((TensorProduct.map (LinearMap.id : A →ₗ[ℂ] A)
+      Q).comp e.symm.toLinearMap)) (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, b i))) =
+        e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, P i (b i))) := by
+  change e ((TensorProduct.map _ (PiTensorProduct.map P)) (e.symm (e _))) = _
+  erw [e.symm_apply_apply]
+  apply congrArg e
+  exact (TensorProduct.map_tmul LinearMap.id (PiTensorProduct.map P) a _).trans
+    (congrArg (TensorProduct.tmul ℂ a) (PiTensorProduct.map_tprod P b))
+
+open Classical in
+private theorem sLocalThetaPrincipalValue_transition_factors {ι : Type*} {M : ι → Type*}
+    [∀ v, AddCommGroup (M v)] [∀ v, Module ℂ (M v)]
+    {S₀ S T : Finset ι} (h₀ : S₀ ⊆ S) (P : ∀ v, M v →ₗ[ℂ] M v) (c : ∀ v, M v)
+    (g : ∀ w : S, M w.val) :
+    let extend := fun (b : ∀ w : S, M w.val) (w : T) ↦
+      if hw : w.val ∈ S then b ⟨w.val, hw⟩ else c w.val
+    let op := fun (R : Finset ι) (b : ∀ w : R, M w.val) (w : R) ↦
+      (if w.val ∈ S₀ then P w.val else LinearMap.id) (b w)
+    extend (op S g) = op T (extend g) := by
+  funext w
+  by_cases hw : w.val ∈ S
+  · simp [hw]
+  · simp [hw, show w.val ∉ S₀ from fun h ↦ hw (h₀ h)]
+
+open Classical in
+private theorem sLocalThetaPrincipalValue_transition_tests {S₀ S T : Finset V}
+    (h₀ : S₀ ⊆ S) (hST : S ⊆ T) :
+    (sAdeleSchwartzTransition F hST).comp (sAdelePrincipalValue F h₀) =
+      (sAdelePrincipalValue F (h₀.trans hST)).comp (sAdeleSchwartzTransition F hST) := by
+  let e (R : Finset V) := (sAdeleSchwartz_inductiveTensor_equiv F R).choose
+  apply sLocalThetaPrincipalValue_transition_ext (e S)
+  intro a g
+  let pureTest (R : Finset V) (b : ∀ w : R, ℬ(w.val.adicCompletion F)) : ℬₛ(R) :=
+    e R (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, b w))
+  let P (v : V) : ℬ(v.adicCompletion F) →ₗ[ℂ] ℬ(v.adicCompletion F) :=
+    if v ∈ S₀ then (finitePlacePrincipalValue v).toLinearMap else LinearMap.id
+  let op (R : Finset V) (b : ∀ w : R, ℬ(w.val.adicCompletion F)) (w : R) :=
+    P w.val (b w)
+  have pv (R : Finset V) (hR : S₀ ⊆ R) (b : ∀ w : R, ℬ(w.val.adicCompletion F)) :
+      sAdelePrincipalValue F hR (pureTest R b) = pureTest R (op R b) := by
+    unfold sAdelePrincipalValue
+    with_reducible exact sLocalThetaPrincipalValue_transition_tmul (e R) (fun w : R ↦ P w.val) a b
+  let extend (b : ∀ w : S, ℬ(w.val.adicCompletion F)) (w : T) :=
+    if hw : w.val ∈ S then b ⟨w.val, hw⟩ else finiteStandardGaussian w.val 1
+  have insertTest (b : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      sAdeleSchwartzTransition F hST (pureTest S b) = pureTest T (extend b) := by
+    apply Subtype.ext
+    funext x
+    have hg (w : T) (hw : w.val ∉ S) (y : w.val.adicCompletion F) :
+        extend b w (Multiplicative.ofAdd y) =
+          (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F)).indicator
+            (fun _ ↦ (1 : ℂ)) y := by
+      rw [show extend b w = finiteStandardGaussian w.val 1 by simp [extend, hw]]
+      change finiteStandardGaussianValue w.val 1 y = _
+      unfold finiteStandardGaussianValue
+      exact ite_eq_left fun u _ ↦ rfl
+    have hr (w : S) : extend b ⟨w.val, hST w.property⟩ = b w := by
+      simp only [extend, dite_eq_left w.property]
+    have spec (R : Finset V) (d : ∀ w : R, ℬ(w.val.adicCompletion F)) (y : SAdeleRing F R) :
+        pureTest R d (Multiplicative.ofAdd y) = a (Multiplicative.ofAdd y.1) *
+          ∏ w : R, d w (Multiplicative.ofAdd (y.2 w)) := by
+      with_reducible exact (sAdeleSchwartz_inductiveTensor_equiv F R).choose_spec a d y
+    with_reducible refine Eq.trans ?_ (spec T (extend b) x.toAdd).symm
+    change sAdeleSchwartzTransition F hST (pureTest S b) (Multiplicative.ofAdd x.toAdd) = _
+    with_reducible
+      refine sAdeleSchwartzTransition_pure F hST a (extend b) hg (pureTest S b) ?_ x.toAdd
+    intro y
+    simp only [hr]
+    with_reducible exact spec S b y
+  with_reducible change sAdeleSchwartzTransition F hST (sAdelePrincipalValue F h₀ (pureTest S g)) =
+    sAdelePrincipalValue F (h₀.trans hST) (sAdeleSchwartzTransition F hST (pureTest S g))
+  have hcomm : extend (op S g) = op T (extend g) := by
+    with_reducible
+      exact sLocalThetaPrincipalValue_transition_factors (M := fun v : V ↦ ℬ(v.adicCompletion F))
+        (T := T) h₀ (fun v ↦ (finitePlacePrincipalValue v).toLinearMap)
+        (fun v ↦ finiteStandardGaussian v 1) g
+  with_reducible
+    exact (congrArg (sAdeleSchwartzTransition F hST) (pv S h₀ g)).trans
+      ((insertTest (op S g)).trans ((congrArg (pureTest T) hcomm).trans
+        ((pv T (h₀.trans hST) (extend g)).symm.trans
+          (congrArg (sAdelePrincipalValue F (h₀.trans hST)) (insertTest g).symm))))
+
+private theorem sLocalThetaPrincipalValue_transition_mapQ {X Y : Type*} [AddCommGroup X]
+    [Module ℂ X] [AddCommGroup Y] [Module ℂ Y] (K : Submodule ℂ X) (L : Submodule ℂ Y)
+    (i : X →ₗ[ℂ] Y) (p : X →ₗ[ℂ] X) (q : Y →ₗ[ℂ] Y) (hi : K ≤ L.comap i)
+    (hp : K ≤ K.comap p) (hq : L ≤ L.comap q) (h : i.comp p = q.comp i) :
+    (K.mapQ L i hi).comp (K.mapQ K p hp) = (L.mapQ L q hq).comp (K.mapQ L i hi) := by
+  apply LinearMap.ext
+  intro x
+  obtain ⟨f, rfl⟩ := K.mkQ_surjective x
+  exact congrArg L.mkQ (DFunLike.congr_fun h f)
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The principal value commutes with passage from an S-local theta stage to a larger stage. -/
 theorem sLocalThetaPrincipalValue_transition {S₀ S T : Finset V}
     (h₀ : S₀ ⊆ S) (hST : S ⊆ T) (hn : S₀.Nonempty) :
     (sLocalThetaTransition (F := F) hST).comp (sLocalThetaPrincipalValue F h₀) =
-      (sLocalThetaPrincipalValue F (h₀.trans hST)).comp (sLocalThetaTransition hST) :=
-  by sorry
+      (sLocalThetaPrincipalValue F (h₀.trans hST)).comp (sLocalThetaTransition hST) := by
+  unfold sLocalThetaTransition sLocalThetaPrincipalValue
+  apply sLocalThetaPrincipalValue_transition_mapQ
+  exact sLocalThetaPrincipalValue_transition_tests h₀ hST
 
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The local and global principal value operators commute with insertion of an S-local theta stage. -/
