@@ -320,10 +320,38 @@ The global homogeneous quotient is Montel. -/
 theorem globalHomogeneousThetaSpace_montel :
     BarrelledSpace ℂ Θ𝔽ω(ω) ∧ MontelSpace ℂ Θ𝔽ω(ω) := by sorry
 
+private theorem sLocalHomogeneousThetaSpace_montel_barrelled {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] (hLF : IsLFSpace E) : BarrelledSpace ℂ E := by
+  obtain ⟨_, X, _, _, _, hX, j, i, h⟩ := hLF
+  refine ⟨fun p hp ↦ ?_⟩
+  have hP : WithSeminorms
+      (Subtype.val : {q : Seminorm ℂ E // ∀ k, Continuous (q ∘ (i k).toLinearMap)} →
+        Seminorm ℂ E) := ⟨h.topology_eq⟩
+  apply hP.continuous_seminorm (i := ⟨p, ?_⟩)
+  intro k
+  let : BarrelledSpace ℂ (X k) := isFrechetTVS_barrelled (hX k)
+  exact (p.comp (i k).toLinearMap).continuous_of_lowerSemicontinuous (hp.comp (i k).continuous)
+
+private theorem sLocalHomogeneousThetaSpace_montel_of_complete_nuclear {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    (hN : IsNuclearTVS.{0} E)
+    (hc : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E)) : MontelSpace ℂ E := by
+  let := hN.1
+  let := hN.2.1
+  let := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hc
+  refine ⟨fun B hc hb ↦ ?_⟩
+  simpa only [hc.closure_eq] using isCompact_closure_of_isNuclearTVS E hN hb
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The S-local homogeneous quotient is Montel. -/
 theorem sLocalHomogeneousThetaSpace_montel (χ : PontryaginDual (J₁(S))) :
-    BarrelledSpace ℂ (Θₛω(S, χ)) ∧ MontelSpace ℂ (Θₛω(S, χ)) := by sorry
+    BarrelledSpace ℂ (Θₛω(S, χ)) ∧ MontelSpace ℂ (Θₛω(S, χ)) := by
+  exact ⟨sLocalHomogeneousThetaSpace_montel_barrelled (sLocalHomogeneousThetaSpace_lf χ),
+    sLocalHomogeneousThetaSpace_montel_of_complete_nuclear
+      (sLocalHomogeneousThetaSpace_nuclear χ) (sLocalHomogeneousThetaSpace_complete χ)⟩
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the global homogeneous quotient is complete. -/
