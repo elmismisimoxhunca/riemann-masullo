@@ -134,13 +134,128 @@ variable {ω : PontryaginDual (ideleClassNorm F).ker}
 
 local notation "ωₛ(" S ", " h ")" => sLocalNormOneCharacter (F := F) S ω h
 
+/-- Extend a representative of a norm-one S-class by one. Its projections to S and T
+represent classes on which the two descended characters agree. -/
+private theorem sLocalHomogeneousThetaTransition_preserves_kernel_lift
+    (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) (a : J₁(S)) :
+    ∃ (u : (integralAdelesOutside F S)ˣ) (b : J₁(T)),
+      a.val = QuotientGroup.mk (Units.map (adeleProjection F S).toMonoidHom
+        (integralIdeleInsertion F S u)) ∧
+      b.val = QuotientGroup.mk (Units.map (adeleProjection F T).toMonoidHom
+        (integralIdeleInsertion F S u)) ∧
+      ωₛ(S, hω) a = ωₛ(T, hω.mono hST) b := by
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective a.val
+  let j := sIdeleInsertion F S g
+  let gT := Units.map (adeleProjection F T).toMonoidHom j
+  obtain ⟨hinf, hin, hout⟩ := sIdeleInsertion_apply F S g
+  have hS : Units.map (adeleProjection F S).toMonoidHom j = g :=
+    Units.ext (Prod.ext hinf (funext hin))
+  have hTj : sIdeleInsertion F T gT = j := by
+    obtain ⟨hinf', hin', hout'⟩ := sIdeleInsertion_apply F T gT
+    apply Units.ext
+    refine Prod.ext hinf' ?_
+    apply RestrictedProduct.ext
+    intro v
+    by_cases hv : v ∈ T
+    · exact hin' ⟨v, hv⟩
+    · exact (hout' v hv).trans (hout v (fun h ↦ hv (hST h))).symm
+  have hn : ideleNorm F j = 1 := by
+    rw [ideleNorm_sIdeleInsertion, ← sIdeleQuotientNorm_mk, hg]
+    exact a.property
+  let x : C₁ := ⟨QuotientGroup.mk j, hn⟩
+  let b : J₁(T) := ⟨QuotientGroup.mk gT, (ideleNorm_sIdeleInsertion F T gT).symm.trans
+    ((congrArg (ideleNorm F) hTj).trans hn)⟩
+  have hj : j ∈ Set.range (integralIdeleInsertion F S) := by
+    apply (mem_range_integralIdeleInsertion F S j).2
+    intro v hv
+    have hi : j⁻¹.val.2 v = 1 := by
+      change ((sIdeleInsertion F S g)⁻¹).val.2 v = 1
+      rw [← map_inv]
+      exact (sIdeleInsertion_apply F S g⁻¹).2.2 v hv
+    exact ⟨(hout v hv) ▸ (v.adicCompletionIntegers F).one_mem,
+      hi ▸ (v.adicCompletionIntegers F).one_mem⟩
+  obtain ⟨uT, huT⟩ := (integralIdeleInsertion_exhaustive F).1 hST hj
+  obtain ⟨u, hu⟩ := hj
+  have ha : a.val = QuotientGroup.mk (Units.map (adeleProjection F S).toMonoidHom j) := by
+    rw [hS, hg]
+  refine ⟨u, b, ?_, ?_, ?_⟩
+  · simpa only [hu] using ha
+  · simp only [hu]; rfl
+  · exact (sLocalNormOneCharacter_apply ω hω u x a (by rw [hu]) (by simpa only [hu] using ha)).trans
+      (sLocalNormOneCharacter_apply ω (hω.mono hST) uT x b (by rw [huT]) (by rw [huT])).symm
+
 /-- Paper: (5.2.3.1), p. 233.
 The stage map of test functions preserves the homogeneous theta kernels. -/
 theorem sLocalHomogeneousThetaTransition_preserves_kernel
     (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
     let hT := NormOneCharacterUnramifiedOutside.mono (F := F) (ω := ω) hω hST
     Kₛω(S, ωₛ(S, hω)) ≤ (Kₛω(T, ωₛ(T, hT))).comap
-      (sAdeleSchwartzTransition F hST) := by sorry
+      (sAdeleSchwartzTransition F hST) := by
+  intro hT
+  let ρ (U : Finset (HeightOneSpectrum (𝓞 F))) :=
+    (existsUnique_sLocalThetaAction (F := F) (S := U)).exists.choose
+  have action (U : Finset (HeightOneSpectrum (𝓞 F))) (g : (SAdeleRing F U)ˣ) (k : ℬₛ(U))
+      (a : SIdeleQuotient F U) (ha : a = QuotientGroup.mk g) :
+      ρ U a (Submodule.Quotient.mk k) = Submodule.Quotient.mk (schwartzBruhatUnitTranslate g k) := by
+    subst a
+    unfold ρ
+    with_reducible exact (existsUnique_sLocalThetaAction (F := F) (S := U)).exists.choose_spec.2 g k
+  let rel (U : Finset (HeightOneSpectrum (𝓞 F))) (χ : PontryaginDual (J₁(U)))
+      (p : J₁(U) × Θₛ(U)) := p.2 - star (χ p.1 : ℂ) • ρ U p.1.val p.2
+  let D (U : Finset (HeightOneSpectrum (𝓞 F))) (χ : PontryaginDual (J₁(U))) :=
+    (Submodule.span ℂ (Set.range (rel U χ))).topologicalClosure
+  -- In the coinvariant description, the kernel is the preimage of the closed relation span.
+  have hmem (U : Finset (HeightOneSpectrum (𝓞 F))) (χ : PontryaginDual (J₁(U))) (f : ℬₛ(U)) :
+      f ∈ Kₛω(U, χ) ↔ (Kₛ(U)).mkQ f ∈ D U χ := by
+    have h : ∃ e : SLocalHomogeneousThetaSpace F U χ ≃L[ℂ] (Θₛ(U) ⧸ D U χ),
+        ∀ k : ℬₛ(U), e (Submodule.Quotient.mk k) = (D U χ).mkQ ((Kₛ(U)).mkQ k) := by
+      unfold D rel ρ
+      with_reducible exact sLocalHomogeneousThetaSpace_equiv_coinvariants (F := F) (S := U) χ
+    refine h.elim fun e he ↦ ?_
+    have he' := congrArg (fun z : Θₛ(U) ⧸ D U χ ↦ z = 0) (he f)
+    have hz := ContinuousLinearEquiv.map_eq_zero_iff e (x := Submodule.Quotient.mk f)
+    exact (Submodule.Quotient.mk_eq_zero (Kₛω(U, χ))).symm.trans
+      (hz.symm.trans (he'.to_iff.trans (Submodule.Quotient.mk_eq_zero (D U χ))))
+  let π := sLocalThetaTransition (F := F) hST
+  have hmap : D S (ωₛ(S, hω)) ≤ (D T (ωₛ(T, hT))).comap π := by
+    apply Submodule.topologicalClosure_minimal
+    · apply Submodule.span_le.mpr
+      rintro _ ⟨⟨a, y⟩, rfl⟩
+      refine (Submodule.Quotient.mk_surjective (Kₛ(S)) y).elim fun f hy ↦ ?_
+      rw [← hy]
+      have lift := sLocalHomogeneousThetaTransition_preserves_kernel_lift
+        (F := F) (ω := ω) (S := S) (T := T) hω hST a
+      refine lift.elim fun u hu ↦ hu.elim fun b hb ↦ ?_
+      let j := integralIdeleInsertion F S u
+      let gS := Units.map (adeleProjection F S).toMonoidHom j
+      let gT := Units.map (adeleProjection F T).toMonoidHom j
+      let fT := sAdeleSchwartzTransition F hST f
+      have hρS := action S gS f a.val hb.1
+      have hρT := action T gT fT b.val hb.2.1
+      let yS : Θₛ(S) := Submodule.Quotient.mk f
+      let yT : Θₛ(T) := Submodule.Quotient.mk fT
+      -- The ordinary transition intertwines translations by this common representative.
+      have heq : π (ρ S a.val yS) = ρ T b.val yT :=
+        (congrArg π hρS).trans ((sLocalThetaTransition_equivariant hST u f).trans hρT.symm)
+      have hπ : π yS = yT := by
+        unfold π yS yT fT sLocalThetaTransition
+        exact Submodule.mapQ_apply _ _ _ f
+      have hχ := congrArg (fun z : Circle ↦ star (z : ℂ)) hb.2.2
+      have hs := congrArg₂ (fun (c : ℂ) (z : Θₛ(T)) ↦ c • z) hχ heq
+      have hrel := (map_sub π yS (star (ωₛ(S, hω) a : ℂ) • ρ S a.val yS)).trans
+        (congrArg₂ (fun v w : Θₛ(T) ↦ v - w) hπ ((map_smul π _ _).trans hs))
+      have he : π (rel S (ωₛ(S, hω)) (a, yS)) = rel T (ωₛ(T, hT)) (b, yT) := by
+        with_reducible exact hrel
+      have hm : rel T (ωₛ(T, hT)) (b, yT) ∈ D T (ωₛ(T, hT)) :=
+        Submodule.le_topologicalClosure _ (Submodule.subset_span (Set.mem_range_self (b, yT)))
+      have h := (congrArg (fun z ↦ z ∈ D T (ωₛ(T, hT))) he).mpr hm
+      apply Submodule.mem_comap.mpr
+      with_reducible exact h
+    · have hc : IsClosed (D T (ωₛ(T, hT)) : Set Θₛ(T)) :=
+        (Submodule.span ℂ (Set.range (rel T (ωₛ(T, hT))))).isClosed_topologicalClosure
+      exact hc.preimage (sLocalThetaTransition_isClosedEmbedding (F := F) hST).continuous
+  intro f hf
+  exact (hmem T (ωₛ(T, hT)) _).mpr (hmap ((hmem S (ωₛ(S, hω)) f).mp hf))
 
 /-- Paper: (5.2.3.1), p. 233.
 The homogeneous theta transition is induced by adjoining integer indicators. -/
