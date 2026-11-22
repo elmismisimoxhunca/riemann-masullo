@@ -307,6 +307,26 @@ def adelePrincipalValue (S₀ : Finset V) : ℬ(𝔸[F]) →ₗ[ℂ] ℬ(𝔸[F]
     ((TensorProduct.map (sAdelePrincipalValue F (Finset.Subset.refl S₀)) idTail).comp
       e.symm.toLinearMap)
 
+private theorem sAdelePrincipalValue_tmul_aux {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)] [∀ i, TopologicalSpace (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (p : ι → Prop) [DecidablePred p] (T : ∀ i, D i →L[ℂ] D i) (f : A) (g : ∀ i, D i) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map fun i ↦
+      if p i then (T i).toLinearMap else LinearMap.id
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    (e.toLinearMap.comp ((TensorProduct.map I P).comp e.symm.toLinearMap))
+      (e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i))) = e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, if p i then T i (g i) else g i)) := by
+  intro W P I
+  change e (TensorProduct.map I P (e.symm (e _))) = e _
+  erw [e.symm_apply_apply, TensorProduct.map_tmul]
+  apply congrArg e
+  apply congrArg (TensorProduct.tmul ℂ f)
+  exact (PiTensorProduct.map_tprod _ g).trans (congrArg (PiTensorProduct.tprod ℂ)
+    (funext fun i ↦ DFunLike.ite_apply (P := p i) (T i).toLinearMap LinearMap.id (g i)))
+
 open Classical in
 /-- Paper: Definition 5.3.1.4(1), p. 242.
 On pure tensors the S-local operator acts by the local principal value in each selected factor. -/
@@ -314,8 +334,12 @@ theorem sAdelePrincipalValue_tmul {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
     (f : ℬ(InfiniteAdeleRing F)) (g : ∀ w : S, ℬ(w.val.adicCompletion F)) :
     let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
     sAdelePrincipalValue F h₀ (e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) =
-      e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, if w.val ∈ S₀ then finitePlacePrincipalValue w.val (g w) else g w)) :=
-  by sorry
+      e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, if w.val ∈ S₀ then finitePlacePrincipalValue w.val (g w) else g w)) := by
+  intro e
+  unfold sAdelePrincipalValue
+  with_reducible
+    exact sAdelePrincipalValue_tmul_aux e (fun w : S ↦ w.val ∈ S₀)
+      (fun w ↦ finitePlacePrincipalValue w.val) f g
 
 /-- Paper: Definition 5.3.1.4(2), p. 242.
 Through any stage containing S₀ the global operator acts as the S-local operator on the stage
