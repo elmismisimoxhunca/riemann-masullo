@@ -2164,11 +2164,263 @@ end ProjectivePeriodization
 -- proof uses the equality of the difference image with the pulled-back
 -- closed range before justifying it.
 
+/-- Translating a polynomial weight along an arithmetic progression costs at most a polynomial in the index. -/
+private theorem intervalPrimitive_weight_bound {V : Type*} [NormedAddCommGroup V]
+    (x t : V) (n k : ℕ) :
+    1 + ‖x‖ ^ k ≤ (n + 1 : ℝ) ^ k * (2 * (1 + ‖t‖) ^ k) * (1 + ‖x + n • t‖ ^ k) := by
+  let R := max 1 ‖x + n • t‖
+  have hR : 1 ≤ R := le_max_left ..
+  have hR0 : 0 ≤ R := zero_le_one.trans hR
+  have hnp : 0 ≤ (n : ℝ) := Nat.cast_nonneg _
+  have hx : ‖x‖ ≤ (n + 1 : ℝ) * (1 + ‖t‖) * R := by
+    have h := norm_sub_le (x + n • t) (n • t)
+    rw [add_sub_cancel_right] at h
+    calc
+      _ ≤ R + n * ‖t‖ := h.trans (add_le_add (le_max_right ..) (norm_nsmul_le ..))
+      _ ≤ (n + 1 : ℝ) * (1 + ‖t‖) * R := by
+        nlinarith [mul_nonneg hnp (norm_nonneg t), mul_le_mul_of_nonneg_left hR (mul_nonneg hnp (norm_nonneg t)), mul_nonneg hnp hR0, mul_nonneg (norm_nonneg t) hR0]
+  have hRp : R ^ k ≤ 1 + ‖x + n • t‖ ^ k := by
+    dsimp [R]
+    rcases le_total 1 ‖x + n • t‖ with h | h
+    · rw [max_eq_right h]; linarith
+    · rw [max_eq_left h, one_pow]; exact le_add_of_nonneg_right (by positivity)
+  let B := (n + 1 : ℝ) ^ k * (1 + ‖t‖) ^ k * (1 + ‖x + n • t‖ ^ k)
+  have hB : 1 ≤ B := by
+    apply one_le_mul_of_one_le_of_one_le
+    · exact one_le_mul_of_one_le_of_one_le (one_le_pow₀ (by linarith)) (one_le_pow₀ (by linarith [norm_nonneg t]))
+    · linarith [pow_nonneg (norm_nonneg (x + n • t)) k]
+  have hxB : ‖x‖ ^ k ≤ B := (pow_le_pow_left₀ (norm_nonneg _) hx _).trans (by
+    simp only [mul_pow]; dsimp [B]; gcongr)
+  calc _ ≤ B + B := add_le_add hB hxB
+       _ = _ := by dsimp [B]; ring
+
+/-- Mixed partial derivatives of a translate are translates of the mixed partial derivatives. -/
+private theorem intervalPrimitive_partial {d t r : ℕ} {F : Type*} [AddCommGroup F]
+    (g : ElementaryLieGroup d t r F) (v) (hv : elementaryCover v g.2.2.1 g.2.2.2 = g)
+    (f : ElementaryLieGroup d t r F → ℂ) (β γ) (u) (a : Fin r → ℤ) (b : F) :
+    elementaryPartial (fun x ↦ f (g + x)) β γ u a b =
+      elementaryPartial f β γ (u + v) (a + g.2.2.1) (b + g.2.2.2) := by
+  have h (w) : g + elementaryCover w a b = elementaryCover (w+v) (a+g.2.2.1) (b+g.2.2.2) := by
+    rw [add_comm, ← hv]; exact Prod.ext rfl (Prod.ext (funext fun i ↦ (AddCircle.coe_add _ _ _).symm) rfl)
+  simp only [elementaryPartial, h]
+  rw [iteratedFDeriv_comp_add_right (f := fun w ↦ f (elementaryCover w (a+g.2.2.1) (b+g.2.2.2))) _ v u]
+
+/-- On an elementary group, polynomial growth of translated seminorms gives convergence of geometrically weighted translates in the Schwartz space. -/
+private theorem intervalPrimitive_elementary {d t r : ℕ} {F : Type*} [AddCommGroup F]
+    [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (g : ElementaryLieGroup d t r F) (f : ElementarySchwartz d t r F) (c : ℝ) (hc : 0 < c) (hc' : c < 1) :
+    ∃ v : ElementarySchwartz d t r F, ∀ x, HasSum (fun n : ℕ ↦ (c ^ n : ℝ) • f (n • g + x)) (v x) := by
+  let V := ElementarySchwartz d t r F
+  obtain ⟨semin, hP, hval⟩ := elementarySchwartz_withSeminorms_P1 (m := d) (n := t) (r := r) (F := F)
+  obtain ⟨T, hT⟩ := elementarySchwartz_translate_jointly (m := d) (n := t) (r := r) (F := F)
+  let Gs (n : ℕ) : V := T (n • g, f)
+  let s (n : ℕ) : V := ((c : ℂ) ^ n) • Gs n
+  let lv (a : Fin r → ℤ) : EuclideanSpace ℝ (Fin r) := WithLp.toLp 2 fun i ↦ (a i : ℝ)
+  let B (i : ℕ × ℕ × (Fin d → ℕ) × (Fin t → ℕ)) := (2 * (1 + ‖g.1‖) ^ i.1) * (2 * (1 + ‖lv g.2.2.1‖) ^ i.2.1) * semin i f
+  have hbound (i) (n : ℕ) : semin i (Gs n) ≤ (n + 1 : ℝ) ^ (i.1 + i.2.1) * B i := by
+    apply (ENNReal.ofReal_le_ofReal_iff (by dsimp [B]; positivity)).mp
+    rw [hval]
+    refine iSup_le fun u ↦ iSup_le fun a ↦ iSup_le fun b ↦ ENNReal.ofReal_le_ofReal ?_
+    let z := n • g
+    obtain ⟨v, hv⟩ := elementaryCover_surjective z.2.2.1 z.2.2.2 z.1 z.2.1
+    have hv' : elementaryCover (z.1,v) z.2.2.1 z.2.2.2 = z := hv
+    have he : (Gs n).val = fun x ↦ f (z + x) := funext (hT z f)
+    have hpar := intervalPrimitive_partial z (z.1,v) hv' f.val i.2.2.1 i.2.2.2 u a b
+    change (1 + ‖u.1‖ ^ i.1) * (1 + ‖lv a‖ ^ i.2.1) * ‖elementaryPartial (Gs n).val _ _ _ _ _‖ ≤ _
+    rw [he, hpar]
+    let dnorm := ‖elementaryPartial f.val i.2.2.1 i.2.2.2 (u + (z.1,v)) (a + z.2.2.1) (b + z.2.2.2)‖
+    have hD : (1 + ‖u.1 + z.1‖ ^ i.1) * (1 + ‖lv (a + z.2.2.1)‖ ^ i.2.1) * dnorm ≤ semin i f := by
+      apply (ENNReal.ofReal_le_ofReal_iff (apply_nonneg _ _)).mp
+      rw [hval]; exact le_iSup_of_le (u + (z.1,v)) (le_iSup_of_le (a + z.2.2.1) (le_iSup_of_le (b + z.2.2.2) le_rfl))
+    have hl : lv a + n • lv g.2.2.1 = lv (a + z.2.2.1) := by
+      ext k; change (a k : ℝ) + n • (g.2.2.1 k : ℝ) = ((a k + n • g.2.2.1 k : ℤ) : ℝ); simp
+    have ha := intervalPrimitive_weight_bound (lv a) (lv g.2.2.1) n i.2.1
+    rw [hl] at ha
+    have hx := intervalPrimitive_weight_bound u.1 g.1 n i.1
+    let C := (n + 1 : ℝ) ^ (i.1 + i.2.1) * ((2 * (1 + ‖g.1‖) ^ i.1) * (2 * (1 + ‖lv g.2.2.1‖) ^ i.2.1))
+    calc _ ≤ _ := mul_le_mul_of_nonneg_right (mul_le_mul hx ha (by positivity) (by positivity)) (norm_nonneg _)
+         _ = C * ((1 + ‖u.1 + z.1‖ ^ i.1) * (1 + ‖lv (a + z.2.2.1)‖ ^ i.2.1) * dnorm) := by dsimp only [C, dnorm]; rw [pow_add, show z.1 = n • g.1 from rfl]; ac_rfl
+         _ ≤ _ := by simpa only [C, B, mul_assoc] using mul_le_mul_of_nonneg_left hD (show 0 ≤ C by dsimp [C]; positivity)
+  have hs (i) : Summable (fun n ↦ semin i (s n)) := by
+    have hs := (summable_pow_mul_geometric_of_norm_lt_one (i.1 + i.2.1) (show ‖c‖ < 1 by rwa [Real.norm_of_nonneg hc.le])).comp_injective Nat.succ_injective
+    have hs' : Summable (fun n : ℕ ↦ (n + 1 : ℝ) ^ (i.1 + i.2.1) * c ^ n) := by
+      simpa only [Function.comp_def, Nat.cast_succ, pow_succ c, mul_assoc, mul_inv_cancel₀ hc.ne', mul_one] using hs.mul_right c⁻¹
+    refine (hs'.mul_right (B i)).of_nonneg_of_le (fun _ ↦ apply_nonneg _ _) fun n ↦ ?_
+    rw [show s n = (c : ℂ)^n • Gs n from rfl, map_smul_eq_mul, norm_pow, Complex.norm_real, Real.norm_of_nonneg hc.le]
+    calc _ ≤ c ^ n * _ := mul_le_mul_of_nonneg_left (hbound i n) (pow_nonneg hc.le _)
+         _ = _ := by ring
+  let : IsTopologicalAddGroup V := hP.isTopologicalAddGroup
+  let : UniformSpace V := IsTopologicalAddGroup.rightUniformSpace V
+  have : IsUniformAddGroup V := isUniformAddGroup_of_addCommGroup
+  obtain ⟨_, _, _, hcomplete⟩ := elementarySchwartz_isFrechet (m := d) (n := t) (r := r) (F := F)
+  have hsum : Summable s := by
+    apply summable_iff_cauchySeq_finset.mpr
+    rw [CauchySeq, cauchy_map_iff', uniformity_eq_comap_nhds_zero, Filter.tendsto_comap_iff, hP.tendsto_nhds]
+    intro i ε hε
+    let j : V →ₗ[ℂ] LocalBanach (semin i) := UniformSpace.Completion.toComplL.toLinearMap.comp LinearMap.id
+    have hj (x : V) : ‖j x‖ = semin i x := localBanach_norm_coe (semin i) x
+    have hj' : Summable (fun n ↦ j (s n)) := .of_norm (by simp only [hj]; exact hs i)
+    have ht := cauchy_map_iff'.mp (summable_iff_cauchySeq_finset.mp hj')
+    rw [tendsto_uniformity_iff_dist_tendsto_zero, Metric.tendsto_nhds] at ht
+    filter_upwards [ht ε hε] with z hz
+    rw [Real.dist_eq, sub_zero, abs_of_nonneg dist_nonneg, dist_eq_norm', ← map_sum, ← map_sum, ← map_sub, hj] at hz
+    simpa only [sub_zero, Function.comp_apply] using hz
+  refine ⟨∑' n, s n, fun x ↦ ?_⟩
+  let A : V →ₗ[ℂ] ℂ := (LinearMap.proj x).comp (elementarySchwartzSubmodule d t r F).subtype
+  let i : ElementarySchwartzIndex d t r := (0,0,0,0)
+  have hcA : Continuous A := by
+    apply WithSeminorms.continuous_normedSpace_rng _ elementarySchwartz_withSeminorms A
+    refine ⟨{i}, 1, fun u ↦ ?_⟩
+    have hu : ‖A u‖ ≤ elementarySchwartzSeminorm i u := by
+      change (‖u.val x‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound u.val i).toReal
+      apply ENNReal.toReal_mono (u.property.2 i).ne
+      rw [show i = (0,0,0,0) from rfl, elementarySchwartzBound_zero]
+      exact le_iSup (fun z ↦ (‖u.val z‖₊ : ENNReal)) x
+    simp [Seminorm.comp_apply]
+    exact hu.trans (Finset.le_sup (f := elementarySchwartzSeminorm) (Finset.mem_singleton_self i) u)
+  let ev : V →L[ℂ] ℂ := ⟨A, hcA⟩
+  exact (hsum.hasSum.mapL ev).congr_fun fun n ↦ by
+    change c ^ n • f (n • g + x) = (c : ℂ) ^ n * T (n • g, f) x
+    rw [hT, Complex.real_smul, Complex.ofReal_pow]
+
+/-- Enlarge the elementary stage to contain the translating element, so that every term and the sum are realized on that same stage. -/
+private theorem intervalPrimitive_geometric {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (g : G) (f : SchwartzBruhat G) (c : ℝ) (hc : 0 < c) (hc' : c < 1) :
+    (fun x ↦ ∑' n : ℕ, c ^ n • f (g ^ n * x)) ∈ schwartzBruhatSubmodule G := by
+  classical
+  obtain ⟨a, e, s, hs⟩ := (mem_schwartzBruhatSubmodule_iff f.val).mp f.property
+  obtain ⟨b, hab, hg⟩ : ∃ b : BruhatStructuralPair G, a ≤ b ∧ g ∈ b.val.1 := by
+    let I := OpenCompactlyGeneratedSubgroups G
+    have hGroups := openCompactlyGeneratedSubgroups_colimit (G := G)
+    let : IsDirectedOrder I := hGroups.1
+    obtain ⟨J, hgJ⟩ := hGroups.2.1 g
+    let aGroup : I := ⟨a.val.1, a.property.1, a.property.2.1⟩
+    obtain ⟨H, haH, hJH⟩ := exists_ge_ge aGroup J
+    exact ⟨⟨(H.val, a.val.2), H.property.1, H.property.2, a.property.2.2.1, a.property.2.2.2.trans haH⟩,
+      ⟨haH, le_rfl⟩, hJH hgJ⟩
+  obtain ⟨e'⟩ := b.elementary
+  obtain ⟨j, hj, _⟩ := schwartzBruhatStage_transition hab e e'
+  let h : b.val.1 := ⟨g, hg⟩
+  let coord (y : b.val.1) := (e'.equiv (QuotientGroup.mk y : b.quotient)).toAdd
+  obtain ⟨v, hv⟩ := intervalPrimitive_elementary (coord h) (j s) c hc hc'
+  apply (mem_schwartzBruhatSubmodule_iff _).mpr
+  refine ⟨b, e', v, funext fun x ↦ ?_⟩
+  have he (y : G) : f y = schwartzBruhatStageRealization b e' (j s) y := (congrFun hs y).symm.trans (congrFun (hj s) y).symm
+  by_cases hx : x ∈ b.val.1
+  · let y : b.val.1 := ⟨x, hx⟩
+    rw [schwartzBruhatStageRealization_apply, dite_eq_left hx]
+    refine (hv (coord y)).tsum_eq.symm.trans (tsum_congr fun n ↦ congrArg (c ^ n • ·) ?_)
+    rw [he, schwartzBruhatStageRealization_apply, dite_eq_left (b.val.1.mul_mem (b.val.1.pow_mem hg n) hx)]
+    apply congrArg (fun z ↦ j s z)
+    change n • coord h + coord y = coord (h ^ n * y)
+    let coordHom := e'.equiv.toMonoidHom.comp (QuotientGroup.mk' (b.val.2.subgroupOf b.val.1))
+    exact congrArg Multiplicative.toAdd ((coordHom.map_mul (h ^ n) y).trans (congrArg (· * coordHom y) (coordHom.map_pow h n))).symm
+  · have hn (n : ℕ) : g ^ n * x ∉ b.val.1 := (b.val.1.mul_mem_cancel_left (x := g ^ n) (y := x) (b.val.1.pow_mem hg n)).not.mpr hx
+    rw [schwartzBruhatStageRealization_apply, dite_eq_right hx]
+    simp only [he, schwartzBruhatStageRealization_apply, dite_eq_right (hn _), smul_zero, tsum_zero]
+
+/-- A contracting twist turns a one-sided orbit sum into a geometric sum of Schwartz–Bruhat translates. -/
+private theorem intervalPrimitive_twist {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] (m : G →ₜ* ℝ≥0ˣ)
+    (g : G) (a : ℝ) (ha : 1 < ((m g).val : ℝ) ^ a) (f : G → ℂ)
+    (hf : modulationWeight m a f ∈ schwartzBruhatSubmodule G) :
+    modulationWeight m a (fun x ↦ ∑' n : ℕ, f (g ^ n * x)) ∈ schwartzBruhatSubmodule G := by
+  let u : SchwartzBruhat G := ⟨modulationWeight m a f, hf⟩
+  let b := ((m g).val : ℝ)
+  have hb : 0 < b := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hba := Real.rpow_pos_of_pos hb a
+  have h := intervalPrimitive_geometric g u (b ^ a)⁻¹ (inv_pos.mpr hba) (inv_lt_one_of_one_lt₀ ha)
+  refine Eq.mp (congrArg (· ∈ schwartzBruhatSubmodule G) (funext fun x ↦ ?_)) h
+  change (∑' n : ℕ, (b ^ a)⁻¹ ^ n • u (g ^ n * x)) = ((((m x).val : ℝ) ^ a : ℝ) : ℂ) * ∑' n : ℕ, f (g ^ n * x)
+  rw [← tsum_mul_left]
+  apply tsum_congr
+  intro n
+  change (b ^ a)⁻¹ ^ n • (((((m (g ^ n * x)).val : ℝ) ^ a : ℝ) : ℂ) * f (g ^ n * x)) = _
+  simp only [Complex.real_smul, ← mul_assoc, ← Complex.ofReal_mul]
+  apply congrArg (fun z : ℝ ↦ (z : ℂ) * f (g ^ n * x))
+  simp only [map_mul, map_pow, Units.val_mul, Units.val_pow_eq_pow_val, NNReal.coe_mul, NNReal.coe_pow]
+  rw [Real.mul_rpow (by positivity) (by positivity), ← Real.rpow_natCast_mul hb.le, mul_comm (n : ℝ) a, Real.rpow_mul_natCast hb.le, inv_pow]
+  exact inv_mul_cancel_left₀ (pow_ne_zero _ hba.ne') _
+
+/-- When the bilateral sum vanishes, the forward tail is a primitive and can also be evaluated using the backward tail. -/
+private theorem intervalPrimitive_orbit {G : Type*} [CommGroup G] (g : G) (f : G → ℂ)
+    (hf : ∀ x, HasSum (fun n : ℤ ↦ f (g ^ n * x)) 0) (x : G) :
+    let v := fun y ↦ ∑' n : ℕ, f (g ^ n * y)
+    v x - v (g * x) = f x ∧ v x = f x - ∑' n : ℕ, f (g⁻¹ ^ n * x) := by
+  intro v
+  let z := fun n : ℤ ↦ f (g ^ n * x)
+  have hp : Summable (fun n : ℕ ↦ z n) := (hf x).summable.comp_injective Nat.cast_injective
+  have hn : Summable (fun n : ℕ ↦ z (-(n + 1))) := (hf x).summable.comp_injective (fun i j h ↦ by omega)
+  have hs : Summable (fun n : ℕ ↦ f (g ^ n * x)) := by simpa only [z, zpow_natCast] using hp
+  have ht : Summable (fun n : ℕ ↦ f (g⁻¹ ^ n * x)) := by
+    simpa only [z, comp_def, zpow_neg, zpow_natCast, inv_pow] using
+      (hf x).summable.comp_injective (show Injective (fun n : ℕ ↦ -(n : ℤ)) from neg_injective.comp Nat.cast_injective)
+  constructor
+  · have he := hs.tsum_eq_zero_add
+    simpa only [pow_zero, one_mul, pow_succ, mul_assoc] using sub_eq_of_eq_add he
+  · have he := (hp.hasSum.of_nat_of_neg_add_one hn.hasSum).unique (hf x)
+    have hzero : v x + (∑' n : ℕ, f (g⁻¹ ^ (n + 1) * x)) = 0 := by
+      simpa only [v, z, zpow_natCast, zpow_neg, ← Int.natCast_succ, inv_pow] using he
+    rw [ht.tsum_eq_zero_add, pow_zero, one_mul]
+    linear_combination hzero
+
+/-- Use the forward tail at positive exponents and the backward tail at negative exponents. Interpolation between two nonzero exponents covers zero. -/
+private theorem intervalPrimitive_mem {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] (m : G →ₜ* ℝ≥0ˣ)
+    (hm : IsModulation m) (hms : Surjective m) (g : G) (hg : 1 < (m g).val)
+    (I : Set ℝ) (ho : IsOpen I) (h0 : 0 ∈ I) (f : modulatedExponentialDecaySubmodule m I)
+    (hf : ∀ x, HasSum (fun n : ℤ ↦ f.val (g ^ n * x)) 0) :
+    (fun x ↦ ∑' n : ℕ, f.val (g ^ n * x)) ∈ modulatedExponentialDecaySubmodule m I := by
+  let v := fun x ↦ ∑' n : ℕ, f.val (g ^ n * x)
+  have hg' : 1 < ((m g).val : ℝ) := hg
+  have hp (a : ℝ) (ha : a ∈ I) (hpos : 0 < a) : modulationWeight m a v ∈ schwartzBruhatSubmodule G :=
+    intervalPrimitive_twist m g a (Real.one_lt_rpow hg' hpos) f.val (modulationWeight_mem_schwartzBruhat m I ⟨a, ha⟩ f)
+  have hn (a : ℝ) (ha : a ∈ I) (hneg : a < 0) : modulationWeight m a v ∈ schwartzBruhatSubmodule G := by
+    have hinv : 1 < ((m g⁻¹).val : ℝ) ^ a := by
+      rw [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.inv_rpow (by positivity)]
+      exact one_lt_inv₀ (Real.rpow_pos_of_pos (zero_lt_one.trans hg') _) |>.mpr (Real.rpow_lt_one_of_one_lt_of_neg hg' hneg)
+    have hfa := modulationWeight_mem_schwartzBruhat m I ⟨a, ha⟩ f
+    have he : v = f.val - (fun x ↦ ∑' n : ℕ, f.val (g⁻¹ ^ n * x)) := funext fun x ↦ (intervalPrimitive_orbit g f.val hf x).2
+    rw [he, map_sub]; exact sub_mem hfa (intervalPrimitive_twist m g⁻¹ a hinv f.val hfa)
+  apply (Submodule.mem_iInf _).mpr
+  rintro ⟨a, ha⟩
+  change modulationWeight m a v ∈ schwartzBruhatSubmodule G
+  rcases lt_trichotomy a 0 with h | rfl | h
+  · exact hn a ha h
+  · obtain ⟨l, r, hlr, hsub⟩ := mem_nhds_iff_exists_Ioo_subset.mp (ho.mem_nhds h0)
+    obtain ⟨l', hll, hl'⟩ := exists_between hlr.1
+    obtain ⟨r', hr', hrr⟩ := exists_between hlr.2
+    exact modulationWeight_mem_schwartzBruhat_between m hm hms v l' 0 r' hl' hr'
+      (hn l' (hsub ⟨hll, hl'.trans hlr.2⟩) hl') (hp r' (hsub ⟨hlr.1.trans hr', hrr⟩) hr')
+  · exact hp a ha h
+
 include hOpen in
 /-- Paper: Corollary 4.5.3.1(1), p. 208. On the interval decay space the
 periodization kernel is exactly the range of the cyclic difference. -/
 theorem modulatedIntervalPeriodization_ker_eq_range :
-    (PI).ker = (ΔI).range := by sorry
+    (PI).ker = (ΔI).range := by
+  apply le_antisymm
+  · intro f hf
+    have hs (x : G) : HasSum (fun n : ℤ ↦ f.val (γ ^ n * x)) 0 := by
+      have hp := modulatedIntervalPeriodization_hasSum m γ hm hms hγ I hInt h0 f x
+      have he : PI f (q x) = 0 := congrArg (fun u : S ↦ u (q x)) (show PI f = 0 from hf)
+      exact he ▸ hp
+    let v : D := ⟨_, intervalPrimitive_mem m hm hms γ hγ I hOpen h0 f hs⟩
+    refine ⟨v, Subtype.ext (funext fun x ↦ ?_)⟩
+    exact (modulatedCyclicDifference_apply m γ hm hms I hInt ⟨0, h0⟩ v x).trans
+      (intervalPrimitive_orbit γ f.val hs x).1
+  · rintro _ ⟨f, rfl⟩
+    change PI (ΔI f) = 0
+    refine Subtype.ext (funext fun z ↦ QuotientGroup.induction_on z fun x ↦ ?_)
+    have hp := modulatedIntervalPeriodization_hasSum m γ hm hms hγ I hInt h0 f x
+    have ht := (Equiv.addRight (1 : ℤ)).hasSum_iff.mpr hp
+    apply (modulatedIntervalPeriodization_hasSum m γ hm hms hγ I hInt h0 (ΔI f) x).unique
+    have hs := hp.sub ht
+    rw [sub_self] at hs
+    refine hs.congr_fun fun n ↦ (modulatedCyclicDifference_apply m γ hm hms I hInt ⟨0, h0⟩ f _).trans ?_
+    change f.val _ - f.val (γ * (γ ^ n * x)) = f.val _ - f.val (γ ^ (n + 1) * x)
+    rw [zpow_add_one, mul_comm (γ ^ n) γ, mul_assoc]
 
 private theorem fullPeriodization_ker_eq_range : (P).ker = (Δ).range := by
   let Pu := modulatedIntervalPeriodization m γ hm hms hγ univ ordConnected_univ (mem_univ 0)
