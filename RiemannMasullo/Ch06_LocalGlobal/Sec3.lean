@@ -222,6 +222,79 @@ def heckeEulerProductOutside (S : Finset V) (χ : U)
   toMeromorphicNFOn
     (fun s ↦ continuedCompletedHeckeL χ s / sLocalHeckeL (twist s)) univ
 
+/-- The descended restriction of a unitary character is unitary. -/
+private theorem heckeEulerProductOutside_eq_finite_unitary (S : Finset V) (χ : U)
+    (hχ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S) :
+    ∃ η : PontryaginDual (SIdeleQuotient F S),
+      sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩ =
+        quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+          (isProperMap_sIdeleQuotientNorm F S).continuous
+          ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) 0 := by
+  let c := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩
+  have hc (x : SIdeleQuotient F S) : ‖c x‖ = 1 := by
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [show c (QuotientGroup.mk g) = ideleClassNormTwist χ 0
+      (QuotientGroup.mk (sIdeleInsertion F S g)) from sIdeleRestriction_mk F S _ g]
+    change ‖(χ _ : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    simp
+  let η : PontryaginDual (SIdeleQuotient F S) :=
+    { toFun := fun x ↦ ⟨c x, mem_sphere_zero_iff_norm.mpr (hc x)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' x y := Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  refine ⟨η, ?_⟩
+  ext x
+  change c x = (η x : ℂ) * _ ^ (0 : ℂ)
+  rw [Complex.cpow_zero, mul_one]
+  rfl
+
+/-- The descended local product consists of the archimedean and selected finite factors. -/
+private theorem heckeEulerProductOutside_eq_finite_local_factor (S : Finset V) (χ : U)
+    (hχ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S) :
+    ∀ s, sLocalHeckeL (quasiCharacterNormTwist (G := SIdeleQuotient F S)
+      (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      (sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩) s) =
+      heckeGammaFactor χ s * ∏ v : S, finiteHeckeEulerFactor χ v.val s := by
+  obtain ⟨η, hη⟩ := heckeEulerProductOutside_eq_finite_unitary S χ hχ
+  intro s
+  have heq : quasiCharacterNormTwist (G := SIdeleQuotient F S)
+      (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      (sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩) s =
+      quasiCharacterNormTwist (G := SIdeleQuotient F S)
+      (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) s := by
+    ext x
+    have h := DFunLike.congr_fun hη x
+    change _ = (η x : ℂ) * _ ^ (0 : ℂ) at h
+    rw [Complex.cpow_zero, mul_one] at h
+    change (sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩) x *
+      (((sIdeleQuotientNorm F S x : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (η x : ℂ) * (((sIdeleQuotientNorm F S x : ℝ≥0) : ℝ) : ℂ) ^ s
+    rw [h]
+  rw [heq]
+  exact sLocalHeckeL_eq_partialEulerProduct η χ hχ hη s
+
+/-- Meromorphic functions equal on a right half-plane have the same normal form. -/
+private theorem heckeEulerProductOutside_eq_finite_nf_eq (f g : ℂ → ℂ) (hf : MeromorphicOn f univ)
+    (hg : MeromorphicOn g univ) (hfg : ∀ z : ℂ, 1 < z.re → f z = g z) :
+    toMeromorphicNFOn f univ = toMeromorphicNFOn g univ := by
+  have hAtTwo : meromorphicOrderAt (f - g) (2 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ z : ℂ in 𝓝 (2 : ℂ), 1 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun z hz ↦ sub_eq_zero.mpr (hfg z hz)
+  ext z
+  have ho := (hf.sub hg).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ z) hAtTwo
+  have hnear : f =ᶠ[𝓝[≠] z] g :=
+    (meromorphicOrderAt_eq_top_iff.mp ho).mono fun _ h ↦ sub_eq_zero.mp h
+  have hn : toMeromorphicNFOn f univ =ᶠ[𝓝[≠] z] toMeromorphicNFOn g univ :=
+    (hf.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ z)).trans
+      (hnear.trans (hg.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ z)).symm)
+  exact (((meromorphicNFOn_toMeromorphicNFOn f univ (mem_univ z)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+    (meromorphicNFOn_toMeromorphicNFOn g univ (mem_univ z))).mp hn).eq_of_nhds
+
+
 /-- Paper: Equation (6.3.1.6), p. 303.
 The outside product equals the finite continuation with the finite factors in S removed,
 as used in Appendix B.6. -/
@@ -230,7 +303,46 @@ theorem heckeEulerProductOutside_eq_finite (S : Finset V) (χ : U)
     (_hL : MeromorphicNFOn L univ) (_hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
     heckeEulerProductOutside S χ hχ = toMeromorphicNFOn
       (fun s ↦ reciprocalPartialHeckeEulerProduct χ S s * L s) univ := by
-  sorry
+  classical
+  have hfactor (v : V) : Differentiable ℂ (fun s ↦ (finiteHeckeEulerFactor χ v s)⁻¹) := by
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · simp_rw [inv_inv]
+      have hq : (Ideal.absNorm v.asIdeal : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+        ((Ideal.absNorm_eq_zero_iff).not.mpr v.ne_bot)
+      exact (differentiable_const _).sub ((differentiable_const _).mul
+        ((differentiable_neg).const_cpow (Or.inl hq)))
+    · simp_rw [inv_one]
+      exact differentiable_const _
+  have hp : Differentiable ℂ (reciprocalPartialHeckeEulerProduct χ S) := by
+    unfold reciprocalPartialHeckeEulerProduct
+    exact Differentiable.fun_finsetProd fun v _ ↦ hfactor v
+  have hlocal : MeromorphicOn (fun s ↦ sLocalHeckeL
+      (quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+        (isProperMap_sIdeleQuotientNorm F S).continuous
+        (sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩) s)) univ := by
+    simp_rw [heckeEulerProductOutside_eq_finite_local_factor S χ hχ]
+    apply (meromorphic_heckeGammaFactor χ).meromorphicOn.mul
+    apply MeromorphicOn.fun_prod
+    intro v _ z _
+    convert ((hfactor v.val).analyticAt z).meromorphicAt.inv using 1
+    ext w
+    simp
+  unfold heckeEulerProductOutside
+  apply heckeEulerProductOutside_eq_finite_nf_eq
+  · exact (continuedCompletedHeckeL_spec χ).1.meromorphicOn.div hlocal
+  · exact (fun z _ ↦ (hp.analyticAt z).meromorphicAt.mul (_hL.meromorphicOn z (mem_univ z)))
+  · intro z hz
+    rw [heckeEulerProductOutside_eq_finite_local_factor S χ hχ, (continuedCompletedHeckeL_spec χ).2 ⟨z, hz⟩,
+      _hSeries ⟨z, hz⟩]
+    change (heckeGammaFactor χ z * finiteHeckeL χ ⟨z, hz⟩) / _ = _
+    have hn := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)
+    have hprod : reciprocalPartialHeckeEulerProduct χ S z =
+        (∏ v : S, finiteHeckeEulerFactor χ v.val z)⁻¹ := by
+      unfold reciprocalPartialHeckeEulerProduct
+      rw [← Finset.prod_coe_sort, Finset.prod_inv_distrib]
+    rw [hprod]
+    field_simp
 
 section GlobalConverse
 
