@@ -649,7 +649,44 @@ theorem spectralAnnihilator_directSum :
 An entire Schwartz–Bergman function includes continuously into the compact-open space
 by keeping its value at each point. -/
 theorem exists_schwartzBergman_entireInclusion :
-    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by sorry
+    ∃ i : Aℂ →L[ℂ] Entire, ∀ (f : Aℂ) (z : ℂ), (i f).val z = f.val z := by
+  have hD (f : Aℂ) : Differentiable ℂ f.val := by
+    simpa only [preimage_univ, differentiableOn_univ] using f.property.2.1
+  let I : Aℂ →ₗ[ℂ] Entire := {
+    toFun f := ⟨⟨_, (hD f).continuous⟩, hD f⟩
+    map_add' := fun _ _ ↦ rfl
+    map_smul' := fun _ _ ↦ rfl }
+  refine ⟨⟨I, ?_⟩, fun _ _ ↦ rfl⟩
+  obtain ⟨T, hT, hemb⟩ := schwartzBergman_schwartzLine_topology univ isOpen_univ
+    Set.ordConnected_univ univ_nonempty
+  have hcont (z : ℂ) : Continuous (fun f : Aℂ ↦ f.val z) := by
+    let a : (univ : Set ℝ) := ⟨z.re, trivial⟩
+    have he : Continuous (fun f : Aℂ ↦ T f a z.im) :=
+      (((BoundedContinuousFunction.evalCLM ℂ z.im).comp
+        (SchwartzMap.toBoundedContinuousFunctionCLM ℂ ℝ ℂ)).continuous.comp
+          ((continuous_apply a).comp hemb.continuous))
+    simpa only [hT, weightedVerticalTrace, pow_zero, one_mul, a, Complex.re_add_im] using he
+  let ev (z : ℂ) : Aℂ →L[ℂ] ℂ := {
+    toFun f := f.val z
+    map_add' := fun _ _ ↦ rfl
+    map_smul' := fun _ _ ↦ rfl
+    cont := hcont z }
+  have : BarrelledSpace ℂ Aℂ := isFrechetTVS_barrelled
+    (schwartzBergman_frechet univ isOpen_univ Set.ordConnected_univ univ_nonempty)
+  apply Continuous.subtype_mk
+  apply continuous_iff_continuousAt.mpr
+  intro f
+  apply ContinuousMap.tendsto_iff_forall_isCompact_tendstoUniformlyOn.mpr
+  intro K hK
+  -- On a compact set the evaluations are pointwise bounded, hence equicontinuous.
+  have hb (g : Aℂ) : Bornology.IsVonNBounded ℂ (range fun z : K ↦ ev z g) := by
+    exact (hK.image (hD g).continuous).isVonNBounded ℂ |>.subset
+      (range_subset_iff.mpr fun z ↦ mem_image_of_mem _ z.property)
+  have heq := (PolynormableSpace.banach_steinhaus (𝓕 := fun z : K ↦ ev z) hb).equicontinuous f
+  apply Metric.tendstoUniformlyOn_iff.mpr
+  intro ε hε
+  filter_upwards [Metric.equicontinuousAt_iff_right.mp heq ε hε] with g hg z hz
+  exact hg ⟨z, hz⟩
 
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327. The canonical map includes entire
 Schwartz–Bergman functions into the compact-open space of entire functions. -/
@@ -667,10 +704,73 @@ def schwartzBergmanDivisible (g : Entire) : Submodule ℂ Aℂ :=
   ((Ideal.span ({g} : Set Entire)).restrictScalars ℂ).comap
     schwartzBergmanEntireInclusion.toLinearMap
 
+/-- An entire function is divisible by `g` exactly when it vanishes to at least the order of
+`g` at every point. In that case the normalized quotient gives an entire factor. -/
+private theorem schwartzBergmanDivisible_isClosed_dvd (g f : Entire) :
+    g ∣ f ↔ ∀ z, analyticOrderAt (g.val : ℂ → ℂ) z ≤ analyticOrderAt (f.val : ℂ → ℂ) z := by
+  have ha (a : Entire) (z : ℂ) : AnalyticAt ℂ (a.val : ℂ → ℂ) z :=
+    (show Differentiable ℂ a.val from a.property).analyticAt z
+  constructor
+  · rintro ⟨k, rfl⟩ z
+    change _ ≤ analyticOrderAt ((g.val : ℂ → ℂ) * (k.val : ℂ → ℂ)) z
+    rw [analyticOrderAt_mul (ha g z) (ha k z)]
+    exact self_le_add_right _ _
+  · intro hord
+    let q := (f.val : ℂ → ℂ) / (g.val : ℂ → ℂ)
+    have hq : MeromorphicOn q univ := fun z _ ↦ (ha f z).meromorphicAt.div (ha g z).meromorphicAt
+    have hdiff : Differentiable ℂ (toMeromorphicNFOn q univ) := by
+      intro z
+      apply AnalyticAt.differentiableAt
+      have hnf := meromorphicNFOn_toMeromorphicNFOn q univ (mem_univ z)
+      apply hnf.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+      rw [meromorphicOrderAt_toMeromorphicNFOn hq (mem_univ z),
+        meromorphicOrderAt_div (ha f z).meromorphicAt (ha g z).meromorphicAt,
+        (ha f z).meromorphicOrderAt_eq, (ha g z).meromorphicOrderAt_eq]
+      have hle := hord z
+      generalize analyticOrderAt (f.val : ℂ → ℂ) z = m at hle ⊢
+      generalize analyticOrderAt (g.val : ℂ → ℂ) z = n at hle ⊢
+      cases m using ENat.recTopCoe with
+      | top => simp
+      | coe m =>
+        cases n using ENat.recTopCoe with
+        | top => simp at hle
+        | coe n =>
+          exact WithTop.coe_le_coe.mpr (sub_nonneg.mpr (by exact_mod_cast hle : (n : ℤ) ≤ m))
+    refine ⟨⟨⟨_, hdiff.continuous⟩, hdiff⟩, Subtype.ext (ContinuousMap.ext fun z ↦ ?_)⟩
+    change f.val z = g.val z * toMeromorphicNFOn q univ z
+    by_cases hz : g.val z = 0
+    · have hpos := lt_of_lt_of_le (pos_iff_ne_zero.mpr ((ha g z).analyticOrderAt_ne_zero.mpr hz))
+          (hord z)
+      rw [hz, zero_mul]
+      exact (ha f z).analyticOrderAt_ne_zero.mp hpos.ne'
+    · rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hq (mem_univ z),
+        toMeromorphicNFAt_eq_self.mpr ((ha f z).div (ha g z) hz).meromorphicNFAt]
+      exact (mul_div_cancel₀ _ hz).symm
+
+/-- A principal ideal of entire functions is the intersection of its vanishing jet kernels. -/
+private theorem schwartzBergmanDivisible_isClosed_span (g : Entire) :
+    IsClosed (Ideal.span ({g} : Set Entire) : Set Entire) := by
+  have heq : (Ideal.span ({g} : Set Entire) : Set Entire) =
+      ⋂ (z : ℂ) (n : ℕ) (_ : (n : ℕ∞) ≤ analyticOrderAt (g.val : ℂ → ℂ) z)
+        (i : ℕ) (_ : i < n), ((entireJet z i).ker : Set Entire) := by
+    ext f
+    simp only [SetLike.mem_coe, Ideal.mem_span_singleton,
+      schwartzBergmanDivisible_isClosed_dvd, mem_iInter, LinearMap.mem_ker,
+      ContinuousLinearMap.coe_coe, entireJet_apply]
+    apply forall_congr'
+    intro z
+    rw [← ENat.forall_natCast_le_iff_le]
+    simp_rw [natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero
+      ((show Differentiable ℂ f.val from f.property).analyticAt z)]
+  rw [heq]
+  exact isClosed_iInter fun z ↦ isClosed_iInter fun n ↦ isClosed_iInter fun _ ↦
+    isClosed_iInter fun i ↦ isClosed_iInter fun _ ↦ (entireJet z i).isClosed_ker
+
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–328. Divisibility defines a closed subspace,
 so its quotient with the Schwartz–Bergman quotient topology is Hausdorff. -/
 theorem schwartzBergmanDivisible_isClosed (g : Entire) :
-    IsClosed (schwartzBergmanDivisible g : Set Aℂ) := by sorry
+    IsClosed (schwartzBergmanDivisible g : Set Aℂ) :=
+  (schwartzBergmanDivisible_isClosed_span g).preimage schwartzBergmanEntireInclusion.continuous
 
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327 and Theorem 7.1.4.3(2), p. 331.
 Restriction to Schwartz–Bergman functions induces an injective map with dense image
