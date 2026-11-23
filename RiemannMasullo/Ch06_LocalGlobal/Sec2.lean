@@ -76,6 +76,76 @@ theorem sLocalHomogeneousThetaTransition_equiv_of_unramified
       ∀ f : ℬₛ(S), e ((Kₛω(S, χS)).mkQ f) =
         (Kₛω(T, χ)).mkQ (sAdeleSchwartzTransition F hST.le f) := by sorry
 
+/-- The descended character at a larger stage kills the additional integral units:
+use the same global lift to evaluate the descent identity at both stages. -/
+private theorem sLocalHomogeneousThetaToGlobal_equiv_of_unramified_units
+    (hST : S ⊆ T) {ω : PontryaginDual C₁} (hω : NormOneCharacterUnramifiedOutside ω S)
+    (x : J₁(T)) (u : relativeIntegralIdeleUnits F S T) (hx : x.val = QuotientGroup.mk u.val) :
+    sLocalNormOneCharacter T ω (hω.mono hST) x = 1 := by
+  obtain ⟨g, hg, hgu⟩ := u.property
+  obtain ⟨a, ha⟩ := hg.1
+  have hp : Units.map (adeleProjection F S).toMonoidHom g = 1 := hg.2
+  have hn : ideleNorm F g = 1 := by
+    have h := (sIdeleNorm_spec F S).1 a
+    change ideleNorm F (integralIdeleInsertion F S a) =
+      sIdeleNorm F S (Units.map (adeleProjection F S).toMonoidHom (integralIdeleInsertion F S a)) at h
+    rwa [ha, hp, map_one] at h
+  let z : C₁ := ⟨QuotientGroup.mk g, hn⟩
+  have hz := sLocalNormOneCharacter_apply ω hω a z 1 (congrArg QuotientGroup.mk ha.symm)
+    (by rw [ha, hp]; rfl)
+  have hb : g ∈ Set.range (integralIdeleInsertion F T) :=
+    (mem_range_integralIdeleInsertion F T g).mpr (fun v hv ↦
+      (mem_range_integralIdeleInsertion F S g).mp ⟨a, ha⟩ v (fun hs ↦ hv (hST hs)))
+  obtain ⟨b, hb⟩ := hb
+  exact (sLocalNormOneCharacter_apply ω (hω.mono hST) b z x (congrArg QuotientGroup.mk hb.symm)
+    (by rw [hb, hgu]; exact hx)).trans (hz.symm.trans (map_one _))
+
+/-- Surjectivity on homogeneous classes can be checked on test representatives, so no
+identification of the two descriptions of the descended source character is needed. -/
+private theorem sLocalHomogeneousThetaToGlobal_equiv_of_unramified_stage
+    (hST : S ⊂ T) (hPic : Subsingleton Picₛ(S)) {ω : PontryaginDual C₁}
+    (hω : NormOneCharacterUnramifiedOutside ω S) :
+    Surjective (sLocalHomogeneousThetaTransition (ω := ω) hω hST.le) := by
+  let χT := sLocalNormOneCharacter T ω (hω.mono hST.le)
+  have hex := sLocalHomogeneousThetaTransition_equiv_of_unramified hST hPic χT
+    (sLocalHomogeneousThetaToGlobal_equiv_of_unramified_units hST.le hω)
+  with_reducible refine hex.elim fun χS hS ↦ ?_
+  with_reducible refine hS.elim fun e he ↦ ?_
+  intro y
+  have hrep := (Kₛω(S, χS)).mkQ_surjective (e.symm y)
+  with_reducible refine hrep.elim fun f hf ↦ ?_
+  refine ⟨(Kₛω(S, sLocalNormOneCharacter S ω hω)).mkQ f, ?_⟩
+  change (Kₛω(T, χT)).mkQ (sAdeleSchwartzTransition F hST.le f) = y
+  with_reducible exact (he.2 f).symm.trans ((congrArg e hf).trans (e.apply_symm_apply y))
+
+/-- A stage in an exhaustive family of closed embeddings exhausts the limit if its
+transition to every strictly larger stage is surjective. -/
+private theorem sLocalHomogeneousThetaToGlobal_equiv_of_unramified_of_limit
+    {ι : Type*} [PartialOrder ι] {P : ι → Prop} (s : ι) (p : P s)
+    (m : ∀ {t u}, P t → t ≤ u → P u) (X : (t : ι) → P t → Type*)
+    [∀ t h, AddCommGroup (X t h)] [∀ t h, Module ℂ (X t h)] [∀ t h, TopologicalSpace (X t h)]
+    {Y : Type*} [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (i : ∀ t (q : P t), X t q →ₗ[ℂ] Y)
+    (j : ∀ t u (q : P t) (h : t ≤ u), X t q →ₗ[ℂ] X u (m q h))
+    (hs : ∀ t (h : s < t), Surjective (j s t p h.le))
+    (hc : let I := {t : ι // s ≤ t}
+      let q := fun t : I ↦ m p t.property
+      let f := fun t : I ↦ i t.val (q t)
+      (∀ t, IsClosedEmbedding (f t)) ∧
+      (∀ (t u : I) (htu : t.val ≤ u.val), (f u).comp (j t u (q t) htu) = f t) ∧
+      (∀ y, ∃ t x, f t x = y)) :
+    ∃ e : X s p ≃L[ℂ] Y, e.toLinearMap = i s p := by
+  have he := hc.1 ⟨s, le_rfl⟩
+  have hi : Surjective (i s p) := by
+    intro y
+    obtain ⟨⟨t, ht⟩, x, rfl⟩ := hc.2.2 y
+    rcases eq_or_lt_of_le ht with rfl | hlt
+    · exact ⟨x, rfl⟩
+    obtain ⟨z, rfl⟩ := hs t hlt x
+    exact ⟨z, (LinearMap.congr_fun (hc.2.1 ⟨s, le_rfl⟩ ⟨t, ht⟩ ht) z).symm⟩
+  let e := LinearEquiv.ofBijective (i s p) ⟨he.injective, hi⟩
+  exact ⟨⟨e, he.continuous, (e.toEquiv.toHomeomorphOfIsInducing he.isInducing).symm.continuous⟩, rfl⟩
+
 /-- Paper: Theorem 6.2.1.1(2), p. 295.
 If the S-integer Picard group is trivial and the global character is unramified
 outside S, the existing homogeneous insertion is a topological linear isomorphism. -/
@@ -83,7 +153,17 @@ theorem sLocalHomogeneousThetaToGlobal_equiv_of_unramified
     (_hPic : Subsingleton Picₛ(S)) {ω : PontryaginDual C₁}
     (hω : NormOneCharacterUnramifiedOutside ω S) :
     ∃ e : Θₛω(S, sLocalNormOneCharacter S ω hω) ≃L[ℂ] Θ𝔽ω(ω),
-      e.toLinearMap = sLocalHomogeneousThetaToGlobal hω := by sorry
+      e.toLinearMap = sLocalHomogeneousThetaToGlobal hω := by
+  let X (T : Finset V) (q : NormOneCharacterUnramifiedOutside ω T) :=
+    Θₛω(T, sLocalNormOneCharacter T ω q)
+  have h := sLocalHomogeneousTheta_inductiveLimit (F := F) (S := S) (ω := ω) hω
+  with_reducible
+    exact sLocalHomogeneousThetaToGlobal_equiv_of_unramified_of_limit (Y := Θ𝔽ω(ω)) S hω
+      (fun q h ↦ NormOneCharacterUnramifiedOutside.mono q h) X
+      (fun T ↦ sLocalHomogeneousThetaToGlobal (F := F) (S := T) (ω := ω))
+      (fun T U ↦ sLocalHomogeneousThetaTransition (F := F) (S := T) (T := U) (ω := ω))
+      (fun t hst ↦ sLocalHomogeneousThetaToGlobal_equiv_of_unramified_stage
+        (F := F) (S := S) (T := t) (ω := ω) hst _hPic hω) ⟨h.1, h.2.1, h.2.2.1⟩
 
 /-- Paper: Corollary 6.2.1.2, p. 295.
 Each global homogeneous theta quotient is a nuclear Fréchet space. -/
