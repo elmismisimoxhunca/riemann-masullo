@@ -6,6 +6,9 @@ public import Mathlib.Analysis.Distribution.Support
 public import Mathlib.Algebra.MvPolynomial.Degrees
 public import Mathlib.RingTheory.MvPowerSeries.PiTopology
 public import Mathlib.RingTheory.PowerSeries.PiTopology
+import all RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Precompact
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 
 /-! # Non-archimedean principal values and distributions supported at the origin
 
@@ -633,7 +636,40 @@ theorem realSchwartzFlatQuotient_strongDual :
     let pull := fun T : StrongDual ℂ (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin) ↦
       T.comp realSchwartzFlatAtOrigin.mkQL
     IsEmbedding pull ∧ Set.range pull =
-      {T : StrongDual ℂ 𝓢(ℝ, ℂ) | ∀ f ∈ realSchwartzFlatAtOrigin, T f = 0} := by sorry
+      {T : StrongDual ℂ 𝓢(ℝ, ℂ) | ∀ f ∈ realSchwartzFlatAtOrigin, T f = 0} := by
+  let E := 𝓢(ℝ, ℂ)
+  let K := realSchwartzFlatAtOrigin
+  have hP := (schwartz_withSeminorms ℂ ℝ ℂ).toPolynormableSpace
+  have hF : IsFrechetTVS E := by
+    have : (uniformity E).IsCountablyGenerated := by
+      rw [uniformity_eq_comap_nhds_zero E]
+      infer_instance
+    refine ⟨inferInstance, hP, UniformSpace.metrizableSpace, ?_⟩
+    rw [IsUniformAddGroup.rightUniformSpace_eq]
+    exact completeSpace_schwartzMap
+  have hlift := liftsBoundedSets_mkQL_of_schwartz_frechet hF
+    ⟨hP, schwartzMap_real_exists_totallyBounded_nhds⟩ K realSchwartzFlatAtOrigin_isClosed
+  let R : StrongDual ℂ (E ⧸ K) →L[ℂ] StrongDual ℂ E := ContinuousLinearMap.precomp ℂ K.mkQL
+  change IsEmbedding R ∧ _
+  refine ⟨⟨?_, ?_⟩, ?_⟩
+  · apply IsTopologicalAddGroup.isInducing_iff_nhds_zero.mpr
+    refine le_antisymm (map_le_iff_le_comap.mp ?_) ?_
+    · simpa only [Tendsto, map_zero] using R.continuous.tendsto 0
+    · apply ContinuousLinearMap.hasBasis_nhds_zero.ge_iff.mpr
+      rintro ⟨B, U⟩ ⟨hB, hU⟩
+      obtain ⟨A, hA, hBA⟩ := hlift B hB
+      refine mem_comap.mpr ⟨{l : StrongDual ℂ E | Set.MapsTo l A U},
+        ContinuousLinearMap.eventually_nhds_zero_mapsTo hA hU, ?_⟩
+      intro l hl b hb
+      obtain ⟨a, ha, rfl⟩ := hBA hb
+      exact hl ha
+  · intro l m he
+    ext x
+    obtain ⟨a, rfl⟩ := K.mkQ_surjective x
+    exact DFunLike.congr_fun he a
+  · rw [range_transpose_mkQL]
+    ext l
+    simp
 
 end RealOrigin
 
