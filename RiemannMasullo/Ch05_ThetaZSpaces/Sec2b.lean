@@ -470,6 +470,54 @@ theorem exists_globalHomogeneousThetaMellin (ω : PontryaginDual C₁) :
         (Z ((K𝔽ω(ω)).mkQ f)).val c =
           (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := by sorry
 
+/-- Restrict a bounded-pole continuation and its regular values along the component inclusion. -/
+private theorem exists_sLocalHomogeneousThetaMellin_restrict {G : Type*} [CommGroup G]
+    [TopologicalSpace G] (m : G →* ℝ≥0ˣ) (hm : Continuous m) (χ : PontryaginDual m.ker)
+    (b : QuasiCharacter G → WithTop ℤ) :
+    ∃ R : ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b) →L[ℂ]
+        ↥(meromorphicNormOneComponent m hm χ b),
+      ∀ u c, (R u).val c = u.val ⟨c.val.val, c.property⟩ := by
+  let X := {c : QuasiCharacter G // ∀ h : m.ker, c h.val = (χ h : ℂ)}
+  let i : C({c : X // 0 ≤ b c.val}, {c // 0 ≤ b c}) :=
+    ⟨fun c ↦ ⟨c.val.val, c.property⟩,
+      (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _⟩
+  have hmem (u : ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b)) :
+      u.val.comp i ∈ meromorphicNormOneComponent m hm χ b := by
+    obtain ⟨Z, hZ, hgerm⟩ := u.property
+    exact ⟨fun c ↦ Z c.val, fun c ↦ hZ (i c), fun c ↦ hgerm c.val⟩
+  exact ⟨{ toFun := fun u ↦ ⟨u.val.comp i, hmem u⟩
+           map_add' := fun _ _ ↦ rfl
+           map_smul' := fun _ _ ↦ rfl
+           cont := ((ContinuousMap.continuous_precomp i).comp continuous_subtype_val).subtype_mk hmem },
+    fun _ _ ↦ rfl⟩
+
+/-- Descend the component restriction when vanishing on its regular locus characterizes the kernel. -/
+private theorem exists_sLocalHomogeneousThetaMellin_of_ker {G : Type*} [CommGroup G]
+    [TopologicalSpace G] (m : G →* ℝ≥0ˣ) (hm : Continuous m) (χ : PontryaginDual m.ker)
+    (b : QuasiCharacter G → WithTop ℤ) {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] (K : Submodule ℂ E)
+    (M : E →L[ℂ] ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b))
+    (hK : ∀ f, f ∈ K ↔ ∀ c : {c // 0 ≤ b c},
+      (∀ h : m.ker, c.val h.val = (χ h : ℂ)) → (M f).val c = 0) :
+    ∃ Z : (E ⧸ K) →L[ℂ] ↥(meromorphicNormOneComponent m hm χ b), Injective Z ∧
+      ∀ f c, (Z (K.mkQ f)).val c = (M f).val ⟨c.val.val, c.property⟩ := by
+  obtain ⟨R, hR⟩ := exists_sLocalHomogeneousThetaMellin_restrict m hm χ b
+  let L := R.comp M
+  have hker : K = L.ker := by
+    refine Submodule.ext fun f ↦ (hK f).trans ?_
+    change _ ↔ R (M f) = 0
+    constructor
+    · intro hf
+      exact Subtype.ext (ContinuousMap.ext fun c ↦ (hR (M f) c).trans
+        (hf ⟨c.val.val, c.property⟩ c.val.property))
+    · intro hf c hc
+      let d : {x : {x : QuasiCharacter G // ∀ h : m.ker, x h.val = (χ h : ℂ)} //
+          0 ≤ b x.val} := ⟨⟨c.val, hc⟩, c.property⟩
+      exact (hR (M f) d).symm.trans
+        (congrArg (fun u : ↥(meromorphicNormOneComponent m hm χ b) ↦ u.val d) hf)
+  refine ⟨K.liftQL L hker.le, ?_, fun f c ↦ hR (M f) c⟩
+  exact LinearMap.ker_eq_bot.mp (Submodule.ker_liftQ_eq_bot' _ L.toLinearMap hker)
+
 /-- Paper: (5.2.3.14), p. 236.
 The S-local Mellin transform on homogeneous classes is continuous and injective.
 On a representative it gives the component of the S-local Mellin transform in (5.2.2.2). -/
@@ -477,7 +525,11 @@ theorem exists_sLocalHomogeneousThetaMellin (χ : PontryaginDual (J₁(S))) :
     ∃ Z : Θₛω(S, χ) →L[ℂ] ↥(Mₛω(S, χ)), Injective Z ∧
       ∀ (f : ℬₛ(S)) c,
         (Z ((Kₛω(S, χ)).mkQ f)).val c =
-          (sLocalIdelicMellin (F := F) (S := S) f).val ⟨c.val.val, c.property⟩ := by sorry
+          (sLocalIdelicMellin (F := F) (S := S) f).val ⟨c.val.val, c.property⟩ := by
+  exact exists_sLocalHomogeneousThetaMellin_of_ker (mₛ(S))
+    (isProperMap_sIdeleQuotientNorm F S).continuous χ (sLocalIdelicOrderBound (F := F) (S := S))
+    (Kₛω(S, χ)) ⟨sLocalIdelicMellin (F := F) (S := S), sLocalIdelicMellin_continuous⟩
+    (mem_sLocalHomogeneousAdelicTheta_ker_iff (F := F) (S := S) χ)
 
 -- TODO(paper-gap): Ordinary insertion does not in general intertwine isotype
 -- projections onto subspaces. Normalizing the averages does not fix this.
