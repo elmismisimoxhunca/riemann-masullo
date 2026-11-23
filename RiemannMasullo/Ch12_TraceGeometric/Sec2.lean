@@ -44,7 +44,21 @@ def IsIndentation (μH : Measure H) (b : G → ℝ) : Prop :=
 /-- Paper: Definition 12.2.1.3, p. 506. For the trivial subgroup with unit counting
 measure, the indentations are exactly the constant one function. -/
 theorem isIndentation_bot_iff (b : G → ℝ) :
-    IsIndentation (⊥ : Subgroup G) Measure.count b ↔ b = fun _ ↦ 1 := by sorry
+    IsIndentation (⊥ : Subgroup G) Measure.count b ↔ b = fun _ ↦ 1 := by
+  have hcount := Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G))
+  constructor
+  · intro hb
+    funext x
+    simpa [hcount] using (hb.2.2.2 x).2
+  · rintro rfl
+    refine ⟨continuous_const, fun _ ↦ zero_le_one, ?_, ?_⟩
+    · intro K hK
+      have hinj : Function.Injective (QuotientGroup.mk' (⊥ : Subgroup G)) :=
+        (QuotientGroup.quotientBot (G := G)).symm.injective
+      rw [Set.preimage_image_eq _ hinj]
+      exact hK.inter_left (isClosed_tsupport _)
+    · intro x
+      simp [hcount]
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
   [SecondCountableTopology G] [BorelSpace G]
@@ -67,13 +81,28 @@ integrable on every subgroup fibre and its fibre integral recovers the quotient 
 theorem integral_indentationLift {b : G → ℝ} (hb : IsIndentation H μH b)
     (u : C(Q, ℂ)) (x : G) :
     Integrable (fun h : H ↦ indentationLift H b u ((h : G)⁻¹ * x)) μH ∧
-      (∫ h : H, indentationLift H b u ((h : G)⁻¹ * x) ∂μH) = u (π x) := by sorry
+      (∫ h : H, indentationLift H b u ((h : G)⁻¹ * x) ∂μH) = u (π x) := by
+  obtain ⟨hi, he⟩ := hb.2.2.2 x
+  have hcoset (h : H) : π ((h : G)⁻¹ * x) = π x := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    rw [map_mul, map_inv, h1, inv_one, one_mul]
+  simp only [indentationLift, hcoset]
+  refine ⟨hi.ofReal.mul_const _, ?_⟩
+  rw [integral_mul_const, integral_complex_ofReal, he, Complex.ofReal_one, one_mul]
 
 /-- Paper: (12.2.1.5), p. 505. Fibre integration of a compactly supported test
 commutes with complex scalar multiplication. -/
 theorem indentationAverage_smul (c : ℂ) (f : C_c(G, ℂ)) :
     (TopologicalGroup.IsSES.ofClosedSubgroup H hH).pushforward μH (c • f) =
-      c • (TopologicalGroup.IsSES.ofClosedSubgroup H hH).pushforward μH f := by sorry
+      c • (TopologicalGroup.IsSES.ofClosedSubgroup H hH).pushforward μH f := by
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  apply DFunLike.ext
+  intro q
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H q
+  change e.pushforward μH (c • f) (π x) = c • e.pushforward μH f (π x)
+  rw [e.pushforward_apply_apply, e.pushforward_apply_apply]
+  simp only [TopologicalGroup.IsSES.pullback_def, CompactlySupportedContinuousMap.smul_apply,
+    integral_smul]
 
 /-- Paper: (12.2.1.5), p. 505. The quotient average of a compactly supported
 continuous function integrates over the subgroup fibres and is a complex-linear
@@ -87,7 +116,19 @@ def indentationAverage : C_c(G, ℂ) →ₗ[ℂ] C_c(Q, ℂ) where
 representative by integrating its inverse subgroup translates. -/
 theorem indentationAverage_apply (f : C_c(G, ℂ)) (x : G) :
     Integrable (fun h : H ↦ f ((h : G)⁻¹ * x)) μH ∧
-      indentationAverage H hH μH f (π x) = ∫ h : H, f ((h : G)⁻¹ * x) ∂μH := by sorry
+      indentationAverage H hH μH f (π x) = ∫ h : H, f ((h : G)⁻¹ * x) ∂μH := by
+  let : LocallyCompactSpace H := hH.locallyCompactSpace
+  let : TopologicalSpace.PseudoMetrizableSpace H :=
+    hH.isClosedEmbedding_subtypeVal.isInducing.pseudoMetrizableSpace
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  have hinv (h : H) : e.pullback f x h⁻¹ = f ((h : G)⁻¹ * x) := by
+    rw [e.pullback_def]
+    simp [mul_comm]
+  constructor
+  · simpa only [hinv] using ((e.pullback f x).integrable (μ := μH)).comp_inv
+  · change e.pushforward μH f (π x) = _
+    rw [e.pushforward_apply_apply]
+    simpa only [hinv] using (integral_inv_eq_self (e.pullback f x) μH).symm
 
 /-- Paper: (12.2.1.6), p. 506. A regular positive measure upstairs lifts a quotient
 measure if its integrals on compactly supported continuous tests agree with the
@@ -218,7 +259,11 @@ def IsIndentationFundamentalDomain (A : Type*) [Group A] [MulAction A X]
 a fundamental domain exactly when it is nonempty under the relaxed definition. -/
 theorem isIndentationFundamentalDomain_univ_punit (μ : Measure X) :
     IsIndentationFundamentalDomain PUnit μ (univ : Set X) ↔
-      (univ : Set X).Nonempty := by sorry
+      (univ : Set X).Nonempty := by
+  unfold IsIndentationFundamentalDomain
+  rw [interior_univ]
+  exact ⟨fun h ↦ h.1, fun h ↦ ⟨h, fun _ ↦ ⟨PUnit.unit, mem_univ _, fun _ _ ↦ rfl⟩,
+    fun a ha ↦ absurd (Subsingleton.elim a 1) ha⟩⟩
 
 /-- Paper: Remark 12.2.1.4, p. 507. With countably many translates and a Borel
 measure, the paper's exact tiling gives a measure-theoretic fundamental domain. -/
@@ -263,7 +308,20 @@ def IsDiagonalIndentationSituation (μ : Measure G) (D : Set G) (U : ℕ → Set
 /-- Paper: Situation 12.2.2.1, p. 508. On the one-element group, the whole space
 is a fundamental domain and also supplies the constant neighborhood sequence. -/
 theorem isDiagonalIndentationSituation_subsingleton [Subsingleton G] :
-    IsDiagonalIndentationSituation (⊥ : Subgroup G) Measure.count univ (fun _ ↦ univ) := by sorry
+    IsDiagonalIndentationSituation (⊥ : Subgroup G) Measure.count univ (fun _ ↦ univ) := by
+  have hmass : (Measure.count : Measure G) univ = 1 := by
+    simp [Subsingleton.count_eq_dirac (1 : G)]
+  refine ⟨⟨by simp, fun x ↦ ⟨1, mem_univ _, fun h _ ↦ Subsingleton.elim _ _⟩,
+    fun h hh ↦ (hh (Subsingleton.elim _ _)).elim⟩, ⟨⟨?_, antitone_const, ?_⟩, ?_⟩, ?_⟩
+  · intro n
+    simp [hmass]
+  · refine ⟨2, by norm_num, fun n ↦ ?_⟩
+    simp [hmass]
+  · intro W hW
+    refine ⟨0, fun x _ ↦ ?_⟩
+    simpa only [Subsingleton.elim x (1 : G)] using mem_of_mem_nhds hW
+  · intro n
+    simp
 
 variable [DiscreteTopology H] (hH : IsClosed (H : Set G))
   {μ : Measure G} [μ.IsHaarMeasure] {ν : Measure (G ⧸ H)}
@@ -286,7 +344,8 @@ def diagonalIndentationWeight (μH : Measure H) (b : G → ℝ) (p : G × G) : �
 /-- Paper: (12.2.2.1), p. 508. Averaging over the trivial subgroup with unit counting
 measure returns the product of the two indentation factors. -/
 theorem diagonalIndentationWeight_bot (b : G → ℝ) (p : G × G) :
-    diagonalIndentationWeight (⊥ : Subgroup G) Measure.count b p = b p.1 * b p.2 := by sorry
+    diagonalIndentationWeight (⊥ : Subgroup G) Measure.count b p = b p.1 * b p.2 := by
+  simp [diagonalIndentationWeight, Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G))]
 
 variable {b : G → ℝ} (hb : IsIndentation H Measure.count b)
 
@@ -304,19 +363,59 @@ theorem integrable_diagonalIndentationWeight (p : G × G) :
 include hH hν hS hb in
 /-- Paper: Proposition 12.2.2.2(1), p. 508. The averaged indentation weight is continuous. -/
 theorem continuous_diagonalIndentationWeight :
-    Continuous (diagonalIndentationWeight H countH b) := by sorry
+    Continuous (diagonalIndentationWeight H countH b) := by
+  classical
+  apply continuous_iff_continuousAt.mpr
+  intro p
+  obtain ⟨C, hC, hp⟩ := exists_compact_mem_nhds p.1
+  let K := tsupport b ∩ π ⁻¹' (π '' C)
+  have hK : IsCompact K := hb.2.2.1 C hC
+  let T := (Subtype.val : H → G) ⁻¹' ((fun z : G × G ↦ z.1 * z.2⁻¹) '' (C ×ˢ K))
+  have hT : T.Finite := (hH.isClosedEmbedding_subtypeVal.isCompact_preimage
+    ((hC.prod hK).image (continuous_fst.mul continuous_snd.inv))).finite_of_discrete
+  let term (h : H) (q : G × G) := b ((h : G)⁻¹ * q.1) * b ((h : G)⁻¹ * q.2)
+  have hc (h : H) : Continuous (term h) :=
+    (hb.1.comp (continuous_const.mul continuous_fst)).mul
+      (hb.1.comp (continuous_const.mul continuous_snd))
+  apply (continuous_finsetSum hT.toFinset fun h _ ↦ hc h).continuousAt.congr_of_eventuallyEq
+  filter_upwards [continuous_fst.continuousAt hp] with q hq
+  have hzero (h : H) (hh : h ∉ hT.toFinset) : term h q = 0 := by
+    suffices hz : b ((h : G)⁻¹ * q.1) = 0 by simp [term, hz]
+    by_contra hn
+    apply hh
+    refine hT.mem_toFinset.mpr ⟨(q.1, (h : G)⁻¹ * q.1), ⟨hq, ?_⟩, ?_⟩
+    · refine ⟨subset_tsupport b hn, q.1, hq, ?_⟩
+      have hπ : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+      simp [map_mul, map_inv, hπ]
+    · change q.1 * ((h : G)⁻¹ * q.1)⁻¹ = (h : G)
+      simp [mul_inv_rev, ← mul_assoc]
+  have hi : Integrable (fun h ↦ term h q) countH := integrable_count_iff.mpr
+    (summable_of_ne_finset_zero (s := hT.toFinset) fun h hh ↦ by simp [hzero h hh])
+  change (∫ h, term h q ∂countH) = _
+  rw [← setIntegral_eq_integral_of_forall_compl_eq_zero (s := (hT.toFinset : Set H)) hzero,
+    setIntegral_finset hT.toFinset hi.integrableOn]
+  simp only [count_real_singleton, one_smul]
 
 include hH hν hS hb in
 /-- Paper: Proposition 12.2.2.2(1), p. 508. The averaged indentation weight is nonnegative. -/
 theorem diagonalIndentationWeight_nonneg (p : G × G) :
-    0 ≤ diagonalIndentationWeight H countH b p := by sorry
+    0 ≤ diagonalIndentationWeight H countH b p := by
+  exact integral_nonneg fun h ↦ mul_nonneg (hb.2.1 _) (hb.2.1 _)
 
 include hH hν hS hb in
 /-- Paper: Proposition 12.2.2.2(1), p. 508. Translating both coordinates by the same
 subgroup element leaves the averaged weight invariant. -/
 theorem diagonalIndentationWeight_mul (h : H) (p : G × G) :
     diagonalIndentationWeight H countH b ((h : G) * p.1, (h : G) * p.2) =
-      diagonalIndentationWeight H countH b p := by sorry
+      diagonalIndentationWeight H countH b p := by
+  let w (k : H) := b ((k : G)⁻¹ * p.1) * b ((k : G)⁻¹ * p.2)
+  change (∫ k : H, b ((k : G)⁻¹ * ((h : G) * p.1)) *
+    b ((k : G)⁻¹ * ((h : G) * p.2)) ∂countH) = ∫ k, w k ∂countH
+  calc
+    _ = ∫ k : H, w (h⁻¹ * k) ∂countH := by
+      apply integral_congr_ae
+      exact ae_of_all _ fun k ↦ by simp [w, mul_assoc]
+    _ = _ := integral_mul_left_eq_self w h⁻¹
 
 /-- Paper: (12.2.2.2), p. 508. Lift a quotient kernel by pulling it back in both
 coordinates and multiplying by the subgroup-averaged indentation weight. -/
@@ -329,7 +428,9 @@ the kernel lift is a product of the two indentation factors and the pulled-back 
 theorem diagonalIndentationLift_bot (b : G → ℝ)
     (u : (G ⧸ (⊥ : Subgroup G)) × (G ⧸ (⊥ : Subgroup G)) → ℂ) (x y : G) :
     diagonalIndentationLift (⊥ : Subgroup G) Measure.count b u (x, y) =
-      (b x : ℂ) * (b y : ℂ) * u (QuotientGroup.mk x, QuotientGroup.mk y) := by sorry
+      (b x : ℂ) * (b y : ℂ) * u (QuotientGroup.mk x, QuotientGroup.mk y) := by
+  simp [diagonalIndentationLift, diagonalIndentationWeight,
+    Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G))]
 
 variable {u : (G ⧸ H) × (G ⧸ H) → ℂ} (hu : LocallyIntegrable u (ν.prod ν))
 
@@ -376,7 +477,17 @@ gives a function measurable for the completed product measure.
 Deviation: The product measure follows the coordinate order `(x, h)`. -/
 theorem aemeasurable_diagonalIndentationLift_right :
     AEMeasurable (fun p : G × H ↦ Ψ uSmooth (p.1, (p.2 : G)⁻¹ * p.1)) (μ.prod countH) :=
-  by sorry
+  by
+  have hweight (x y : G) :
+      diagonalIndentationWeight H countH b (x, y) = diagonalIndentationWeight H countH b (y, x) :=
+    integral_congr_ae (ae_of_all _ fun k ↦ mul_comm _ _)
+  have hswap (h : H) (x : G) :
+      Ψ uSmooth ((h : G)⁻¹ * x, x) = Ψ uSmooth (x, (h : G)⁻¹ * x) := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    have hπ : π ((h : G)⁻¹ * x) = π x := by rw [map_mul, map_inv, h1, inv_one, one_mul]
+    simp only [diagonalIndentationLift, Prod.map_apply, hπ, hweight ((h : G)⁻¹ * x) x]
+  simpa only [hswap] using
+    aemeasurable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: (12.2.2.3), p. 508. The first skew-diagonal evaluation is absolutely
@@ -390,7 +501,17 @@ include hH hν hS hb hu hdiag hi in
 absolutely integrable on the fundamental domain times the subgroup. -/
 theorem integrable_diagonalIndentationLift_right :
     Integrable (fun p : G × H ↦ Ψ uSmooth (p.1, (p.2 : G)⁻¹ * p.1))
-      ((μ.restrict D).prod countH) := by sorry
+      ((μ.restrict D).prod countH) := by
+  have hweight (x y : G) :
+      diagonalIndentationWeight H countH b (x, y) = diagonalIndentationWeight H countH b (y, x) :=
+    integral_congr_ae (ae_of_all _ fun k ↦ mul_comm _ _)
+  have hswap (h : H) (x : G) :
+      Ψ uSmooth ((h : G)⁻¹ * x, x) = Ψ uSmooth (x, (h : G)⁻¹ * x) := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    have hπ : π ((h : G)⁻¹ * x) = π x := by rw [map_mul, map_inv, h1, inv_one, one_mul]
+    simp only [diagonalIndentationLift, Prod.map_apply, hπ, hweight ((h : G)⁻¹ * x) x]
+  simpa only [hswap] using
+    integrable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: Proposition 12.2.2.2(2), p. 508. The integral of the smoothened quotient diagonal
@@ -404,28 +525,44 @@ include hH hν hS hb hu hdiag hi in
 exchanging the order of integration. -/
 theorem integral_diagonalIndentationLift_left_swap :
     (∫ x in D, ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH ∂μ) =
-      ∫ h : H, ∫ x in D, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂μ ∂countH := by sorry
+      ∫ h : H, ∫ x in D, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂μ ∂countH := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  exact (integral_integral_swap (integrable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi))
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: (12.2.2.6), p. 508. Translating the second coordinate gives the same
 integral as translating the first. -/
 theorem integral_diagonalIndentationLift_swap_coordinates :
     (∫ h : H, ∫ x in D, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂μ ∂countH) =
-      ∫ h : H, ∫ x in D, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂μ ∂countH := by sorry
+      ∫ h : H, ∫ x in D, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂μ ∂countH := by
+  have hweight (x y : G) :
+      diagonalIndentationWeight H countH b (x, y) = diagonalIndentationWeight H countH b (y, x) :=
+    integral_congr_ae (ae_of_all _ fun k ↦ mul_comm _ _)
+  have hswap (h : H) (x : G) :
+      Ψ uSmooth ((h : G)⁻¹ * x, x) = Ψ uSmooth (x, (h : G)⁻¹ * x) := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    have hπ : π ((h : G)⁻¹ * x) = π x := by rw [map_mul, map_inv, h1, inv_one, one_mul]
+    simp only [diagonalIndentationLift, Prod.map_apply, hπ, hweight ((h : G)⁻¹ * x) x]
+  simp only [hswap]
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: (12.2.2.7), p. 508. The second skew-diagonal integral is unchanged by
 exchanging the order of integration. -/
 theorem integral_diagonalIndentationLift_right_swap :
     (∫ h : H, ∫ x in D, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂μ ∂countH) =
-      ∫ x in D, ∫ h : H, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂countH ∂μ := by sorry
+      ∫ x in D, ∫ h : H, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂countH ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  exact (integral_integral_swap (integrable_diagonalIndentationLift_right H hH hν hS hb hu hdiag hi)).symm
 
 include hH hν hS hb hu in
 /-- Paper: Proposition 12.2.2.2(3), p. 508. Multiplication by a compactly supported
 continuous quotient function commutes almost everywhere with the kernel lift after
 pullback of the multiplier. -/
 theorem diagonalIndentationLift_mul (ρ : C_c(Q × Q, ℂ)) :
-    Ψ (fun p ↦ ρ p * u p) =ᵐ[μ.prod μ] fun p ↦ ρ (q₂ p) * Ψ u p := by sorry
+    Ψ (fun p ↦ ρ p * u p) =ᵐ[μ.prod μ] fun p ↦ ρ (q₂ p) * Ψ u p := by
+  apply ae_of_all
+  intro p
+  exact mul_left_comm _ _ _
 
 -- TODO(paper-gap): The continuous multiplier step on p. 511 applies Corollary
 -- A.5.4.3 at every regular point. The printed equivalence fails (ERRATA R8).
@@ -460,7 +597,8 @@ coordinate, the tail kernel equals the lifted kernel. -/
 theorem diagonalIndentationTail_of_notMem (μH : Measure H) (b : G → ℝ) (v : Q × Q → ℂ)
     {K : Subgroup G} {x y : G} (hy : y ∉ K) :
     diagonalIndentationTail H μH b v K (x, y) =
-      diagonalIndentationLift H μH b v (x, y) := by sorry
+      diagonalIndentationLift H μH b v (x, y) := by
+  simp [diagonalIndentationTail, hy]
 
 -- TODO(paper-gap): The closing citation on p. 513 refers to the tail definition
 -- (12.2.2.26); the convergence claim is (12.2.2.27).

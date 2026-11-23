@@ -7,6 +7,8 @@ public import RiemannMasullo.Ch09_HardySobolev.Sec3
 
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 
+import Mathlib.MeasureTheory.Measure.SeparableMeasure
+
 /-!
 # Hardy–Sobolev topologies on adelic theta spaces
 
@@ -146,14 +148,24 @@ local notation "jₛ(" ha ", " hI ", " hs ", " hp ")" => sLocalThetaSobolevInclu
 dense image in their respective completions.
 Deviation: Sanity checks for the closure models. -/
 theorem globalThetaSobolev_dense (a : ℝ) {α β s : ℝ} (hI : α ≤ β) (hs : 0 ≤ s) :
-    DenseRange (j𝔽(a, hI, hs)) := by sorry
+    DenseRange (j𝔽(a, hI, hs)) := by
+  intro x
+  apply closure_subtype.mpr
+  rw [← Set.range_comp]
+  exact x.property
 
 /-- Paper: Definition 10.1.1.1(2), p. 434. The weighted S-local test classes are
 dense in the local Sobolev completion.
 Deviation: Sanity check for the closure model at the admissible exponents. -/
 theorem sLocalThetaSobolev_dense {a α β s : ℝ} (ha : 0 < a) (hI : α ≤ β)
     (hs : 0 ≤ s) (hp : 0 < a + α) :
-    DenseRange (jₛ(ha, hI, hs, hp)) := by sorry
+    DenseRange (jₛ(ha, hI, hs, hp)) := by
+  intro x
+  have hr : Set.range (Eₛ(ha, hI, hs, hp)) =
+      Subtype.val '' Set.range (jₛ(ha, hI, hs, hp)) :=
+    Set.range_comp (Subtype.val : Hₛ(ha, hI, hs, hp) → Wₛ(α, β, s)) (jₛ(ha, hI, hs, hp))
+  apply closure_subtype.mpr
+  exact (congrArg (fun R : Set Wₛ(α, β, s) ↦ x.val ∈ closure R) hr).mp x.property
 
 /-- Paper: Remark 10.1.1.2, pp. 434–435. The original S-local left action
 extends jointly continuously to the norm completion via the completion map.
@@ -179,7 +191,20 @@ complete and separable subspace of the ambient Hilbert space. -/
 theorem globalThetaSobolev_closed_complete_separable (a : ℝ) {α β s : ℝ}
     (hI : α ≤ β) (hs : 0 ≤ s) :
     IsClosed (H𝔽(a, hI, hs) : Set W𝔽(α, β, s)) ∧
-      CompleteSpace (H𝔽(a, hI, hs)) ∧ TopologicalSpace.SeparableSpace (H𝔽(a, hI, hs)) := by sorry
+      CompleteSpace (H𝔽(a, hI, hs)) ∧ TopologicalSpace.SeparableSpace (H𝔽(a, hI, hs)) := by
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
+  let : LocallyCompactSpace C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.1
+  let : SecondCountableTopology C𝔽 := by
+    let := idele_secondCountable F
+    exact inferInstanceAs (SecondCountableTopology
+      (IdeleGroup (𝓞 F) F ⧸ IdeleGroup.principalSubgroup (𝓞 F) F))
+  let : (ideleClassTamagawaMeasure F).IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
+  have hc : IsClosed (H𝔽(a, hI, hs) : Set W𝔽(α, β, s)) :=
+    Submodule.isClosed_topologicalClosure _
+  let : Fact ((2 : ENNReal) ≠ ⊤) := ⟨by norm_num⟩
+  let : SecondCountableTopology W𝔽(α, β, s) := Lp.SecondCountableTopology
+  exact ⟨hc, hc.completeSpace_coe, inferInstance⟩
 
 local instance instIdeleClassBorelSpaceSec1 : BorelSpace C𝔽 := ⟨rfl⟩
 local instance instSIdeleQuotientBorelSpaceSec1 : BorelSpace Jₛ := ⟨rfl⟩
@@ -304,7 +329,12 @@ theorem sLocalThetaSobolev_closed_complete_separable {a α β s : ℝ} (ha : 0 <
     (hI : α ≤ β) (hs : 0 ≤ s) (hp : 0 < a + α) :
     IsClosed (Hₛ(ha, hI, hs, hp) : Set Wₛ(α, β, s)) ∧
       CompleteSpace (Hₛ(ha, hI, hs, hp)) ∧
-      TopologicalSpace.SeparableSpace (Hₛ(ha, hI, hs, hp)) := by sorry
+      TopologicalSpace.SeparableSpace (Hₛ(ha, hI, hs, hp)) := by
+  have hc : IsClosed (Hₛ(ha, hI, hs, hp) : Set Wₛ(α, β, s)) :=
+    Submodule.isClosed_topologicalClosure _
+  let : Fact ((2 : ENNReal) ≠ ⊤) := ⟨by norm_num⟩
+  let : SecondCountableTopology Wₛ(α, β, s) := Lp.SecondCountableTopology
+  exact ⟨hc, hc.completeSpace_coe, inferInstance⟩
 
 /-- Paper: Lemma 10.1.1.4(4), p. 436. Ambient left translation preserves the
 S-local completion, acts jointly continuously there, and on weighted classes
@@ -327,7 +357,9 @@ Deviation: Swap the arguments of Mathlib's conjugate-linear-first inner product.
 theorem sIdeleIntervalSobolev_inner (α β s : ℝ)
     (u v : Lp ℂ 2 (sIdeleIntervalSobolevMeasure F S α β s)) :
     inner ℂ v u =
-      ∫ g : Iₛ, u g * star (v g) ∂(sIdeleIntervalSobolevMeasure F S α β s) := by sorry
+      ∫ g : Iₛ, u g * star (v g) ∂(sIdeleIntervalSobolevMeasure F S α β s) := by
+  rw [MeasureTheory.L2.inner_def]
+  simp only [RCLike.inner_apply, starRingEnd_apply]
 
 -- TODO(paper-gap): The global spaces in Proposition 10.1.1.5 drop the subscript 0.
 -- At weight zero the usual rational adelic Gaussian does not have square-integrable theta.

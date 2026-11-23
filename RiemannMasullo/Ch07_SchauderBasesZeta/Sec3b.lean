@@ -813,10 +813,18 @@ theorem sLocalGammaFiltration_antitone (ω : PontryaginDual J₁(S)) :
   obtain ⟨hc, w, hw, hcard⟩ := j.property.2.1
   exact ⟨hc, w, hw, hcard.trans (by exact_mod_cast hN w)⟩
 
+private theorem isClosed_iInf_ker {E ι : Type*} [AddCommMonoid E] [Module ℂ E]
+    [TopologicalSpace E] (f : ι → E →L[ℂ] ℂ) :
+    IsClosed (↑(⨅ i, (f i).ker) : Set E) := by
+  rw [Submodule.coe_iInf]
+  exact isClosed_iInter fun i ↦ (f i).isClosed_ker
+
 /-- Paper: Theorem 7.3.4.1(1), p. 364.
 Each stage of the archimedean pole filtration is closed. -/
 theorem sLocalGammaFiltration_isClosed (ω : PontryaginDual J₁(S)) (N : depths) :
-    IsClosed (sLocalGammaFiltration ω N : Set (fullPV(ω))) := by sorry
+    IsClosed (sLocalGammaFiltration ω N : Set (fullPV(ω))) := by
+  exact isClosed_iInf_ker
+    (fun j : ΓIndex(ω, sLocalGammaPoleCutoff (F := F) (S := S) ω N) ↦ ΓCoeff(ω, j))
 
 -- TODO(paper-gap): The test list (7.3.4.9) does not separate the two coefficients
 -- of a double real pole at cutoff (0,0). See ERRATA I169. Finite interpolation can
