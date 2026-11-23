@@ -447,12 +447,132 @@ theorem sLocalThetaPrincipalValue_isotypicAverage {S₀ S : Finset V}
     let A := (existsUnique_sLocalThetaIsotypicAverage (F := F) χ).exists.choose
     sLocalThetaPrincipalValue F h₀ (A x) = A (sLocalThetaPrincipalValue F h₀ x) := by sorry
 
+private theorem globalThetaPrincipalValue_isotypicAverage_tensor
+    {M N Y : Type*} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (e : InductiveTensor M N ≃L[ℂ] Y)
+    (f : M →ₗ[ℂ] M) (g : N →ₗ[ℂ] N) (hf : f = LinearMap.id) (hg : g = LinearMap.id) :
+    e.toLinearMap.comp ((TensorProduct.map f g).comp e.symm.toLinearMap) = LinearMap.id := by
+  subst f g
+  have H : TensorProduct.map (LinearMap.id (R := ℂ) (M := M)) (LinearMap.id (R := ℂ) (M := N)) =
+      LinearMap.id := TensorProduct.map_id
+  rw [H]
+  apply LinearMap.ext
+  exact e.apply_symm_apply
+
+private theorem globalThetaPrincipalValue_isotypicAverage_emptyTensor
+    {ι M Y : Type*} {N : ι → Type*} [IsEmpty ι]
+    [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+    [∀ i, AddCommGroup (N i)] [∀ i, Module ℂ (N i)] [AddCommGroup Y] [Module ℂ Y]
+    [TopologicalSpace Y] (e : InductiveTensor M (FinestLocallyConvex (⨂[ℂ] i, N i)) ≃L[ℂ] Y)
+    (L : ∀ i, N i →ₗ[ℂ] N i) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, N i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map L
+    e.toLinearMap.comp ((TensorProduct.map (LinearMap.id (R := ℂ) (M := M)) P).comp
+      e.symm.toLinearMap) = LinearMap.id := by
+  intro W P
+  have hp : P = LinearMap.id := (congrArg (PiTensorProduct.map (R := ℂ))
+    (Subsingleton.elim L (fun i ↦ (LinearMap.id : N i →ₗ[ℂ] N i)))).trans PiTensorProduct.map_id
+  exact globalThetaPrincipalValue_isotypicAverage_tensor e LinearMap.id P rfl hp
+
+private theorem globalThetaPrincipalValue_isotypicAverage_emptyTest :
+    adelePrincipalValue F ∅ = LinearMap.id := by
+  unfold adelePrincipalValue
+  with_reducible_and_instances
+    refine globalThetaPrincipalValue_isotypicAverage_tensor _ _ _ ?_ rfl
+  unfold sAdelePrincipalValue
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_emptyTensor (ι := ↥(∅ : Finset V)) _ _
+
+private theorem globalThetaPrincipalValue_isotypicAverage_mapQ_id {E : Type*}
+    [AddCommGroup E] [Module ℂ E] (K : Submodule ℂ E) (P : E →ₗ[ℂ] E)
+    (hK : K ≤ K.comap P) (h : P = LinearMap.id) (x : E ⧸ K) : K.mapQ K P hK x = x := by
+  subst P
+  exact Submodule.Quotient.induction_on K x fun _ ↦ rfl
+
+private theorem globalThetaPrincipalValue_isotypicAverage_empty (x : Θ𝔽) :
+    globalThetaPrincipalValue F ∅ x = x := by
+  unfold globalThetaPrincipalValue
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_mapQ_id _ _ _
+      (globalThetaPrincipalValue_isotypicAverage_emptyTest (F := F)) x
+
+private theorem globalThetaPrincipalValue_isotypicAverage_onReps {G C E X : Type*}
+    (π : G → C) (m : E → X) (hπ : Surjective π) (hm : Surjective m)
+    (p : E → E) (t : G → E → E) (P : X → X) (ρ : C → X → X)
+    (hp : ∀ f, P (m f) = m (p f)) (ht : ∀ g f, ρ (π g) (m f) = m (t g f))
+    (h : ∀ g f, m (p (t g f)) = m (t g (p f))) (q : C) (y : X) :
+    P (ρ q y) = ρ q (P y) := by
+  obtain ⟨g, rfl⟩ := hπ q
+  obtain ⟨f, rfl⟩ := hm y
+  rw [ht, hp, hp, ht, h]
+
+private theorem globalThetaPrincipalValue_isotypicAverage_action {S₀ : Finset V} (hn : S₀.Nonempty)
+    (q : IdeleClassGroup (𝓞 F) F) (y : Θ𝔽) :
+    let ρ := (existsUnique_globalThetaAction (F := F)).exists.choose
+    globalThetaPrincipalValue F S₀ (ρ q y) = ρ q (globalThetaPrincipalValue F S₀ y) := by
+  intro ρ
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_onReps
+      (QuotientGroup.mk : IdeleGroup (𝓞 F) F → IdeleClassGroup (𝓞 F) F)
+      (Submodule.Quotient.mk (p := K𝔽)) QuotientGroup.mk_surjective
+      (Submodule.Quotient.mk_surjective _)
+      (adelePrincipalValue F S₀) schwartzBruhatUnitTranslate (globalThetaPrincipalValue F S₀)
+      (fun g y ↦ ρ g y) (globalThetaPrincipalValue_mk S₀)
+      (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2
+      (globalThetaPrincipalValue_equivariant hn) q y
+
+private theorem globalThetaPrincipalValue_isotypicAverage_commutes
+    {G E : Type*} [Monoid G] [TopologicalSpace G] [MeasurableSpace G]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E]
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E]
+    {μ : Measure G} {ρ : G →* (E →L[ℂ] E)} {χ : PontryaginDual G} {A : E →L[ℂ] E}
+    (hA : IsPettisIsotypicAverageOn μ univ ρ χ A) (P : E →L[ℂ] E)
+    (hP : ∀ g y, P (ρ g y) = ρ g (P y)) (x : E) : P (A x) = A (P x) := by
+  have h : HasPettisIntegral (.positive (μ.restrict univ))
+      (fun g ↦ P (star (χ g : ℂ) • ρ g x)) (P (A x)) := by
+    obtain ⟨hi, he⟩ := hA x
+    refine ⟨fun φ ↦ hi (φ.comp P), LinearMap.ext fun φ ↦ ?_⟩
+    exact LinearMap.congr_fun he (φ.comp P)
+  simp only [map_smul, hP] at h
+  exact h.unique (hA (P x))
+
+private theorem globalThetaPrincipalValue_isotypicAverage_nonempty (S₀ : Finset V) (hn : S₀.Nonempty)
+    (χ : PontryaginDual (ideleClassNorm F).ker) (x : Θ𝔽) :
+    let A := (existsUnique_globalThetaIsotypicAverage (F := F) χ).exists.choose
+    globalThetaPrincipalValue F S₀ (A x) = A (globalThetaPrincipalValue F S₀ x) := by
+  intro A
+  let P : Θ𝔽 →L[ℂ] Θ𝔽 := ⟨globalThetaPrincipalValue F S₀, globalThetaPrincipalValue_continuous S₀⟩
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed adelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup Θ𝔽 := PolynormableSpace.isTopologicalAddGroup ℂ Θ𝔽
+  let : ContinuousSMul ℂ Θ𝔽 := (PolynormableSpace.withSeminorms ℂ Θ𝔽).continuousSMul
+  let : MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+  refine globalThetaPrincipalValue_isotypicAverage_commutes
+    (existsUnique_globalThetaIsotypicAverage (F := F) χ).exists.choose_spec P ?_ x
+  intro g y
+  exact globalThetaPrincipalValue_isotypicAverage_action (F := F) hn g.val y
+
+private theorem globalThetaPrincipalValue_isotypicAverage_cases {ι E : Type*}
+    (P : Finset ι → E → E) (A : E → E) (he : ∀ y, P ∅ y = y)
+    (hn : ∀ t : Finset ι, t.Nonempty → ∀ y, P t (A y) = A (P t y))
+    (s : Finset ι) (x : E) : P s (A x) = A (P s x) := by
+  rcases s.eq_empty_or_nonempty with rfl | h
+  · rw [he, he]
+  · exact hn s h x
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The global principal value commutes with the norm-one character average of §5.2.3. -/
 theorem globalThetaPrincipalValue_isotypicAverage (S₀ : Finset V)
     (χ : PontryaginDual (ideleClassNorm F).ker) (x : Θ𝔽) :
     let A := (existsUnique_globalThetaIsotypicAverage (F := F) χ).exists.choose
-    globalThetaPrincipalValue F S₀ (A x) = A (globalThetaPrincipalValue F S₀ x) := by sorry
+    globalThetaPrincipalValue F S₀ (A x) = A (globalThetaPrincipalValue F S₀ x) := by
+  intro A
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_cases
+      (fun S y ↦ globalThetaPrincipalValue F S y) A
+      (globalThetaPrincipalValue_isotypicAverage_empty (F := F))
+      (fun S hn y ↦ globalThetaPrincipalValue_isotypicAverage_nonempty (F := F) S hn χ y) S₀ x
 
 end AdelicPrincipalValue
 
