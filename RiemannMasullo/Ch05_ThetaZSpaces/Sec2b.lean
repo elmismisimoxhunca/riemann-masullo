@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 
 /-! # Homogeneous theta spaces and Fourier descent
 
@@ -356,10 +358,31 @@ The strong dual of the global homogeneous quotient is Montel. -/
 theorem globalHomogeneousThetaSpace_strongDual_montel :
     BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by sorry
 
+private theorem sLocalHomogeneousThetaSpace_strongDual_montel_aux {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E]
+    [BarrelledSpace ℂ E] [MontelSpace ℂ E] :
+    BarrelledSpace ℂ (StrongDual ℂ E) ∧ MontelSpace ℂ (StrongDual ℂ E) := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  constructor
+  · apply barrelled_of_barrel_nbhd
+    apply strongDual_barrel_nbhd
+    intro l
+    obtain ⟨x, rfl⟩ := surjective_strongBidual_eval l
+    exact ⟨x, fun _ ↦ rfl⟩
+  · exact montelSpace_strongDual
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is Montel. -/
 theorem sLocalHomogeneousThetaSpace_strongDual_montel (χ : PontryaginDual (J₁(S))) :
-    BarrelledSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) ∧ MontelSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) := by sorry
+    BarrelledSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) ∧ MontelSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) := by
+  let : T2Space (Θₛω(S, χ)) := (sLocalHomogeneousThetaSpace_lf χ).1
+  have hn : IsNuclearTVS.{0} (Θₛω(S, χ)) := sLocalHomogeneousThetaSpace_nuclear χ
+  let : PolynormableSpace ℂ (Θₛω(S, χ)) := hn.2.1
+  let : BarrelledSpace ℂ (Θₛω(S, χ)) := (sLocalHomogeneousThetaSpace_montel χ).1
+  let : MontelSpace ℂ (Θₛω(S, χ)) := (sLocalHomogeneousThetaSpace_montel χ).2
+  exact sLocalHomogeneousThetaSpace_strongDual_montel_aux
 
 /-- Paper: Theorem 5.2.3.1(3), p. 233.
 There are continuous idempotents onto the stage images. The net of these idempotents
