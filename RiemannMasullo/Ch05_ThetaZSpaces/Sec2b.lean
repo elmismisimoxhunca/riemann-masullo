@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 
 /-! # Homogeneous theta spaces and Fourier descent
 
@@ -351,10 +354,30 @@ The strong dual of the S-local homogeneous quotient is nuclear. -/
 theorem sLocalHomogeneousThetaSpace_strongDual_nuclear (χ : PontryaginDual (J₁(S))) :
     IsNuclearTVS (StrongDual ℂ (Θₛω(S, χ))) := by sorry
 
+private theorem globalHomogeneousThetaSpace_strongDual_montel_aux {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E] [MontelSpace ℂ E]
+    [BarrelledSpace ℂ E] :
+    BarrelledSpace ℂ (StrongDual ℂ E) ∧ MontelSpace ℂ (StrongDual ℂ E) := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  refine ⟨?_, montelSpace_strongDual⟩
+  apply barrelled_of_barrel_nbhd
+  apply strongDual_barrel_nbhd
+  intro l
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval l
+  exact ⟨x, fun _ ↦ rfl⟩
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the global homogeneous quotient is Montel. -/
 theorem globalHomogeneousThetaSpace_strongDual_montel :
-    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by sorry
+    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by
+  let : PolynormableSpace ℂ ℬ𝔽 := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ Θ𝔽ω(ω) := polynormableSpace_quotient _
+  let : T2Space Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_lf (F := F) (ω := ω)).1
+  let : BarrelledSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).1
+  let : MontelSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).2
+  exact globalHomogeneousThetaSpace_strongDual_montel_aux (E := Θ𝔽ω(ω))
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is Montel. -/
