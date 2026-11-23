@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 
 /-! # Homogeneous theta spaces and Fourier descent
 
@@ -812,6 +814,39 @@ theorem sLocalThetaFourier_transition (hST : S ⊆ T)
     let transition := sLocalThetaTransition (F := F) (S := S) (T := T) hST
     fourierT (transition x) = transition (fourierS x) := by sorry
 
+/-- At a stage containing the different, the Fourier lift formula has the same
+integer tail on both sides and no factor from the omitted places. -/
+private theorem sLocalThetaFourier_toGlobal_test
+    (hgood : ∀ v : HeightOneSpectrum (𝓞 F), v.asIdeal ∣ differentIdeal ℤ (𝓞 F) → v ∈ S)
+    (f : ℬₛ(S)) :
+    adeleSchwartzFourier (sAdeleSchwartzToGlobal F S f) =
+      sAdeleSchwartzToGlobal F S (sAdeleSchwartzFourier f) := by
+  classical
+  have hd (v : HeightOneSpectrum (𝓞 F)) (hv : v ∉ S) :
+      multiplicity v.asIdeal (differentIdeal ℤ (𝓞 F)) = 0 :=
+    multiplicity_eq_zero_of_not_dvd (fun h ↦ hv (hgood v h))
+  have hp := sAdeleProjection_restrict F S ∅ (Finset.disjoint_empty_right _)
+    (by simpa only [Finset.union_empty] using hd) (fun _ ↦ Set.univ)
+    (fun _ ↦ MeasurableSet.univ) 1 (by simp)
+  have hft := tamagawaFourier_sAdeleLift F S 1 (by simpa using hp)
+    (fun x ↦ f (Multiplicative.ofAdd x)) (partialTensor_integrable F S f)
+  dsimp only at hft
+  rw [tailDual_eq_integers F S hd, NNReal.coe_one, one_smul] at hft
+  let I : Set 𝔸[F] := integralAdelesOutside F S
+  have hlift (g : ℬₛ(S)) (x : 𝔸[F]) : sAdeleSchwartzToGlobal F S g (Multiplicative.ofAdd x) =
+      I.indicator ((fun z ↦ g (Multiplicative.ofAdd z)) ∘ adeleProjection F S) x := by
+    rw [sAdeleSchwartzToGlobal_apply]
+    by_cases hx : x ∈ integralAdelesOutside F S
+    · rw [Set.indicator_of_mem hx, ite_eq_left ((integralTail_iff F S x).mp hx)]; rfl
+    · rw [Set.indicator_of_notMem hx, ite_eq_right ((integralTail_iff F S x).not.mp hx)]
+  apply Subtype.ext
+  funext y
+  let : MeasurableSpace 𝔸[F] := borel _
+  let ft : (𝔸[F] → ℂ) → 𝔸[F] → ℂ := tamagawaFourier (additiveTamagawaMeasure F) (adeleStandardCharacter F)
+  change ft (fun x ↦ sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd x)) y.toAdd = _
+  exact (congrArg (fun g ↦ ft g y.toAdd) (funext (hlift f))).trans
+    ((congrFun hft y.toAdd).trans (hlift (sAdeleSchwartzFourier f) y.toAdd).symm)
+
 set_option maxSynthPendingDepth 8 in
 /-- Paper: (5.2.4.4), p. 239.
 The local and global Fourier involutions commute with insertion once S contains
@@ -822,7 +857,17 @@ theorem sLocalThetaFourier_toGlobal
     (x : Θₛ(S)) :
     let fourierS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose
     let fourier := (existsUnique_globalThetaFourier (F := F)).exists.choose
-    fourier (sLocalThetaToGlobal F S x) = sLocalThetaToGlobal F S (fourierS x) := by sorry
+    fourier (sLocalThetaToGlobal F S x) = sLocalThetaToGlobal F S (fourierS x) := by
+  intro fourierS fourier
+  induction x using Submodule.Quotient.induction_on with | _ f => ?_
+  have hS := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose_spec.2 f
+  have hF := (existsUnique_globalThetaFourier (F := F)).exists.choose_spec.2
+    (sAdeleSchwartzToGlobal F S f)
+  calc
+    _ = (K𝔽).mkQ (adeleSchwartzFourier (sAdeleSchwartzToGlobal F S f)) := hF
+    _ = (K𝔽).mkQ (sAdeleSchwartzToGlobal F S (sAdeleSchwartzFourier f)) :=
+      congrArg (K𝔽).mkQ (sLocalThetaFourier_toGlobal_test hgood f)
+    _ = _ := (congrArg (sLocalThetaToGlobal F S) hS).symm
 
 /-- Paper: Theorem 5.2.4.1(1), p. 239.
 S-local Fourier transform exchanges each norm-one isotype with its conjugate. -/
