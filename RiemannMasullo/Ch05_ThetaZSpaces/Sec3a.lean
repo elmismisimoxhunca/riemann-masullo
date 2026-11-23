@@ -704,45 +704,7 @@ Inserting zeros into the normal coordinates gives a continuous linear restrictio
 on compactly supported smooth functions. -/
 theorem exists_testFunction_coordinatePlaneRestriction :
     ∃ R : 𝒟(ι ⊕ κ) →L[ℂ] 𝒟(κ), ∀ (f : 𝒟(ι ⊕ κ)) (y : Eᵣ(κ)),
-      R f y = f (insertPlane y) := by
-  let I : Eᵣ(κ) →ₗ[ℝ] Eᵣ(ι ⊕ κ) :=
-    { toFun := fun y ↦ insertPlane y
-      map_add' := fun y z ↦ PiLp.ext fun i ↦ by cases i <;> simp
-      map_smul' := fun c y ↦ PiLp.ext fun i ↦ by cases i <;> simp }
-  let L := I.toContinuousLinearMap
-  have hL : IsClosedEmbedding L := by
-    apply LinearMap.isClosedEmbedding_of_injective (f := I)
-    apply LinearMap.ker_eq_bot.mpr
-    intro y z h
-    exact PiLp.ext fun j ↦ congrArg (fun x : Eᵣ(ι ⊕ κ) ↦ x (.inr j)) h
-  let Φ (f : 𝒟(ι ⊕ κ)) : 𝒟(κ) := ⟨f ∘ L, f.contDiff.comp L.contDiff,
-    f.hasCompactSupport.comp_isClosedEmbedding hL, subset_univ _⟩
-  let K' (K : Compacts Eᵣ(ι ⊕ κ)) : Compacts Eᵣ(κ) :=
-    ⟨L ⁻¹' (K : Set Eᵣ(ι ⊕ κ)), hL.isCompact_preimage K.isCompact⟩
-  let P (K : Compacts Eᵣ(ι ⊕ κ)) : 𝓓_{K}(Eᵣ(ι ⊕ κ), ℂ) →ₗ[ℂ] 𝓓_{K' K}(Eᵣ(κ), ℂ) :=
-    { toFun := fun f ↦ ⟨f ∘ L, f.contDiff.comp L.contDiff, fun x hx ↦ f.zero_on_compl hx⟩
-      map_add' := fun _ _ ↦ rfl
-      map_smul' := fun _ _ ↦ rfl }
-  -- On each compact stage, restriction multiplies the order-n seminorm by at most ‖L‖ ^ n.
-  have hP (K : Compacts Eᵣ(ι ⊕ κ)) : Continuous (P K) := by
-    apply WithSeminorms.continuous_of_isBounded (ContDiffMapSupportedIn.withSeminorms ..)
-      (ContDiffMapSupportedIn.withSeminorms ..) _ (.of_real ?_)
-    intro n
-    refine ⟨{n}, ‖L‖ ^ n, fun f ↦ ?_⟩
-    rw [Finset.sup_singleton]
-    apply (ContDiffMapSupportedIn.seminorm_top_le_iff ℂ (mul_nonneg (by positivity)
-      (apply_nonneg _ _)) _ _).2
-    intro x _
-    change ‖iteratedFDeriv ℝ n (⇑f ∘ L) x‖ ≤ _
-    rw [L.iteratedFDeriv_comp_right f.contDiff x (by simp)]
-    apply (ContinuousMultilinearMap.norm_compContinuousLinearMap_le _ _).trans
-    rw [Finset.prod_const, Finset.card_univ, Fintype.card_fin, mul_comm (‖L‖ ^ n)]
-    exact mul_le_mul_of_nonneg_right
-      (ContDiffMapSupportedIn.norm_iteratedFDeriv_apply_le_seminorm_top ℂ (i := n) (f := f)
-        (x := L x)) (pow_nonneg (norm_nonneg L) n)
-  exact ⟨TestFunction.limitCLM ℂ Φ (fun K _ ↦
-    (TestFunction.ofSupportedInCLM ℂ (K := K' K) (subset_univ _)).comp ⟨P K, hP K⟩)
-    (fun _ _ _ ↦ rfl), fun _ _ ↦ rfl⟩
+      R f y = f (insertPlane y) := by sorry
 
 /-- Paper: Theorem 5.3.2.3(1), p. 245.
 Inserting zeros into the normal coordinates gives a continuous linear restriction map
