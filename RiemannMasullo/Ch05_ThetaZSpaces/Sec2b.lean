@@ -750,6 +750,17 @@ section IsotypicMellin
 
 attribute [local instance] ideleClassGroupMeasurableSpaceSec2b normOneSIdeleQuotientMeasurableSpaceSec2b
 
+/-- Evaluation by an equivariant functional cancels the character weight in the Pettis average. -/
+private theorem globalThetaMellin_isotypicAverage_eval {G E : Type*} [Monoid G]
+    [TopologicalSpace G] [MeasurableSpace G] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (μ : Measure G) (ρ : G →* (E →L[ℂ] E)) (ω : PontryaginDual G) (P : E →L[ℂ] E)
+    (hP : IsPettisIsotypicAverageOn μ Set.univ ρ ω P) (L : StrongDual ℂ E) (x : E)
+    (hL : ∀ g, L (ρ g x) = (ω g : ℂ) * L x) : L (P x) = (μ.real Set.univ : ℂ) * L x := by
+  obtain ⟨_, he⟩ := hP x
+  have h := LinearMap.congr_fun he L
+  change L (P x) = ∫ g, L (star (ω g : ℂ) • ρ g x) ∂(μ.restrict Set.univ) at h
+  simpa [hL, ← Circle.coe_inv_eq_conj, Complex.real_smul] using h
+
 /-- Paper: Remark 5.2.3.5, p. 238.
 On each component the global Mellin transform of the Tamagawa average equals
 the Mellin transform of the original class times the norm-one Haar mass. -/
@@ -757,7 +768,22 @@ theorem globalThetaMellin_isotypicAverage (ω : PontryaginDual C₁) (x : Θ𝔽
     (c : {c : QuasiCharacter C𝔽 // 0 ≤ globalIdelicOrderBound c})
     (hc : ∀ g : C₁, c.val g.val = (ω g : ℂ)) :
     (globalThetaMellin (F := F) (P𝔽(ω) x)).val c =
-      ((μ𝔽₁).real Set.univ : ℂ) * (globalThetaMellin (F := F) x).val c := by sorry
+      ((μ𝔽₁).real Set.univ : ℂ) * (globalThetaMellin (F := F) x).val c := by
+  let Z : Θ𝔽 →L[ℂ] _ := ⟨globalThetaMellin (F := F),
+    (K𝔽).isQuotientMap_mkQ.continuous_iff.mpr (globalIdelicMellin_continuous (F := F))⟩
+  let L : StrongDual ℂ Θ𝔽 := (ContinuousMap.evalCLM ℂ c).comp ((Submodule.subtypeL _).comp Z)
+  have htranslate (a : C𝔽) : L (ρ𝔽 a x) = c.val a * L x := by
+    refine QuotientGroup.induction_on (C := fun a : C𝔽 ↦ L (ρ𝔽 a x) = c.val a * L x) a fun g ↦ ?_
+    refine Submodule.Quotient.induction_on (p := K𝔽)
+      (C := fun y : Θ𝔽 ↦ L (ρ𝔽 (QuotientGroup.mk g) y) = c.val (QuotientGroup.mk g) * L y)
+      x fun f ↦ ?_
+    exact (congrArg L ((existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 g f)).trans
+      (globalIdelicMellin_unitTranslate g f c)
+  change L (P𝔽(ω) x) = ((μ𝔽₁).real Set.univ : ℂ) * L x
+  refine globalThetaMellin_isotypicAverage_eval μ𝔽₁ ρ𝔽₁ ω (P𝔽(ω))
+    (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec L x fun g ↦ ?_
+  simp only [MonoidHom.comp_apply, Subgroup.coe_subtype]
+  exact (htranslate g.val).trans (congrArg (· * L x) (hc g))
 
 /-- Paper: Remark 5.2.3.5, p. 238.
 On each S-local component the Mellin transform of the Tamagawa average equals
