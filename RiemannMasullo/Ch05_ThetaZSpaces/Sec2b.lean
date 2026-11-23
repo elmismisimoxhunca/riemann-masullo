@@ -461,6 +461,25 @@ local notation "M𝔽ω(" ω ")" => meromorphicNormOneComponent m𝔽
 local notation "Mₛω(" S ", " ω ")" => meromorphicNormOneComponent (mₛ(S))
   (isProperMap_sIdeleQuotientNorm F S).continuous ω (sLocalIdelicOrderBound (F := F) (S := S))
 
+/-- Restriction to a norm-one component is continuous for compact convergence, and
+restricting a continuation preserves its pole bound. -/
+private theorem exists_globalHomogeneousThetaMellin_restriction {G : Type*}
+    [CommGroup G] [TopologicalSpace G] (m : G →* ℝ≥0ˣ) (hm : Continuous m)
+    (ω : PontryaginDual m.ker) (b : QuasiCharacter G → WithTop ℤ) :
+    ∃ R : ↥(meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b) →L[ℂ]
+        ↥(meromorphicNormOneComponent m hm ω b),
+      ∀ u c, (R u).val c = u.val ⟨c.val.val, c.property⟩ := by
+  let Ω := {c : QuasiCharacter G // ∀ h : m.ker, c h.val = (ω h : ℂ)}
+  let i : C({c : Ω // 0 ≤ b c.val}, {c : QuasiCharacter G // 0 ≤ b c}) :=
+    ⟨fun c ↦ ⟨c.val.val, c.property⟩,
+      (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _⟩
+  let M := meromorphicWithPoleBound (quasiCharacterNormTwist m hm) b
+  let A := (ContinuousMap.compCLM ℂ ℂ i).comp M.subtypeL
+  refine ⟨A.codRestrict _ ?_, fun _ _ ↦ rfl⟩
+  intro u
+  obtain ⟨Z, hZ, hgerm⟩ := u.property
+  exact ⟨fun c ↦ Z c.val, fun c ↦ hZ (i c), fun c ↦ hgerm c.val⟩
+
 /-- Paper: (5.2.3.14), p. 236.
 The global Mellin transform on homogeneous classes is continuous and injective.
 On a representative it gives the component of the global Mellin transform in (5.2.2.2). -/
@@ -468,7 +487,30 @@ theorem exists_globalHomogeneousThetaMellin (ω : PontryaginDual C₁) :
     ∃ Z : Θ𝔽ω(ω) →L[ℂ] ↥(M𝔽ω(ω)), Injective Z ∧
       ∀ (f : ℬ𝔽) c,
         (Z ((K𝔽ω(ω)).mkQ f)).val c =
-          (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := by sorry
+          (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := by
+  refine (exists_globalHomogeneousThetaMellin_restriction m𝔽
+    (isProperMap_ideleClassNorm F).continuous ω (globalIdelicOrderBound (F := F))).elim fun R hR ↦ ?_
+  let L : ℬ𝔽 →L[ℂ] _ := ⟨globalIdelicMellin (F := F), globalIdelicMellin_continuous⟩
+  let T : ℬ𝔽 →L[ℂ] ↥(M𝔽ω(ω)) := R.comp L
+  have hT (f : ℬ𝔽) c : (T f).val c =
+      (globalIdelicMellin (F := F) f).val ⟨c.val.val, c.property⟩ := hR _ c
+  have hker : K𝔽ω(ω) = T.ker := by
+    apply SetLike.ext
+    intro f
+    constructor
+    · intro hf
+      apply LinearMap.mem_ker.mpr
+      apply Subtype.ext
+      exact ContinuousMap.ext fun c ↦ (hT f c).trans
+        ((mem_homogeneousAdelicTheta_ker_iff ω f).mp hf _ c.val.property)
+    · intro hf
+      apply (mem_homogeneousAdelicTheta_ker_iff ω f).mpr
+      intro c hc
+      exact (hT f ⟨⟨c.val, hc⟩, c.property⟩).symm.trans
+        (congrArg (fun v : ↥(M𝔽ω(ω)) ↦ v.val ⟨⟨c.val, hc⟩, c.property⟩)
+          (LinearMap.mem_ker.mp hf))
+  exact ⟨(K𝔽ω(ω)).liftQL T hker.le,
+    LinearMap.ker_eq_bot.mp ((K𝔽ω(ω)).ker_liftQ_eq_bot T.toLinearMap hker.le hker.ge), hT⟩
 
 /-- Paper: (5.2.3.14), p. 236.
 The S-local Mellin transform on homogeneous classes is continuous and injective.
