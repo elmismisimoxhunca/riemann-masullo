@@ -4,6 +4,10 @@ public import RiemannMasullo.Ch06_LocalGlobal.Sec1
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
+import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
+import all RiemannMasullo.AppC_LCTVS.Sec2b
+import RiemannMasullo.ForMathlib.Analysis.Fourier.CompactGroup
+import Mathlib.LinearAlgebra.Eigenspace.Basic
 
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Topology.Algebra.IsOpenUnits
@@ -159,6 +163,73 @@ local notation "E𝔽(" ω ")" => actionIsotype ρ𝔽₁ ω
 -- The proof of strictness also assumes infinitely many everywhere unramified
 -- characters, which fails over ℚ.
 
+/-- A separating functional for the closed sum would give a nonzero continuous
+matrix coefficient on the compact group with all Fourier coefficients zero. -/
+private theorem sLocalThetaIsotypeSum_dense_aux {H E : Type*} [CommGroup H]
+    [TopologicalSpace H] [IsTopologicalGroup H] (N : Subgroup H) [T2Space N] [CompactSpace N]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E]
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+    (hc : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E))
+    (σ : H →* (E →L[ℂ] E)) (hσ : Continuous fun p : H × E ↦ σ p.1 p.2) :
+    let X := fun χ : PontryaginDual N ↦ ↥(actionIsotype (σ.comp N.subtype) χ)
+    letI := Classical.decEq (PontryaginDual N)
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
+    let i := DirectSum.toModule ℂ _ E (fun χ ↦ (actionIsotype (σ.comp N.subtype) χ).subtype)
+    Continuous i ∧ Injective i ∧ DenseRange i := by
+  classical
+  let ρ := σ.comp N.subtype
+  have hρ : Continuous fun p : N × E ↦ ρ p.1 p.2 :=
+    hσ.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  let X := actionIsotype ρ
+  let := locallyConvexFinalTopology (DirectSum.lof ℂ _ (fun χ ↦ ↥(X χ)))
+  change Continuous (DirectSum.coeLinearMap X) ∧ Injective _ ∧ DenseRange _
+  refine ⟨?_, ?_, ?_⟩
+  · apply continuous_of_locallyConvexFinalTopology (DirectSum.lof ℂ _ (fun χ ↦ ↥(X χ)))
+    intro χ
+    simpa only [Function.comp_def, DirectSum.coeLinearMap_lof] using
+      (continuous_subtype_val : Continuous (fun x : X χ ↦ (x : E)))
+  · let f (g : N) : Module.End ℂ E := (ρ g).toLinearMap
+    let v (χ : PontryaginDual N) (g : N) : ℂ := χ g
+    have hv : Injective v := fun χ ψ h ↦ DFunLike.ext _ _ fun g ↦ Subtype.ext (congrFun h g)
+    have hi := iSupIndep.iInf (fun g ↦ (f g).eigenspace) (fun g ↦ (f g).eigenspaces_iSupIndep)
+    apply iSupIndep.dfinsupp_lsum_injective (p := X)
+    refine (hi.comp hv).mono fun χ x hx ↦ (Submodule.mem_iInf _).mpr fun g ↦ ?_
+    exact Module.End.mem_eigenspace_iff.mpr ((mem_actionIsotype ρ χ x).mp hx g)
+  · let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+    let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+    let : CompleteSpace E := hc
+    let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+    let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+    let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+    let : SeparatingDual ℂ E := locallyConvexSpace_separatingDual ℂ E
+    let : MeasurableSpace N := borel N
+    let : BorelSpace N := ⟨rfl⟩
+    let μ : Measure N := Measure.haar
+    intro x
+    let D := (LinearMap.range (DirectSum.coeLinearMap X)).topologicalClosure
+    change x ∈ D
+    by_contra hn
+    obtain ⟨φ, hne, hz⟩ := exists_dual_eq_zero_on_submodule_of_notMem D
+      (Submodule.isClosed_topologicalClosure _) hn
+    let u : N → ℂ := fun g ↦ φ (ρ g x)
+    have hu : Continuous u := φ.continuous.comp (hρ.comp (continuous_id.prodMk continuous_const))
+    have hcoeff (χ : PontryaginDual N) : ∫ g, star (χ g : ℂ) * u g ∂μ = 0 := by
+      let A (g : N) := star (χ g : ℂ) • ρ g
+      have hA : Continuous fun p : N × E ↦ A p.1 p.2 :=
+        (show Continuous (fun p : N × E ↦ star (χ p.1 : ℂ)) from by fun_prop).smul hρ
+      obtain ⟨P, hP, _⟩ := existsUnique_pettisIntegral_continuousFamily μ isCompact_univ
+        (ae_of_all _ fun _ ↦ Set.mem_univ _) A hA
+      have hav : IsPettisIsotypicAverageOn μ Set.univ ρ χ P := by
+        simpa [IsPettisIsotypicAverageOn, A] using hP
+      rw [← compactActionAverage_dual_apply μ ρ χ P hav x φ]
+      apply hz _ (Submodule.le_topologicalClosure _ ?_)
+      rw [DirectSum.range_coeLinearMap]
+      exact le_iSup X χ (compactActionAverage_mem_isotype μ ρ χ P hav x)
+    have hae := ae_eq_zero_of_character_integral_eq_zero μ
+      (hu.memLp_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)) hcoeff
+    have heq := Measure.eq_of_ae_eq hae hu continuous_const
+    exact hne (by simpa [u] using congrFun heq 1)
+
 /-- Paper: Remark 6.2.1.4(1), pp. 297–298.
 The direct sum of the S-local isotypes maps continuously and injectively to the
 theta quotient with dense range.
@@ -169,7 +240,21 @@ theorem sLocalThetaIsotypeSum_dense :
     letI := Classical.decEq (PontryaginDual J₁(S))
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
     let i := DirectSum.toModule ℂ _ Θₛ(S) (fun χ ↦ (Eₛ(χ)).subtype)
-    Continuous i ∧ Injective i ∧ DenseRange i := by sorry
+    Continuous i ∧ Injective i ∧ DenseRange i := by
+  have hclosed := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space (Jₛ(S)) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space (J₁(S)) := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set (Jₛ(S))))
+  let : CompactSpace (J₁(S)) := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : T2Space (Θₛ(S)) := sLocalAdelicThetaSpace_t2_of_isClosed
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ (Θₛ(S)) := sLocalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup (Θₛ(S)) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  let : ContinuousSMul ℂ (Θₛ(S)) := PolynormableSpace.continuousSMul ℂ _
+  with_reducible_and_instances
+    exact sLocalThetaIsotypeSum_dense_aux (H := Jₛ(S)) (E := Θₛ(S)) (sIdeleQuotientNorm F S).ker
+      (sLocalAdelicThetaSpace_complete (F := F) (S := S)) ρₛ(S)
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1
 
 /-- Paper: Remark 6.2.1.4(1), pp. 297–298.
 The direct sum of the global isotypes maps continuously and injectively to the
