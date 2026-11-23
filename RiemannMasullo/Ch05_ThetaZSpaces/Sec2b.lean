@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
+import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 
 /-! # Homogeneous theta spaces and Fourier descent
@@ -289,10 +290,90 @@ theorem sLocalHomogeneousThetaSpace_lf (χ : PontryaginDual (J₁(S))) :
     sLocalHomogeneousThetaSpace_nuclearFrechetPresentation χ
   exact h.isLFSpace
 
+private theorem globalHomogeneousThetaSpace_complete_coinvariants {G E : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [CompactSpace G] [T2Space G] [MeasurableSpace G] [BorelSpace G]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [T2Space E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E]
+    (hE : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E))
+    (μ : Measure G) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (hρ : Continuous fun p : G × E ↦ ρ p.1 p.2) (ω : PontryaginDual G) :
+    @CompleteSpace (E ⧸ (Submodule.span ℂ (Set.range (fun p : G × E ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1 p.2))).topologicalClosure)
+      (IsTopologicalAddGroup.rightUniformSpace _) := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hE
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  let : SeparatingDual ℂ E := locallyConvexSpace_separatingDual ℂ E
+  let A (g : G) := star (ω g : ℂ) • ρ g
+  have hA : Continuous (fun p : G × E ↦ A p.1 p.2) :=
+    (show Continuous (fun p : G × E ↦ star (ω p.1 : ℂ)) from by fun_prop).smul hρ
+  obtain ⟨P, hP, _⟩ := existsUnique_pettisIntegral_continuousFamily μ isCompact_univ
+    (ae_of_all _ fun _ ↦ Set.mem_univ _) A hA
+  have hav : IsPettisIsotypicAverageOn μ Set.univ ρ ω P := by
+    simpa [IsPettisIsotypicAverageOn, A] using hP
+  have hk := compactActionAverage_ker μ ρ hρ ω P hav
+  obtain ⟨e, _⟩ := compactActionAverage_quotient_equiv μ ρ hρ ω P hav
+  let : IsUniformAddGroup (actionIsotype ρ ω) := IsUniformAddGroup.comap (actionIsotype ρ ω).subtype
+  have hc : CompleteSpace (actionIsotype ρ ω) :=
+    completeSpace_coe_iff_isComplete.mpr (isClosed_actionIsotype ρ ω).isComplete
+  rw [← hk]
+  let : UniformSpace (E ⧸ P.ker) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (E ⧸ P.ker) := isUniformAddGroup_of_addCommGroup
+  exact (completeSpace_congr (e := e.toEquiv) e.isUniformEmbedding).2 hc
+
+private theorem globalHomogeneousThetaSpace_complete_subgroup {H E : Type*}
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H]
+    (N : Subgroup H) [CompactSpace N] [T2Space N] [MeasurableSpace N] [BorelSpace N]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [T2Space E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E]
+    (hE : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E))
+    (μ : Measure N) [μ.IsHaarMeasure] (ρ : H →* (E →L[ℂ] E))
+    (hρ : Continuous fun p : N × E ↦ ρ p.1.val p.2) (ω : PontryaginDual N) :
+    @CompleteSpace (E ⧸ (Submodule.span ℂ (Set.range (fun p : N × E ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1.val p.2))).topologicalClosure)
+      (IsTopologicalAddGroup.rightUniformSpace _) := by
+  exact globalHomogeneousThetaSpace_complete_coinvariants hE μ (ρ.comp N.subtype) hρ ω
+
+private theorem globalHomogeneousThetaSpace_complete_transfer {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [IsTopologicalAddGroup X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [IsTopologicalAddGroup Y] (e : X ≃L[ℂ] Y)
+    (h : @CompleteSpace Y (IsTopologicalAddGroup.rightUniformSpace Y)) :
+    @CompleteSpace X (IsTopologicalAddGroup.rightUniformSpace X) := by
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  let : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  let : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  exact (completeSpace_congr (e := e.toEquiv) e.isUniformEmbedding).2 h
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous quotient is complete for its additive uniformity. -/
 theorem globalHomogeneousThetaSpace_complete :
-    @CompleteSpace Θ𝔽ω(ω) (IsTopologicalAddGroup.rightUniformSpace _) := by sorry
+    @CompleteSpace Θ𝔽ω(ω) (IsTopologicalAddGroup.rightUniformSpace _) := by
+  let E := GlobalAdelicThetaSpace F
+  let G := (ideleClassNorm F).ker
+  let : T2Space E := globalAdelicThetaSpace_t2_of_isClosed (F := F) (adelicTheta_ker_isClosed (F := F))
+  let : PolynormableSpace ℂ E := globalAdelicThetaSpace_polynormable (F := F)
+  let : T2Space G := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace G := (ideleClassGroup_finiteness F).2.1
+  let : MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+  let : BorelSpace (IdeleClassGroup (𝓞 F) F) := ⟨rfl⟩
+  let μ := normOneIdeleClassTamagawaMeasure F
+  let : μ.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let ρ : IdeleClassGroup (𝓞 F) F →* (E →L[ℂ] E) := (existsUnique_globalThetaAction (F := F)).exists.choose
+  let σ : G →* (E →L[ℂ] E) := ρ.comp G.subtype
+  have hσ : Continuous (fun p : G × E ↦ σ p.1 p.2) :=
+    (existsUnique_globalThetaAction (F := F)).exists.choose_spec.1.comp
+      ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  have hq := globalHomogeneousThetaSpace_complete_subgroup G
+    (globalAdelicThetaSpace_complete (F := F)) μ ρ hσ ω
+  have he := (globalHomogeneousThetaSpace_equiv_coinvariants (F := F) ω).choose
+  with_reducible_and_instances
+    exact globalHomogeneousThetaSpace_complete_transfer he hq
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The S-local homogeneous quotient is complete for its additive uniformity. -/
