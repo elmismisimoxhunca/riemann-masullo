@@ -830,11 +830,80 @@ theorem sLocalThetaFourier_mem_isotype (χ : PontryaginDual (J₁(S))) (x : Θ�
     let fourier := (existsUnique_sLocalThetaFourier (F := F) (S := S)).exists.choose
     fourier x ∈ Eₛω(S, χ⁻¹) ↔ x ∈ Eₛω(S, χ) := by sorry
 
+/-- Norm-one dilations preserve additive Tamagawa measure, so Fourier transform
+intertwines translation by such an idele with translation by its inverse. -/
+private theorem globalThetaFourier_mem_isotype_translate (g : IdeleGroup (𝓞 F) F)
+    (hg : ideleNorm F g = 1) (f : ℬ𝔽) :
+    adeleSchwartzFourier (schwartzBruhatUnitTranslate g f) =
+      schwartzBruhatUnitTranslate g⁻¹ (adeleSchwartzFourier f) := by
+  let : MeasurableSpace 𝔸[F] := borel _
+  let : BorelSpace 𝔸[F] := ⟨rfl⟩
+  let μ := additiveTamagawaMeasure F
+  let : μ.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  let d := Homeomorph.smul (α := 𝔸[F]) g⁻¹
+  have hd : MeasurePreserving d μ μ := by
+    refine ⟨d.continuous.measurable, Measure.ext fun s hs ↦ ?_⟩
+    rw [Measure.map_apply d.continuous.measurable hs]
+    change μ ((fun x : 𝔸[F] ↦ g⁻¹ • x) ⁻¹' s) = μ s
+    rw [Set.preimage_smul_inv]
+    change μ ((fun a : 𝔸[F] ↦ g.val * a) '' s) = μ s
+    simpa only [hg, Units.val_one, ENNReal.coe_one, one_mul] using adeleHaar_mul_image F μ g s hs
+  apply Subtype.ext
+  funext y
+  let k (z : 𝔸[F]) := f (Multiplicative.ofAdd z) *
+    star (adeleStandardCharacter F (z * (g.val * y.toAdd)) : ℂ)
+  refine Eq.trans ?_ (hd.integral_comp d.toMeasurableEquiv.measurableEmbedding k)
+  apply integral_congr_ae
+  refine Eventually.of_forall fun z ↦ ?_
+  change _ * star (adeleStandardCharacter F (z * y.toAdd) : ℂ) =
+    _ * star (adeleStandardCharacter F ((g⁻¹.val * z) * (g.val * y.toAdd)) : ℂ)
+  rw [mul_mul_mul_comm, show g⁻¹.val * g.val = (1 : 𝔸[F]) from g.inv_val, one_mul]
+  rfl
+
+/-- On theta classes, norm-one translation therefore passes through the Fourier
+involution as inverse translation. -/
+private theorem globalThetaFourier_mem_isotype_intertwine (g : C₁) (x : Θ𝔽) :
+    let e := (existsUnique_globalThetaFourier (F := F)).exists.choose
+    e (ρ𝔽₁ g x) = ρ𝔽₁ g⁻¹ (e x) := by
+  intro e
+  obtain ⟨a, ha⟩ := g
+  induction a using QuotientGroup.induction_on with | H u => ?_
+  induction x using Submodule.Quotient.induction_on with | _ f => ?_
+  have hρ := (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2
+  have he := (existsUnique_globalThetaFourier (F := F)).exists.choose_spec.2
+  calc
+    _ = e ((K𝔽).mkQ (schwartzBruhatUnitTranslate u f)) := congrArg e (hρ u f)
+    _ = (K𝔽).mkQ (adeleSchwartzFourier (schwartzBruhatUnitTranslate u f)) := he _
+    _ = (K𝔽).mkQ (schwartzBruhatUnitTranslate u⁻¹ (adeleSchwartzFourier f)) :=
+      congrArg (K𝔽).mkQ (globalThetaFourier_mem_isotype_translate u ha f)
+    _ = ρ𝔽 (QuotientGroup.mk u⁻¹) ((K𝔽).mkQ (adeleSchwartzFourier f)) := (hρ u⁻¹ _).symm
+    _ = _ := congrArg (ρ𝔽 (QuotientGroup.mk u⁻¹)) (he f).symm
+
+/-- An invertible linear intertwiner for an action and the inverse action
+exchanges the eigenspaces for a character and its inverse. -/
+private theorem globalThetaFourier_mem_isotype_of_intertwine {G E : Type*}
+    [CommGroup G] [TopologicalSpace G] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (ρ : G →* (E →L[ℂ] E)) (e : E ≃L[ℂ] E)
+    (he : ∀ g x, e (ρ g x) = ρ g⁻¹ (e x)) (ω : PontryaginDual G) (x : E) :
+    e x ∈ actionIsotype ρ ω⁻¹ ↔ x ∈ actionIsotype ρ ω := by
+  rw [mem_actionIsotype, mem_actionIsotype]
+  have hχ (g : G) : ω⁻¹ g = ω g⁻¹ := (map_inv ω g).symm
+  constructor
+  · intro h g
+    apply e.injective
+    rw [he, h, hχ, inv_inv, map_smul]
+  · intro h g
+    calc
+      ρ g (e x) = e (ρ g⁻¹ x) := by simpa only [inv_inv] using (he g⁻¹ x).symm
+      _ = _ := by rw [h, hχ, map_smul]
+
 /-- Paper: Theorem 5.2.4.1(2), p. 239.
 Global Fourier transform exchanges each norm-one isotype with its conjugate. -/
 theorem globalThetaFourier_mem_isotype (ω : PontryaginDual C₁) (x : Θ𝔽) :
     let fourier := (existsUnique_globalThetaFourier (F := F)).exists.choose
-    fourier x ∈ E𝔽ω(ω⁻¹) ↔ x ∈ E𝔽ω(ω) := by sorry
+    fourier x ∈ E𝔽ω(ω⁻¹) ↔ x ∈ E𝔽ω(ω) := by
+  exact globalThetaFourier_mem_isotype_of_intertwine ρ𝔽₁ _
+    globalThetaFourier_mem_isotype_intertwine ω x
 
 end Fourier
 
