@@ -17,6 +17,7 @@ public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.Fini
 public import Mathlib.Analysis.Meromorphic.Divisor
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.Digamma
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
 import Mathlib.Topology.Algebra.IsOpenUnits
@@ -385,6 +386,253 @@ local notation "localChart(" w ", " χ ")" =>
     ((Units.map nnNormHom.toMonoidHom) ^ (InfinitePlace.mult w) :
       (InfinitePlace.Completion w)ˣ →* ℝ≥0ˣ) (continuous_infiniteLocalModule w) (ContinuousMonoidHom.comp circleToComplex χ)
 
+/-- A real norm twist adds its coordinate to the radial exponent and preserves parity. -/
+private theorem realHeckeArchimedean_mellinLogDeriv_twist (w : InfinitePlace F) (hw : w.IsReal)
+    (χ : PontryaginDual w.Completionˣ) (z : ℂ) (k : Fin 2)
+    (hχ : ∀ x : ℝˣ,
+      (χ (Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom x) : ℂ) =
+        (‖(x : ℝ)‖ : ℂ) ^ z * (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ k.val) :
+    infiniteLocalEulerFactor w ∘ localChart(w, χ) = fun s ↦ Complex.Gammaℝ (s + (z + k.val)) := by
+  funext s
+  let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm
+  have h := (realLocalEulerParameters w hw (localChart(w, χ) s)).unique
+    (realLocalEulerParameters w hw _).exists.choose_spec (y₂ := (s + z, k)) (by
+      intro x
+      have hn : ‖e (x : ℝ)‖ = ‖(x : ℝ)‖ :=
+        (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+          (map_zero e) (x : ℝ)
+      change (χ (Units.map e.toMonoidHom x) : ℂ) * ((‖e (x : ℝ)‖ ^ w.mult : ℝ) : ℂ) ^ s = _
+      rw [hχ, hn, Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero))]
+      simp only [InfinitePlace.mult, hw, ite_true, pow_one]
+      ac_rfl)
+  simp only [Function.comp_apply, infiniteLocalEulerFactor, hw, ↓reduceDIte, h, add_assoc]
+
+/-- Unitarity forces the exponent to be imaginary. Inverting the character negates that
+exponent and leaves its sign character fixed. -/
+private theorem realHeckeArchimedean_mellinLogDeriv_parameters (w : InfinitePlace F) (hw : w.IsReal)
+    (χ : PontryaginDual w.Completionˣ) :
+    let p := (realLocalEulerParameters w hw (ContinuousMonoidHom.comp circleToComplex χ)).exists.choose
+    p.1.re = 0 ∧
+      (infiniteLocalEulerFactor w ∘ localChart(w, χ) = fun s ↦ Complex.Gammaℝ (s + (p.1 + p.2.val))) ∧
+      (infiniteLocalEulerFactor w ∘ localChart(w, χ⁻¹) = fun s ↦ Complex.Gammaℝ (s + (-p.1 + p.2.val))) := by
+  intro p
+  let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm
+  have hp := (realLocalEulerParameters w hw (ContinuousMonoidHom.comp circleToComplex χ)).exists.choose_spec
+  change ∀ x : ℝˣ, (χ (Units.map e.toMonoidHom x) : ℂ) =
+    (‖(x : ℝ)‖ : ℂ) ^ p.1 * (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ p.2.val at hp
+  refine ⟨?_, realHeckeArchimedean_mellinLogDeriv_twist w hw χ _ _ hp,
+    realHeckeArchimedean_mellinLogDeriv_twist w hw χ⁻¹ _ _ ?_⟩
+  · have h := congrArg norm (hp (Units.mk0 (2 : ℝ) (by norm_num)))
+    have hpow : ‖((2 : ℝ) : ℂ) ^ p.1‖ = 1 := by simpa using h.symm
+    rw [Complex.norm_cpow_eq_rpow_re_of_pos (by norm_num)] at hpow
+    exact (Real.rpow_right_inj (by norm_num : (0 : ℝ) < 2) (by norm_num)).mp
+      (hpow.trans (Real.rpow_zero _).symm)
+  · intro x
+    change ((χ (Units.map e.toMonoidHom x) : ℂ))⁻¹ = _
+    rw [hp, mul_inv, Complex.cpow_neg]
+    split_ifs <;> simp [← inv_pow]
+
+/-- The logarithmic derivative of the shifted real gamma factor on its right half-plane. -/
+private theorem realHeckeArchimedean_mellinLogDeriv_gamma (b s : ℂ) (h : 0 < ((s + b) / 2).re) :
+    logDeriv (fun w ↦ Complex.Gammaℝ (w + b)) s =
+      (Complex.digamma ((s + b) / 2) - (Real.log Real.pi : ℂ)) / 2 := by
+  let z (w : ℂ) := (w + b) / 2
+  let E (w : ℂ) := Complex.exp (-(Real.log Real.pi : ℂ) * z w)
+  have hf : (fun w ↦ Complex.Gammaℝ (w + b)) = fun w ↦ E w * Complex.Gamma (z w) := by
+    funext w
+    rw [Complex.Gammaℝ_def, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero),
+      ← Complex.ofReal_log Real.pi_pos.le]
+    simp only [E, z, neg_div, neg_mul, mul_neg]
+  have hz : HasDerivAt z (1 / 2) s := ((hasDerivAt_id s).add_const b).div_const 2
+  have hE := (hz.const_mul (-(Real.log Real.pi : ℂ))).cexp
+  have hG := (Complex.hasDerivAt_Gamma_of_re_pos h).differentiableAt
+  rw [hf, logDeriv_fun_mul (f := E) (g := fun w ↦ Complex.Gamma (z w)) s
+    (Complex.exp_ne_zero _) (Complex.Gamma_ne_zero_of_re_pos h) hE.differentiableAt
+    (hG.comp s hz.differentiableAt), hz.logDeriv_Gamma (fun m he ↦ by
+      have := congrArg Complex.re he
+      simp [z] at this h
+      linarith [show (0 : ℝ) ≤ m by positivity])]
+  rw [logDeriv_apply, show deriv E s = E s * (-(Real.log Real.pi : ℂ) * (1 / 2)) from hE.deriv,
+    mul_div_cancel_left₀ _ (show E s ≠ 0 from Complex.exp_ne_zero _)]
+  dsimp [z]
+  ring
+
+/-- The Gauss difference times a Schwartz trace is absolutely integrable in both variables.
+Its bound uses the first absolute moment of the trace. -/
+private theorem realHeckeArchimedean_mellinLogDeriv_domination (W : 𝓢(ℝ, ℂ))
+    (a : ℝ) (b : ℂ) (hab : 0 < a + b.re) :
+    Integrable (fun p : ℝ × ℝ ↦ W p.1 * gaussDigammaDifferenceKernel 1
+      (((a : ℂ) + (p.1 : ℂ) * Complex.I + b) / 2) p.2)
+      ((volume : Measure ℝ).prod (volume.restrict (Ioi 0))) := by
+  let u := (a + b.re) / 2
+  let m := min 1 u
+  let C := |1 - u| + |b.im|
+  have hm : 0 < m := lt_min one_pos (half_pos hab)
+  have hExp := integrableOn_exp_mul_Ioi (neg_neg_of_pos hm) 0
+  have hxExp : IntegrableOn (fun x : ℝ ↦ x * Real.exp (-m * x)) (Ioi 0) := by
+    simpa using (integrableOn_rpow_mul_exp_neg_mul_rpow (p := 1) (s := 1) (by norm_num) one_pos hm)
+  have hEnv : IntegrableOn (fun x : ℝ ↦ (1 + x) * Real.exp (-m * x)) (Ioi 0) := by
+    simpa only [Pi.add_def, add_mul, one_mul] using hExp.add hxExp
+  have hMoment : Integrable (fun y : ℝ ↦ (C + |y|) * ‖W y‖) := by
+    simpa only [Pi.add_def, add_mul, Real.norm_eq_abs, pow_one] using
+      (W.integrable.norm.const_mul C).add (W.integrable_pow_mul volume 1)
+  refine (hMoment.mul_prod hEnv).mono'
+    (Measurable.aestronglyMeasurable (by unfold gaussDigammaDifferenceKernel; fun_prop)) ?_
+  have hx : ∀ᵐ p : ℝ × ℝ ∂((volume : Measure ℝ).prod (volume.restrict (Ioi 0))), p.2 ∈ Ioi 0 :=
+    (Measure.ae_prod_mem_iff_ae_ae_mem (measurable_snd measurableSet_Ioi)).mpr
+      (Eventually.of_forall fun _ : ℝ ↦ ae_restrict_mem (μ := (volume : Measure ℝ)) measurableSet_Ioi)
+  filter_upwards [hx] with ⟨y, x⟩ hx
+  have hxpos : 0 < x := hx
+  have he : ((a : ℂ) + (y : ℂ) * Complex.I + b) / 2 =
+      (u : ℂ) + ((y + b.im) / 2 : ℝ) * Complex.I := by
+    apply Complex.ext <;> simp [u, add_div, Complex.div_ofNat_re, Complex.div_ofNat_im]
+  have hIm : |(y + b.im) / 2| ≤ |y| + |b.im| := by
+    rw [abs_div, abs_of_pos (by norm_num : (0 : ℝ) < 2)]
+    linarith [abs_add_le y b.im, abs_nonneg (y + b.im)]
+  rw [norm_mul, he]
+  have h := norm_gaussDigammaDifferenceKernel_le (d := 1) (u := u) (v := (y + b.im) / 2)
+    one_pos hxpos
+  simp only [div_one] at h
+  change _ ≤ ((C + |y|) * ‖W y‖) * ((1 + x) * Real.exp (-m * x))
+  rw [mul_assoc, mul_left_comm (C + |y|)]
+  apply mul_le_mul_of_nonneg_left _ (norm_nonneg _)
+  refine h.trans (mul_le_mul_of_nonneg_right ?_ (by positivity))
+  dsimp [C]
+  linarith
+
+/-- A Mellin trace of an exponentially decaying test is Schwartz. Mellin inversion
+evaluates its exponentially twisted integral at every log coordinate. -/
+private theorem realHeckeArchimedean_mellinLogDeriv_trace (f : 𝓢(ℝ, ℂ)) (hf : ExponentialDecay f)
+    (a : ℝ) :
+    let s := fun y : ℝ ↦ (a : ℂ) + (y : ℂ) * Complex.I
+    ∃ W : 𝓢(ℝ, ℂ), (∀ y, W y = logMellin f (s y)) ∧ ∀ x : ℝ,
+      (∫ y : ℝ, W y * Complex.exp (-s y * (x : ℂ))) / (2 * (Real.pi : ℂ)) = f x := by
+  intro s
+  obtain ⟨W, hW⟩ := exists_schwartz_verticalTrace_mellin_of_weighted_schwartz f (a - 1) (a + 1)
+    (by linarith) (fun c _ ↦ exponentialDecay_weighted_schwartz f hf c) a ⟨by linarith, by linarith⟩
+  refine ⟨W, congrFun hW, fun x ↦ ?_⟩
+  have hi : Complex.VerticalIntegrable (logMellin f) a :=
+    W.integrable.congr (Eventually.of_forall (congrFun hW))
+  have hx := Real.exp_pos x
+  have he := mellinInv_mellin_eq a (fun t ↦ f (Real.log t)) hx
+    (mellinConvergent_of_exponentialDecay f hf a) hi
+    (f.continuous.continuousAt.comp (Real.continuousAt_log hx.ne'))
+  rw [Real.log_exp] at he
+  rw [← he, mellinInv, Complex.real_smul]
+  simp only [Complex.ofReal_div, Complex.ofReal_one, Complex.ofReal_mul, Complex.ofReal_ofNat]
+  rw [div_eq_inv_mul, one_div]
+  congr 1
+  apply integral_congr_ae
+  filter_upwards with y
+  rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hx.ne'),
+    ← Complex.ofReal_log hx.le, Real.log_exp, smul_eq_mul, mul_comm (x : ℂ)]
+  rw [mul_comm, congrFun hW y]
+
+/-- Reversing the ordinate in Mellin inversion gives the reflected trace.
+The sample at log coordinate `x` acquires the factor `exp (-x)`. -/
+private theorem realHeckeArchimedean_mellinLogDeriv_reflect (f : 𝓢(ℝ, ℂ)) (hf : ExponentialDecay f)
+    (a : ℝ) :
+    let s := fun y : ℝ ↦ (a : ℂ) + (y : ℂ) * Complex.I
+    ∃ W : 𝓢(ℝ, ℂ), (∀ y, W y = logMellin f (1 - s y)) ∧ ∀ x : ℝ,
+      (∫ y : ℝ, W y * Complex.exp (-s y * (x : ℂ))) / (2 * (Real.pi : ℂ)) =
+        Complex.exp (-(x : ℂ)) * f (-x) := by
+  intro s
+  obtain ⟨T, hT, hinv⟩ := realHeckeArchimedean_mellinLogDeriv_trace f hf (1 - a)
+  obtain ⟨R, hR, _⟩ := exists_schwartzLogReflection
+  refine ⟨R T, fun y ↦ ?_, fun x ↦ ?_⟩
+  · rw [hR, hT]
+    congr 1
+    dsimp [s]
+    push_cast
+    ring
+  · rw [← hinv (-x), ← mul_div_assoc, ← integral_const_mul]
+    congr 1
+    rw [← integral_neg_eq_self (fun y : ℝ ↦ R T y * Complex.exp (-s y * (x : ℂ)))]
+    apply integral_congr_ae
+    filter_upwards with y
+    rw [hR, neg_neg, mul_left_comm, ← Complex.exp_add]
+    congr 2
+    dsimp [s]
+    push_cast
+    ring
+
+local notation "gaussSample(" b ", " g ", " t ")" =>
+  (((g) 0 * (Real.exp (-(t)) : ℂ) - (g) ((t) / 2) * Complex.exp (-(b) * ((t) : ℂ) / 2)) /
+    (1 - (Real.exp (-(t)) : ℂ)))
+
+/-- Evaluate one shifted real gamma factor against a Schwartz trace. The Gauss
+difference stays together under Fubini, including at the singular endpoint. -/
+private theorem realHeckeArchimedean_mellinLogDeriv_leg (W : 𝓢(ℝ, ℂ)) (g : ℝ → ℂ)
+    (a : ℝ) (b : ℂ) (hab : 0 < a + b.re)
+    (hinv : ∀ x : ℝ, (∫ y : ℝ, W y * Complex.exp
+      (-((a : ℂ) + (y : ℂ) * Complex.I) * (x : ℂ))) / (2 * (Real.pi : ℂ)) = g x) :
+    let s := fun y : ℝ ↦ (a : ℂ) + (y : ℂ) * Complex.I
+    let L := fun y ↦ W y * logDeriv (fun z ↦ Complex.Gammaℝ (z + b)) (s y)
+    Integrable L ∧ IntegrableOn (fun t ↦ gaussSample(b, g, t)) (Ioi 0) ∧
+      (∫ y, L y) / (2 * (Real.pi : ℂ)) =
+        ((∫ t in Ioi (0 : ℝ), gaussSample(b, g, t)) -
+          ((Real.eulerMascheroniConstant : ℂ) + (Real.log Real.pi : ℂ)) * g 0) / 2 := by
+  intro s L
+  let c : ℂ := 2 * Real.pi
+  let A : ℂ := Real.eulerMascheroniConstant + (Real.log Real.pi : ℂ)
+  let D (y t : ℝ) := gaussDigammaDifferenceKernel 1 ((s y + b) / 2) t
+  have hW : Integrable (W : ℝ → ℂ) := W.integrable
+  have hJ : Integrable (fun p : ℝ × ℝ ↦ W p.1 * D p.1 p.2)
+      ((volume : Measure ℝ).prod (volume.restrict (Ioi 0))) :=
+    realHeckeArchimedean_mellinLogDeriv_domination W a b hab
+  have h0 : (∫ y, W y) / c = g 0 := by simpa [c] using hinv 0
+  have hslice (t : ℝ) : (∫ y, W y * D y t) / c = gaussSample(b, g, t) := by
+    let E : ℂ := Real.exp (-t)
+    let B := Complex.exp (-b * (t : ℂ) / 2)
+    let P (y : ℝ) := Complex.exp (-s y * ((t / 2 : ℝ) : ℂ))
+    have hP : Integrable (fun y ↦ W y * P y) := by
+      refine (hW.norm.mul_const (Real.exp (-a * (t / 2)))).mono'
+        (Continuous.aestronglyMeasurable (by dsimp [P, s]; fun_prop)) ?_
+      filter_upwards with y
+      simp [P, s, Complex.norm_exp, Complex.mul_re]
+    have hsample : (∫ y, W y * P y) / c = g (t / 2) := hinv _
+    have hpoint (y : ℝ) : W y * D y t = (W y * E - (W y * P y) * B) / (1 - E) := by
+      have hsplit : Complex.exp (-((s y + b) / 2) * (t : ℂ)) = P y * B := by
+        change _ = Complex.exp _ * Complex.exp _
+        rw [← Complex.exp_add]
+        congr 1
+        push_cast
+        ring
+      simp only [D, gaussDigammaDifferenceKernel, Complex.ofReal_one, neg_one_mul, hsplit, E,
+        Complex.ofReal_exp, Complex.ofReal_neg]
+      ring
+    simp_rw [hpoint]
+    rw [integral_div, integral_sub (hW.mul_const E) (hP.mul_const B), integral_mul_const,
+      integral_mul_const]
+    change ((_ - _) / (1 - E)) / c = (g 0 * E - g (t / 2) * B) / (1 - E)
+    rw [← h0, ← hsample]
+    ring
+  have hsampleInt : IntegrableOn (fun t ↦ gaussSample(b, g, t)) (Ioi 0) :=
+    (hJ.integral_prod_right.div_const c).congr (Eventually.of_forall hslice)
+  have hL (y : ℝ) : L y = ((∫ t in Ioi (0 : ℝ), W y * D y t) - W y * A) / 2 := by
+    have hz : 0 < ((s y + b) / 2).re := by simpa [s, Complex.div_ofNat_re] using half_pos hab
+    have hψ := (integral_gaussDigammaDifferenceKernel (d := 1) (w := (s y + b) / 2)
+      one_pos (by simpa using hz)).2
+    simp only [Complex.ofReal_one, div_one, Complex.digamma_one] at hψ
+    dsimp only [L]
+    rw [realHeckeArchimedean_mellinLogDeriv_gamma b (s y) hz, integral_const_mul]
+    change _ = (W y * (∫ t in Ioi (0 : ℝ), gaussDigammaDifferenceKernel 1 ((s y + b) / 2) t) - _) / 2
+    rw [hψ]
+    dsimp [A]
+    ring
+  have hline := hJ.integral_prod_left
+  refine ⟨(hline.sub (hW.mul_const A)).div_const 2 |>.congr (Eventually.of_forall fun y ↦ (hL y).symm),
+    hsampleInt, ?_⟩
+  change (∫ y, L y) / c = ((∫ t in Ioi (0 : ℝ), gaussSample(b, g, t)) - A * g 0) / 2
+  simp_rw [hL]
+  rw [integral_div, integral_sub hline (hW.mul_const A), integral_mul_const, integral_integral_swap hJ]
+  have hsampleTotal : (∫ t in Ioi (0 : ℝ), ∫ y, W y * D y t) / c =
+      ∫ t in Ioi (0 : ℝ), gaussSample(b, g, t) := by
+    rw [← integral_div]
+    exact integral_congr_ae (Eventually.of_forall hslice)
+  rw [← hsampleTotal, ← h0]
+  ring
+
 /-- Paper: Proposition B.4.2.1, p. 616. The two real local contour terms equal
 the integral of the digamma kernel and the real gamma prefactor contribution.
 Deviation: The integral converges at both endpoints and includes sign parity. -/
@@ -398,7 +646,56 @@ theorem realHeckeArchimedean_mellinLogDeriv (w : InfinitePlace F) (hw : w.IsReal
       logMellin f (1 - s) * logDeriv (infiniteLocalEulerFactor w ∘ localChart(w, χ⁻¹)) s
     Complex.VerticalIntegrable H a ∧ IntegrableOn K (Ioi 0) ∧
       verticalLineIntegral H a / twoPiI =
-        (∫ t in Ioi (0 : ℝ), K t) - (Real.log Real.pi : ℂ) * f 0 := by sorry
+        (∫ t in Ioi (0 : ℝ), K t) - (Real.log Real.pi : ℂ) * f 0 := by
+  intro p K H
+  let b : ℂ := p.1 + p.2.val
+  let b' : ℂ := -p.1 + p.2.val
+  let g (x : ℝ) := Complex.exp (-(x : ℂ)) * f (-x)
+  have hg0 : g 0 = f 0 := by simp [g]
+  obtain ⟨hre, hχ, hχinv⟩ := realHeckeArchimedean_mellinLogDeriv_parameters w hw χ
+  change p.1.re = 0 at hre
+  have hb : 0 < a + b.re := by simp [b, hre]; positivity
+  have hb' : 0 < a + b'.re := by simp [b', hre]; positivity
+  obtain ⟨W, hW, hWinv⟩ := realHeckeArchimedean_mellinLogDeriv_trace f _hf a
+  obtain ⟨V, hV, hVinv⟩ := realHeckeArchimedean_mellinLogDeriv_reflect f _hf a
+  obtain ⟨hD, hKD, hDval⟩ := realHeckeArchimedean_mellinLogDeriv_leg W f a b hb hWinv
+  obtain ⟨hR, hKR, hRval⟩ := realHeckeArchimedean_mellinLogDeriv_leg V g a b' hb' hVinv
+  let s (y : ℝ) := (a : ℂ) + (y : ℂ) * Complex.I
+  have hline (y : ℝ) : H (s y) =
+      W y * logDeriv (fun z ↦ Complex.Gammaℝ (z + b)) (s y) +
+        V y * logDeriv (fun z ↦ Complex.Gammaℝ (z + b')) (s y) := by
+    rw [hW, hV]
+    simp only [H, hχ, hχinv, b, b', p, s]
+  have hK (t : ℝ) : K t = (gaussDigammaKernel t : ℂ) * f 0 +
+      (gaussSample(b, f, t) + gaussSample(b', g, t)) / 2 := by
+    have hsample : g (t / 2) * Complex.exp (-b' * (t : ℂ) / 2) =
+        f (-(t / 2)) * Complex.exp (-((1 - p.1 + p.2.val) / 2) * (t : ℂ)) := by
+      dsimp only [g]
+      rw [mul_comm (Complex.exp _), mul_assoc, ← Complex.exp_add]
+      congr 2
+      dsimp [b']
+      push_cast
+      ring
+    simp only [K, heckeArchimedeanDigammaKernel, gaussDigammaKernel, hg0, hsample, b,
+      one_div_mul_eq_div]
+    push_cast
+    ring_nf
+  have hbase : IntegrableOn (fun t ↦ (gaussDigammaKernel t : ℂ) * f 0) (Ioi 0) :=
+    integrableOn_gaussDigammaKernel.ofReal.mul_const _
+  have hsum : IntegrableOn (fun t ↦ gaussSample(b, f, t) + gaussSample(b', g, t)) (Ioi 0) :=
+    hKD.add hKR
+  have hvi : Complex.VerticalIntegrable H a :=
+    (hD.add hR).congr (Eventually.of_forall fun y ↦ (hline y).symm)
+  refine ⟨hvi, (hbase.add (hsum.div_const 2)).congr
+    (Eventually.of_forall fun t ↦ (hK t).symm), ?_⟩
+  change (Complex.I * ∫ y, H (s y)) / twoPiI = _
+  rw [mul_comm (2 * (Real.pi : ℂ)) Complex.I, mul_div_mul_left _ _ Complex.I_ne_zero]
+  simp_rw [hline, hK]
+  rw [integral_add hD hR, add_div, hDval, hRval,
+    integral_add hbase (hsum.div_const 2), integral_div, integral_add hKD hKR,
+    integral_mul_const, integral_complex_ofReal, integral_gaussDigammaKernel, hg0]
+  push_cast
+  ring
 
 /-- Paper: Proposition B.4.2.1, p. 616. The two complex local contour terms
 equal the digamma integral and the complex gamma prefactor contribution.

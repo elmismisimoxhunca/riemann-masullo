@@ -79,7 +79,8 @@ abbrev spectralSobolevQuotient (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 �
 /-- Paper: (10.2.1.1), p. 439, and (10.2.2.1), p. 445. A Sobolev vector has
 zero spectral class exactly when it is in the closed weighted theta subspace. -/
 theorem spectralSobolevQuotient_eq_zero (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
-    (f : W(l, r, s)) : Θ(a, hI, hs).mkQ f = 0 ↔ f ∈ Θ(a, hI, hs) := by sorry
+    (f : W(l, r, s)) : Θ(a, hI, hs).mkQ f = 0 ↔ f ∈ Θ(a, hI, hs) :=
+  Submodule.Quotient.mk_eq_zero _
 
 variable (F) in
 /-- Paper: (10.2.1.2), p. 439, and (10.2.2.2), p. 445. Divide the ambient
@@ -186,7 +187,37 @@ theorem IsSpectralBasepointChoice.existsUnique_normTwist
     {χ : PontryaginDual C₁ → PontryaginDual C𝔽} (_hχ : IsSpectralBasepointChoice χ)
     (ω : PontryaginDual C₁) (c : QuasiCharacter C𝔽)
     (_hc : ∀ g : C₁, c g.val = (ω g : ℂ)) :
-    ∃! z : ℂ, c = ideleClassNormTwist (χ ω) z := by sorry
+    ∃! z : ℂ, c = ideleClassNormTwist (χ ω) z := by
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let σ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hσ : Function.RightInverse σ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let d := c * j.comp (χ ω)⁻¹
+  have hd (g : C𝔽) : d g = c g / (χ ω g : ℂ) := by
+    change c g * (((χ ω g)⁻¹ : Circle) : ℂ) = _
+    rw [Circle.coe_inv, div_eq_mul_inv]
+  have hk (g : C₁) : d g = 1 := by
+    have hres : χ ω (g : C𝔽) = ω g := DFunLike.congr_fun (_hχ ω) g
+    rw [hd, _hc g, hres, div_self (Circle.coe_ne_zero _)]
+  obtain ⟨z, hz, huniq⟩ := existsUnique_complexPower (d.comp σ)
+  refine ⟨z, ?_, fun w hw ↦ ?_⟩
+  · ext g : 1
+    let t := ideleClassNorm F g
+    have hg : g / σ t ∈ (ideleClassNorm F).ker := by
+      change ideleClassNorm F (g / σ t) = 1
+      rw [map_div, hσ t, div_self']
+    have hr : d g = (((t : ℝ≥0) : ℝ) : ℂ) ^ z := calc
+      d g = d (g / σ t) * d (σ t) := by rw [← map_mul, div_mul_cancel]
+      _ = _ := by rw [hk ⟨_, hg⟩, one_mul]; exact hz t
+    change c g = (χ ω g : ℂ) * _
+    exact ((div_eq_iff (Circle.coe_ne_zero _)).mp ((hd g).symm.trans hr)).trans (mul_comm _ _)
+  · apply huniq
+    intro t
+    change d (σ t) = _
+    rw [hd, hw]
+    change ((χ ω (σ t) : ℂ) * (((ideleClassNorm F (σ t)).val : ℝ) : ℂ) ^ w) / _ = _
+    rw [hσ t, mul_div_cancel_left₀ _ (Circle.coe_ne_zero _)]
 
 local notation "shift(" b ", " t ")" => ((b : ℝ) : ℂ) + (t : ℂ) * Complex.I
 local notation "vanishingOrder(" χ ", " z ")" =>
@@ -340,7 +371,40 @@ theorem spectralLineJet_denseInterpolants (χ : PontryaginDual C₁ → Pontryag
 /-- Paper: Theorem 10.2.1.1, p. 440. The norm-one dual and the discrete
 zero sets in its charts give countably many admitted line jets. -/
 theorem spectralLineJet_countable (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (a s : ℝ) :
-    Countable (SpectralLineJetIndex χ a s) := by sorry
+    Countable (SpectralLineJetIndex χ a s) := by
+  have hK : IsCompact ((ideleClassNorm F).ker : Set C𝔽) :=
+    IsModulation.isCompact_ker (m := m𝔽) hm𝔽
+  let : CompactSpace C₁ := isCompact_iff_compactSpace.mp hK
+  let : LocallyCompactSpace C₁ := hK.isClosed.locallyCompactSpace
+  let : SecondCountableTopology C₁ := Topology.IsInducing.subtypeVal.secondCountableTopology
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual C₁) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C₁ Circle).secondCountableTopology
+  let : Countable (PontryaginDual C₁) := countable_of_Lindelof_of_discrete
+  let Z (ω : PontryaginDual C₁) := {z : ℂ | 0 < multiplicity(χ ω, z)}
+  have hc (ω : PontryaginDual C₁) : (Z ω).Countable := by
+    have hm := (continuedCompletedHeckeL_spec (χ ω)).1.meromorphicOn
+    have hcod : (Z ω)ᶜ ∈ Filter.codiscrete ℂ := by
+      filter_upwards [hm.codiscreteWithin_setOfPred_meromorphicOrderAt_eq_zero_or_top] with z hz
+      rcases hz.2 with h | h <;> simp [Z, h]
+    let : DiscreteTopology (Z ω) := isDiscrete_iff_discreteTopology.mp
+      (compl_mem_codiscrete_iff.mp hcod).2
+    exact Set.countable_coe_iff.mp countable_of_Lindelof_of_discrete
+  let W := ⋃ ω, Z ω
+  let : Countable W := (Set.countable_iUnion hc).to_subtype
+  have hz (j : SpectralLineJetIndex χ a s) : shift(a, j.val.2.1) ∈ W := by
+    apply Set.mem_iUnion.mpr
+    refine ⟨j.val.1, ?_⟩
+    exact Nat.zero_lt_of_lt (lt_of_lt_of_le j.property (min_le_left _ _))
+  let e (j : SpectralLineJetIndex χ a s) : PontryaginDual C₁ × W × ℕ :=
+    (j.val.1, ⟨shift(a, j.val.2.1), hz j⟩, j.val.2.2)
+  apply Function.Injective.countable (f := e)
+  intro i j hij
+  have him := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.2.1.val.im) hij
+  have hω := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.1) hij
+  have hk := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.2.2) hij
+  exact Subtype.ext (Prod.ext hω (Prod.ext (by simpa [e] using him) hk))
 
 /-- Paper: Theorem 10.2.1.1 and Terminology 10.2.1.1, p. 440. The a-line
 jets represent quotient functionals and admit a Markushevich biorthogonal family.
@@ -451,13 +515,27 @@ two conditions agree with the existing §4.1 terminology. -/
 theorem spectralFamily_regular_normalized_iff {E : Type*} [NormedAddCommGroup E]
     [NormedSpace ℂ E] (x : ℕ → E) :
     (IsRegularSpectralFamily x ↔ SchauderBasis.IsRegular x) ∧
-    (IsNormalizedSpectralFamily x ↔ SchauderBasis.IsNormalized x) := by sorry
+    (IsNormalizedSpectralFamily x ↔ SchauderBasis.IsNormalized x) := by
+  have hr : IsRegularSpectralFamily x ↔ SchauderBasis.IsRegular x := by
+    constructor
+    · rintro ⟨c, hc, h⟩
+      exact ⟨Metric.ball 0 c, Metric.ball_mem_nhds _ hc, fun n hn ↦
+        (h n).not_gt (by simpa only [Metric.mem_ball, dist_zero_right] using hn)⟩
+    · rintro ⟨U, hU, hx⟩
+      obtain ⟨c, hc, hball⟩ := Metric.mem_nhds_iff.mp hU
+      refine ⟨c, hc, fun n ↦ le_of_not_gt fun hn ↦ hx n (hball ?_)⟩
+      simpa only [Metric.mem_ball, dist_zero_right] using hn
+  refine ⟨hr, ?_⟩
+  simp only [IsNormalizedSpectralFamily, SchauderBasis.IsNormalized, ← hr,
+    NormedSpace.isVonNBounded_iff' ℂ, Set.forall_mem_range]
+  exact and_comm
 
 /-- Paper: Terminology 10.2.1.2, p. 444. A nonzero vector defines a regular
 and normalized singleton family.
 Deviation: Sanity check for the two predicates. -/
 theorem spectralFamily_singleton_normalized {E : Type*} [NormedAddCommGroup E] (x : E)
-    (_hx : x ≠ 0) : IsNormalizedSpectralFamily (fun _ : Unit ↦ x) := by sorry
+    (_hx : x ≠ 0) : IsNormalizedSpectralFamily (fun _ : Unit ↦ x) := by
+  exact ⟨⟨‖x‖, fun _ ↦ le_rfl⟩, ‖x‖, norm_pos_iff.mpr _hx, fun _ ↦ le_rfl⟩
 
 /-- Paper: Corollary 10.2.1.4, p. 444. The a-line basis in the quotient dual
 is normalized in the norm of its realization in the negative space.
@@ -521,7 +599,12 @@ def spectralStripMultiplicity (α s b : ℝ) (N : ℕ) : ℕ :=
 is the truncated multiplicity. -/
 theorem spectralStripMultiplicity_boundary {α b : ℝ} (_hα : 0 ≤ α)
     (_hb : b = -α ∨ b = α) (s : ℝ) (N : ℕ) :
-    spectralStripMultiplicity α s b N = spectralBoundaryMultiplicity s N := by sorry
+    spectralStripMultiplicity α s b N = spectralBoundaryMultiplicity s N := by
+  unfold spectralStripMultiplicity
+  split_ifs with h1
+  · exfalso
+    rcases _hb with rfl | rfl <;> linarith [h1.1, h1.2]
+  · rfl
 
 /-- Paper: (10.2.2.6), p. 446. At an interior point every order below the
 zero multiplicity is retained. -/
