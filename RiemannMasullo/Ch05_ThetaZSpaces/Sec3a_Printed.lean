@@ -198,12 +198,109 @@ def Printed.testFunction_no_projectiveOrInjectiveTensor_equiv : Prop :=
     (¬ ∃ e : InjectiveTensor 𝒟(ι) 𝒟(κ) ≃L[ℂ] 𝒟(ι ⊕ κ),
       ∀ (f : 𝒟(ι)) (g : 𝒟(κ)) (x : Eᵣ(ι ⊕ κ)), e (f ⊗ₜ[ℂ] g) x = factors(f, g, x))
 
+/-- Pullback along a linear isometry preserves every fixed-support derivative seminorm,
+so is continuous for the test function topology. -/
+private theorem tensorTest_pullback {ι κ : Type} [Fintype ι] [Fintype κ]
+    (e : Eᵣ(κ) ≃ₗᵢ[ℝ] Eᵣ(ι)) :
+    ∃ T : 𝒟(ι) →L[ℂ] 𝒟(κ), ∀ f x, T f x = f (e x) := by
+  let pull (f : 𝒟(ι)) : 𝒟(κ) := ⟨f ∘ e, f.contDiff.comp e.contDiff,
+    f.hasCompactSupport.comp_homeomorph e.toHomeomorph, subset_univ _⟩
+  refine ⟨TestFunction.mkCLM ℂ pull (fun _ _ ↦ rfl) (fun _ _ ↦ rfl) ?_, fun _ _ ↦ rfl⟩
+  intro K hK
+  let K' : Compacts Eᵣ(κ) :=
+    ⟨e ⁻¹' (K : Set Eᵣ(ι)), e.toHomeomorph.isCompact_preimage.mpr K.isCompact⟩
+  let L : 𝓓_{K}(Eᵣ(ι), ℂ) →ₗ[ℂ] 𝓓_{K'}(Eᵣ(κ), ℂ) :=
+    { toFun := fun f ↦ ⟨f ∘ e, f.contDiff.comp e.contDiff, fun _ hx ↦ f.zero_on_compl hx⟩
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have hL : Continuous L := by
+    apply (ContDiffMapSupportedIn.withSeminorms ℂ Eᵣ(ι) ℂ ⊤ K).continuous_of_isBounded
+      (ContDiffMapSupportedIn.withSeminorms ℂ Eᵣ(κ) ℂ ⊤ K') L
+    refine .of_real fun i ↦ ⟨{i}, 1, fun f ↦ ?_⟩
+    rw [Finset.sup_singleton, one_mul]
+    apply (ContDiffMapSupportedIn.seminorm_top_le_iff ℂ (apply_nonneg _ _) i (L f)).2
+    intro x _
+    change ‖iteratedFDeriv ℝ i (f ∘ e) x‖ ≤ _
+    rw [e.norm_iteratedFDeriv_comp_right]
+    exact ContDiffMapSupportedIn.norm_iteratedFDeriv_apply_le_seminorm_top ℂ
+  exact (TestFunction.continuous_ofSupportedIn (Ω := (⊤ : Opens Eᵣ(κ)))
+    (subset_univ (K' : Set Eᵣ(κ)))).comp hL
+
+open scoped ComplexOrder in
+/-- The real locally convex test function topology is also complex polynormable. -/
+private theorem tensorTest_polynormable (ι : Type) [Fintype ι] : PolynormableSpace ℂ 𝒟(ι) := by
+  let L : 𝒟(ι) →L[ℂ] 𝒟(ι) := TestFunction.postcompCLM (Complex.I • ContinuousLinearMap.id ℂ ℂ)
+  have h : Continuous (fun z : ℂ × 𝒟(ι) ↦ z.1.re • z.2 + z.1.im • L z.2) :=
+    ((Complex.continuous_re.comp continuous_fst).smul continuous_snd).add
+      ((Complex.continuous_im.comp continuous_fst).smul (L.continuous.comp continuous_snd))
+  let : ContinuousSMul ℂ 𝒟(ι) := ⟨h.congr fun z ↦ TestFunction.ext fun x ↦ by
+    change (z.1.re : ℂ) * z.2 x + (z.1.im : ℂ) * (Complex.I * z.2 x) = z.1 * z.2 x
+    rw [← mul_assoc, ← add_mul, Complex.re_add_im]⟩
+  let : LocallyConvexSpace ℂ 𝒟(ι) := .ofBasisZero ℂ 𝒟(ι) _ _
+    (LocallyConvexSpace.convex_basis_zero ℝ 𝒟(ι)) (fun _ hs ↦
+      convex_of_nonneg_surjective_algebraMap ℂ (fun _ hz ↦ RCLike.nonneg_iff_exists_ofReal.mp hz) hs.2)
+  infer_instance
+
+/-- With no tangential coordinates the second tensor factor acts by its value at zero. -/
+private theorem tensorTest_scalar :
+    ∃ S : ProjectiveTensor 𝒟(Unit) 𝒟(Empty) ≃L[ℂ] 𝒟(Unit),
+      ∀ f g, S (f ⊗ₜ[ℂ] g) = g 0 • f := by
+  let := tensorTest_polynormable Unit
+  let := tensorTest_polynormable Empty
+  let := (PolynormableSpace.withSeminorms ℂ 𝒟(Unit)).continuousSMul
+  let v : 𝒟(Empty) ≃ₗ[ℂ] ℂ :=
+    { toFun := fun g ↦ g 0
+      invFun := fun a ↦ ⟨fun _ ↦ a, contDiff_const, .of_compactSpace _, subset_univ _⟩
+      left_inv := fun g ↦ TestFunction.ext fun x ↦ congrArg g (Subsingleton.elim 0 x)
+      right_inv := fun _ ↦ rfl
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let e : ProjectiveTensor 𝒟(Unit) 𝒟(Empty) ≃ₗ[ℂ] 𝒟(Unit) :=
+    (TensorProduct.congr (LinearEquiv.refl ℂ 𝒟(Unit)) v).trans (TensorProduct.rid ℂ 𝒟(Unit))
+  have he (f : 𝒟(Unit)) (g : 𝒟(Empty)) : e (f ⊗ₜ[ℂ] g) = g 0 • f := by
+    change (TensorProduct.rid ℂ 𝒟(Unit))
+      ((TensorProduct.congr (LinearEquiv.refl ℂ 𝒟(Unit)) v) (f ⊗ₜ[ℂ] g)) = _
+    rw [TensorProduct.congr_tmul, TensorProduct.rid_tmul]
+    rfl
+  have hf : Continuous e := (continuous_projectiveTensor_iff e.toLinearMap).2 (by
+    change Continuous (fun p : 𝒟(Unit) × 𝒟(Empty) ↦ e (p.1 ⊗ₜ[ℂ] p.2))
+    simp only [he]
+    have hv : Continuous (fun g : 𝒟(Empty) ↦ g 0) := continuous_eval_const _
+    exact (hv.comp continuous_snd).smul continuous_fst)
+  have ht := (continuous_projectiveTensor_iff
+    (LinearMap.id : ProjectiveTensor 𝒟(Unit) 𝒟(Empty) →ₗ[ℂ] ProjectiveTensor 𝒟(Unit) 𝒟(Empty))).1
+    continuous_id
+  have hb : Continuous e.symm := by
+    apply (ht.comp (continuous_id.prodMk (continuous_const (y := v.symm 1)))).congr
+    intro f
+    apply e.injective
+    change e (f ⊗ₜ[ℂ] v.symm 1) = e (e.symm f)
+    rw [he, e.apply_symm_apply]
+    exact one_smul ℂ f
+  exact ⟨{ e with continuous_toFun := hf, continuous_invFun := hb }, he⟩
+
 /-- Paper: Remark 5.3.2.4, p. 246. Take one normal coordinate and no tangential
 coordinates. The tangential test space is ℂ by evaluation at its single point. For both
 tensor topologies the product map is the scalar isomorphism f ⊗ a ↦ af. -/
 theorem Printed.testFunction_no_projectiveOrInjectiveTensor_equiv_false :
     ¬ Printed.testFunction_no_projectiveOrInjectiveTensor_equiv := by
-  sorry
+  intro h
+  apply (h Unit Empty).1
+  let j : Eᵣ(Unit ⊕ Empty) ≃ₗᵢ[ℝ] Eᵣ(Unit) :=
+    LinearIsometryEquiv.piLpCongrLeft 2 ℝ ℝ (Equiv.sumEmpty Unit Empty)
+  obtain ⟨P, hP⟩ := tensorTest_pullback j
+  obtain ⟨Q, hQ⟩ := tensorTest_pullback j.symm
+  let A := ContinuousLinearEquiv.equivOfInverse P Q
+    (fun f ↦ TestFunction.ext fun x ↦ by rw [hQ, hP, j.apply_symm_apply])
+    (fun f ↦ TestFunction.ext fun x ↦ by rw [hP, hQ, j.symm_apply_apply])
+  obtain ⟨S, hS⟩ := tensorTest_scalar
+  refine ⟨S.trans A, ?_⟩
+  intro f g x
+  change P (S (f ⊗ₜ[ℂ] g)) x = _
+  rw [hP, hS]
+  change g 0 * f (j x) = _
+  rw [mul_comm, Subsingleton.elim (0 : Eᵣ(Empty)) (WithLp.toLp 2 (fun a ↦ x (.inr a)))]
+  rfl
 
 end CoordinatePlane
 
