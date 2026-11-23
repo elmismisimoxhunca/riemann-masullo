@@ -421,6 +421,33 @@ local notation "P𝔽(" ω ")" => (existsUnique_globalThetaIsotypicAverage (F :=
 local notation "Pₛ(" S ", " χ ")" =>
   (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose
 
+/-- Compose the homogeneous-to-coinvariant identification with the compact average's
+identification of its kernel quotient with the isotype. -/
+private theorem globalThetaIsotypicAverage_equiv_of_coinvariants {G E T : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] (N : Subgroup G)
+    [CompactSpace N] [T2Space N] [MeasurableSpace N] [BorelSpace N]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [T2Space E] [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E]
+    [AddCommGroup T] [Module ℂ T] [TopologicalSpace T] (H : Submodule ℂ T) (q : T → E)
+    (μ : Measure N) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (hρ : Continuous (fun p : G × E ↦ ρ p.1 p.2)) (ω : PontryaginDual N) (P : E →L[ℂ] E)
+    (hP : IsPettisIsotypicAverageOn μ Set.univ (ρ.comp N.subtype) ω P)
+    (h : let D := (Submodule.span ℂ (Set.range (fun p : N × E ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1.val p.2))).topologicalClosure
+      ∃ e : (T ⧸ H) ≃L[ℂ] (E ⧸ D), ∀ f : T, e (Submodule.Quotient.mk f) = D.mkQ (q f)) :
+    IsClosed (actionIsotype (ρ.comp N.subtype) ω : Set E) ∧
+      ∃ e : (T ⧸ H) ≃L[ℂ] actionIsotype (ρ.comp N.subtype) ω, ∀ f, (e (H.mkQ f) : E) = P (q f) := by
+  have hc : Continuous (fun p : N × E ↦ (ρ.comp N.subtype) p.1 p.2) :=
+    hρ.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  have hker := compactActionAverage_ker μ (ρ.comp N.subtype) hc ω P hP
+  simp only [MonoidHom.comp_apply, Subgroup.subtype_apply] at hker
+  dsimp only at h
+  rw [← hker] at h
+  obtain ⟨e, he⟩ := h
+  obtain ⟨a, ha⟩ := compactActionAverage_quotient_equiv μ (ρ.comp N.subtype) hc ω P hP
+  exact ⟨isClosed_actionIsotype _ ω, e.trans a, fun f ↦
+    (congrArg (fun v ↦ (a v : E)) (he f)).trans (ha (q f))⟩
+
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 The global average induces a topological linear equivalence from the homogeneous quotient
 to the closed isotype. Its map on ordinary theta classes is therefore open onto the isotype.
@@ -428,7 +455,23 @@ Deviation: The continuous coinvariant quotient is identified via Definition 5.2.
 theorem globalThetaIsotypicAverage_equiv (ω : PontryaginDual C₁) :
     IsClosed (E𝔽ω(ω) : Set Θ𝔽) ∧
       ∃ e : Θ𝔽ω(ω) ≃L[ℂ] E𝔽ω(ω), ∀ f : ℬ𝔽,
-        (e ((K𝔽ω(ω)).mkQ f) : Θ𝔽) = P𝔽(ω) ((K𝔽).mkQ f) := by sorry
+        (e ((K𝔽ω(ω)).mkQ f) : Θ𝔽) = P𝔽(ω) ((K𝔽).mkQ f) := by
+  let : MeasurableSpace C𝔽 := borel _
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (μ𝔽₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed (F := F) adelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable (F := F)
+  let : Module ℝ Θ𝔽 := Module.restrictScalars ℝ ℂ _
+  let : IsScalarTower ℝ ℂ Θ𝔽 := IsScalarTower.restrictScalars ℝ ℂ _
+  let : LocallyConvexSpace ℝ Θ𝔽 := (PolynormableSpace.withSeminorms ℂ Θ𝔽).toLocallyConvexSpace
+  with_reducible_and_instances
+    exact globalThetaIsotypicAverage_equiv_of_coinvariants (G := C𝔽) (E := Θ𝔽) (T := ℬ𝔽)
+      C₁ (K𝔽ω(ω)) (K𝔽).mkQ μ𝔽₁ ρ𝔽 (existsUnique_globalThetaAction (F := F)).exists.choose_spec.1
+      ω (P𝔽(ω)) (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
+      (globalHomogeneousThetaSpace_equiv_coinvariants (F := F) ω)
 
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 The S-local average induces a topological linear equivalence from the homogeneous quotient
