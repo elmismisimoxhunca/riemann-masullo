@@ -194,6 +194,148 @@ theorem sLocalThetaIsotypeSum_complete :
       ∀ (u : UniformSpace D), u.toTopologicalSpace = (inferInstance : TopologicalSpace D) →
         @IsUniformAddGroup D u _ → @CompleteSpace D u := by sorry
 
+/-- The generating seminorms for the final locally convex topology are tested on each stage. -/
+private theorem globalThetaIsotypeSum_finalTopology_withSeminorms {K Z : Type*} {Y : K → Type*}
+    [AddCommGroup Z] [Module ℂ Z] [∀ k, AddCommGroup (Y k)] [∀ k, Module ℂ (Y k)]
+    [∀ k, TopologicalSpace (Y k)] (j : ∀ k, Y k →ₗ[ℂ] Z) :
+    letI := locallyConvexFinalTopology j
+    WithSeminorms (E := Z) (Subtype.val : {p : Seminorm ℂ Z // ∀ k, Continuous (p ∘ j k)} → _) := by
+  let := locallyConvexFinalTopology j
+  exact ⟨rfl⟩
+
+/-- Each stage map into the final locally convex topology is continuous. -/
+private theorem globalThetaIsotypeSum_continuous_finalTopology_stage {K Z : Type*} {Y : K → Type*}
+    [AddCommGroup Z] [Module ℂ Z] [∀ k, AddCommGroup (Y k)] [∀ k, Module ℂ (Y k)]
+    [∀ k, TopologicalSpace (Y k)] [∀ k, IsTopologicalAddGroup (Y k)]
+    (j : ∀ k, Y k →ₗ[ℂ] Z) (k : K) :
+    letI := locallyConvexFinalTopology j
+    Continuous (j k) := by
+  let := locallyConvexFinalTopology j
+  exact (globalThetaIsotypeSum_finalTopology_withSeminorms j).continuous_of_continuous_comp _ fun p ↦ p.property k
+
+/-- A linear map on a space with the final locally convex topology is continuous if all
+its restrictions to the defining stages are continuous. -/
+private theorem globalThetaIsotypeSum_continuous_finalTopology_lift {K Z W : Type*} {Y : K → Type*}
+    [AddCommGroup Z] [Module ℂ Z] [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)]
+    [∀ i, TopologicalSpace (Y i)] [AddCommGroup W] [Module ℂ W] [TopologicalSpace W]
+    [PolynormableSpace ℂ W] (u : ∀ i, Y i →ₗ[ℂ] Z) (T : Z →ₗ[ℂ] W)
+    (h : ∀ i, Continuous (T ∘ u i)) :
+    letI := locallyConvexFinalTopology u
+    Continuous T := by
+  let := locallyConvexFinalTopology u
+  have hs := globalThetaIsotypeSum_finalTopology_withSeminorms u
+  have := hs.isTopologicalAddGroup
+  exact (PolynormableSpace.withSeminorms ℂ W).continuous_of_continuous_comp T fun p ↦
+    hs.continuous_seminorm ⟨p.val.comp T, fun i ↦ p.property.comp (h i)⟩
+
+/-- Coordinate projections are continuous on the locally convex direct sum. -/
+private theorem globalThetaIsotypeSum_continuous_lcDirectSum_component {K : Type*} [DecidableEq K] (Y : K → Type*)
+    [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)] [∀ i, TopologicalSpace (Y i)]
+    [∀ i, PolynormableSpace ℂ (Y i)] (i : K) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ K Y)
+    Continuous (DirectSum.component ℂ K Y i) := by
+  let lof := DirectSum.lof ℂ K Y
+  let := locallyConvexFinalTopology lof
+  apply globalThetaIsotypeSum_continuous_finalTopology_lift lof
+  intro k
+  change Continuous ((DirectSum.component ℂ K Y i).comp (DirectSum.lof ℂ K Y k))
+  by_cases h : k = i
+  · subst k
+    simp only [DirectSum.component_comp_lof_same, LinearMap.id_coe, continuous_id]
+  · rw [DirectSum.component_comp_lof, dite_eq_right h]
+    exact continuous_const
+
+/-- A Cauchy filter in a locally convex direct sum of complete spaces converges.
+Its coordinate limits have finite support, as seen by testing a seminorm that takes
+value one on each nonzero limit coordinate. -/
+private theorem globalThetaIsotypeSum_completeSpace_lcDirectSum {K : Type*} [DecidableEq K] (Y : K → Type*)
+    [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)] [∀ i, UniformSpace (Y i)]
+    [∀ i, IsUniformAddGroup (Y i)] [∀ i, PolynormableSpace ℂ (Y i)]
+    [∀ i, T2Space (Y i)] [∀ i, CompleteSpace (Y i)] :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ K Y)
+    letI := (globalThetaIsotypeSum_finalTopology_withSeminorms (DirectSum.lof ℂ K Y)).isTopologicalAddGroup
+    @CompleteSpace (⨁ i, Y i) (IsTopologicalAddGroup.rightUniformSpace _) := by
+  classical
+  let D := ⨁ i, Y i
+  let lof := DirectSum.lof ℂ K Y
+  let := locallyConvexFinalTopology lof
+  have hD := globalThetaIsotypeSum_finalTopology_withSeminorms lof
+  have : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let := IsTopologicalAddGroup.rightUniformSpace D
+  have : IsUniformAddGroup D := isUniformAddGroup_of_addCommGroup
+  have : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  let pr := DirectSum.component ℂ K Y
+  have hpr := globalThetaIsotypeSum_continuous_lcDirectSum_component Y
+  constructor
+  intro l hl
+  have : l.NeBot := hl.1
+  obtain ⟨v, hv⟩ : ∃ v : ∀ i, Y i, ∀ i, Tendsto (pr i) l (𝓝 (v i)) := by
+    choose v hv using fun i ↦ CompleteSpace.complete (hl.map
+      ((pr i).toAddMonoidHom.uniformContinuous_of_continuousAt_zero (hpr i).continuousAt))
+    exact ⟨v, hv⟩
+  -- Finite sums of coordinate seminorms stay close to the coordinatewise limit.
+  have approx (q : ∀ i, Seminorm ℂ (Y i)) (hq : ∀ i, Continuous (q i)) :
+      ∀ᶠ x : D in l, ∀ s : Finset K, (∑ i ∈ s, q i (x i - v i)) ≤ 1/2 := by
+    let p := directSumSeminorm q
+    have hp : Continuous p := hD.continuous_seminorm ⟨p, fun i ↦ by
+      change Continuous (fun a ↦ directSumSeminorm q (DirectSum.lof ℂ K Y i a))
+      simpa only [directSumSeminorm_lof] using hq i⟩
+    have ht := (IsUniformAddGroup.cauchy_iff_tendsto l).mp hl
+    obtain ⟨S, hS, hSS⟩ := l.basis_sets.prod_self.mem_iff.mp
+      (ht.2 (p.ball_mem_nhds hp (show (0 : ℝ) < 1/2 by norm_num)))
+    filter_upwards [hS] with x hx
+    intro s
+    have htend : Tendsto (fun y : D ↦ ∑ i ∈ s, q i (x i - y i)) l
+        (𝓝 (∑ i ∈ s, q i (x i - v i))) :=
+      tendsto_finsetSum _ fun i _ ↦ (hq i).continuousAt.tendsto.comp ((hv i).const_sub (x i))
+    apply le_of_tendsto htend
+    filter_upwards [hS] with y hy
+    exact (sum_le_directSumSeminorm q (x-y) s).trans (p.mem_ball_zero.mp (hSS (a := (x,y)) ⟨hx,hy⟩)).le
+  have hsep (i : K) : ∃ q : Seminorm ℂ (Y i), Continuous q ∧ (v i ≠ 0 → q (v i) = 1) := by
+    by_cases h : v i = 0
+    · exact ⟨0, continuous_zero, fun hn ↦ (hn h).elim⟩
+    have := polynormableSpace_separatingDual ℂ (Y i)
+    obtain ⟨φ, hφ⟩ := SeparatingDual.exists_eq_one (R := ℂ) h
+    exact ⟨(normSeminorm ℂ ℂ).comp φ.toLinearMap, φ.continuous.norm, fun _ ↦ by
+      change ‖φ (v i)‖ = 1
+      simp [hφ]⟩
+  choose q hq hsep using hsep
+  obtain ⟨a, ha⟩ := (approx q hq).exists
+  let z : D := DFinsupp.mk a.support fun i ↦ v i
+  have hz (i : K) : z i = v i := by
+    rw [show z i = _ from DFinsupp.mk_apply]
+    split_ifs with hi
+    · rfl
+    · by_contra h
+      have := ha {i}
+      have hai : a i = 0 := DFinsupp.notMem_support_iff.mp hi
+      simp [hai, hsep i (Ne.symm h)] at this
+      linarith
+  refine ⟨z, (Filter.tendsto_sub_const_iff z).mp ?_⟩
+  rw [sub_self]
+  apply (PolynormableSpace.hasBasis_zero_ball ℂ D).tendsto_right_iff.mpr
+  intro p hp
+  let r (i : K) := p.comp (lof i)
+  have hr i : Continuous (r i) := hp.comp (globalThetaIsotypeSum_continuous_finalTopology_stage lof i)
+  filter_upwards [approx r hr] with x hx
+  let d := x - z
+  have hsum := Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p)
+    d.support (fun i ↦ lof i (d i))
+  rw [show (∑ i ∈ d.support, lof i (d i)) = d from DirectSum.sum_support_of d] at hsum
+  apply p.mem_ball_zero.mpr
+  refine hsum.trans_lt ((le_trans ?_ (hx d.support)).trans_lt (by norm_num))
+  apply Finset.sum_le_sum
+  intro i _
+  change p (lof i (x i - z i)) ≤ p (lof i (x i - v i))
+  rw [hz]
+
+/-- A compatible uniform additive group structure is determined by its topology. -/
+private theorem globalThetaIsotypeSum_uniform_eq {A : Type*} [AddCommGroup A] (t : TopologicalSpace A)
+    (h : @IsTopologicalAddGroup A t _) (u : UniformSpace A) (hu : u.toTopologicalSpace = t)
+    (hg : @IsUniformAddGroup A u _) : u = @IsTopologicalAddGroup.rightUniformSpace A _ t h := by
+  subst t
+  exact (@IsUniformAddGroup.rightUniformSpace_eq A u _ hg).symm
+
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex direct sum of the global isotypes is Hausdorff and complete. -/
 theorem globalThetaIsotypeSum_complete :
@@ -203,7 +345,37 @@ theorem globalThetaIsotypeSum_complete :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
     T2Space D ∧ PolynormableSpace ℂ D ∧
       ∀ (u : UniformSpace D), u.toTopologicalSpace = (inferInstance : TopologicalSpace D) →
-        @IsUniformAddGroup D u _ → @CompleteSpace D u := by sorry
+        @IsUniformAddGroup D u _ → @CompleteSpace D u := by
+  classical
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed (adelicTheta_ker_isClosed (F := F))
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup Θ𝔽 := PolynormableSpace.isTopologicalAddGroup ℂ _
+  let : UniformSpace Θ𝔽 := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup Θ𝔽 := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace Θ𝔽 := globalAdelicThetaSpace_complete
+  let X := fun ω : PontryaginDual C₁ ↦ ↥(E𝔽(ω))
+  let D := ⨁ ω, X ω
+  let lof := DirectSum.lof ℂ (PontryaginDual C₁) X
+  let : ∀ ω, UniformSpace (X ω) := fun ω ↦ UniformSpace.comap Subtype.val inferInstance
+  let : ∀ ω, IsUniformAddGroup (X ω) := fun ω ↦
+    IsUniformAddGroup.comap (f := (E𝔽(ω)).subtype.toAddMonoidHom)
+  let : ∀ ω, CompleteSpace (X ω) := fun ω ↦ (globalThetaIsotypicAverage_equiv ω).1.completeSpace_coe
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD := globalThetaIsotypeSum_finalTopology_withSeminorms lof
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  refine ⟨T2Space.of_injective_continuous (f := fun x : D ↦ fun i ↦ x i)
+    (fun _ _ h ↦ DFinsupp.ext (congrFun h))
+    (continuous_pi (globalThetaIsotypeSum_continuous_lcDirectSum_component X)), inferInstance, ?_⟩
+  intro u hu hg
+  have ht : u.toTopologicalSpace = locallyConvexFinalTopology lof := hu
+  let : UniformSpace D := u
+  let : IsUniformAddGroup D := hg
+  have heq : u = @IsTopologicalAddGroup.rightUniformSpace D _
+      (locallyConvexFinalTopology lof) hD.isTopologicalAddGroup :=
+    globalThetaIsotypeSum_uniform_eq _ hD.isTopologicalAddGroup u ht hg
+  rw [heq]
+  exact globalThetaIsotypeSum_completeSpace_lcDirectSum X
 
 -- The properties referred to in Remark 6.2.1.4(1) are listed in Theorem 5.2.3.1(2).
 local notation "sumProperties(" D ")" =>
