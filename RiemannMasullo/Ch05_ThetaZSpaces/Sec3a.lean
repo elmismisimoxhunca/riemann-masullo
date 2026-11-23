@@ -6,6 +6,7 @@ public import Mathlib.Analysis.Distribution.Support
 public import Mathlib.Algebra.MvPolynomial.Degrees
 public import Mathlib.RingTheory.MvPowerSeries.PiTopology
 public import Mathlib.RingTheory.PowerSeries.PiTopology
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-! # Non-archimedean principal values and distributions supported at the origin
 
@@ -416,12 +417,148 @@ theorem sLocalThetaPrincipalValue_transition {S₀ S T : Finset V}
       (sLocalThetaPrincipalValue F (h₀.trans hST)).comp (sLocalThetaTransition hST) :=
   by sorry
 
+open Classical in
+private theorem sLocalThetaPrincipalValue_toGlobal_compactOpenIndicator
+    {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (H : Subgroup G) (ho : IsOpen (H : Set G)) (hc : IsCompact (H : Set G)) :
+    ∃ c : SchwartzBruhat G, ∀ x, c x = if x ∈ H then 1 else 0 := by
+  let : CompactSpace H := isCompact_iff_compactSpace.mp hc
+  let : CompactSpace (lcaAnnihilator H) := isCompact_iff_compactSpace.mp (isCompact_lcaAnnihilator H ho)
+  let a : BruhatStructuralPair G :=
+    ⟨(H, OrderDual.toDual H), ho, isCompactlyGeneratedGroup_of_compact,
+      ⟨H.isClosed_of_isOpen ho, isOpen_lcaAnnihilator H hc,
+        isCompactlyGeneratedGroup_of_compact (G := lcaAnnihilator H)⟩, le_rfl⟩
+  let : Subsingleton a.quotient := by
+    change Subsingleton (H ⧸ H.comap H.subtype)
+    have ht : H.comap H.subtype = ⊤ := eq_top_iff.mpr fun x _ ↦ x.property
+    rw [ht]
+    exact QuotientGroup.subsingleton_quotient_top
+  let A := Multiplicative (ElementaryLieGroup 0 0 0 PUnit)
+  let : Subsingleton A := inferInstanceAs (Subsingleton (ElementaryLieGroup 0 0 0 PUnit))
+  let j : a.quotient ≃* A := MulEquiv.ofBijective (1 : a.quotient →* A)
+    ⟨fun _ _ _ ↦ Subsingleton.elim _ _, fun y ↦ ⟨1, Subsingleton.elim _ y⟩⟩
+  let e : ElementaryLCAPresentation a.quotient :=
+    { realDim := 0, torusDim := 0, latticeRank := 0, finiteFactor := PUnit
+      equiv := { j with
+        continuous_toFun := (continuous_const (y := (1 : A))).congr fun _ ↦ Subsingleton.elim _ _
+        continuous_invFun := (continuous_const (y := (1 : a.quotient))).congr fun _ ↦ Subsingleton.elim _ _ } }
+  let s : SchwartzBruhatStage e := ⟨fun _ ↦ 1, by
+    refine ⟨fun _ _ ↦ contDiff_const, fun i ↦ ?_⟩
+    rw [Subsingleton.elim i (0, 0, 0, 0)]
+    simp [elementarySchwartzBound_zero]⟩
+  refine ⟨schwartzBruhatStageInclusion a e s, fun x ↦ ?_⟩
+  rw [schwartzBruhatStageInclusion_apply, schwartzBruhatStageRealization_apply]
+  by_cases hx : x ∈ H
+  · rw [dite_eq_left (show x ∈ a.val.1 from hx), ite_eq_left hx]
+  · rw [dite_eq_right (show x ∉ a.val.1 from hx), ite_eq_right hx]
+
+open Classical in
+open scoped RestrictedProduct in
+private theorem sLocalThetaPrincipalValue_toGlobal_indicator (S : Finset V) :
+    ∃ c : ℬ(FiniteAdeleTail F S), ∀ x : FiniteAdeleTail F S,
+      c (Multiplicative.ofAdd x) = if ∀ w, x w ∈ w.val.adicCompletionIntegers F then 1 else 0 := by
+  let I := {w : V // w ∉ S}
+  let E := FiniteAdeleTail F S
+  let H : AddSubgroup E :=
+    { carrier := {x | ∀ w : I, x w ∈ w.val.adicCompletionIntegers F}
+      zero_mem' := fun w ↦ (w.val.adicCompletionIntegers F).zero_mem
+      add_mem' := fun ha hb w ↦ (w.val.adicCompletionIntegers F).toSubring.add_mem (ha w) (hb w)
+      neg_mem' := fun ha w ↦ (w.val.adicCompletionIntegers F).toSubring.neg_mem (ha w) }
+  have ho : IsOpen (H : Set E) :=
+    RestrictedProduct.isOpen_forall_mem (R := fun w : I ↦ w.val.adicCompletion F)
+      (A := fun w ↦ (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F)))
+      (fun w ↦ Valued.isOpen_valuationSubring _)
+  let (w : I) : CompactSpace (w.val.adicCompletionIntegers F) := compactSpace_adicCompletionIntegers w.val
+  let j (a : ∀ w : I, w.val.adicCompletionIntegers F) : E :=
+    ⟨fun w ↦ a w, .of_forall fun w ↦ (a w).property⟩
+  have hj : Continuous j := continuous_restrictedProduct_of_uniform
+    (fun w ↦ continuous_subtype_val.comp (continuous_apply w)) (.of_forall fun w a ↦ (a w).property)
+  have hc : IsCompact (H : Set E) := by
+    convert isCompact_range hj using 1
+    ext x
+    exact ⟨fun hx ↦ ⟨fun w ↦ ⟨x w, hx w⟩, rfl⟩, fun ⟨a, ha⟩ w ↦ ha ▸ (a w).property⟩
+  let : Fact (∀ w : I, IsOpen (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F))) :=
+    ⟨fun w ↦ Valued.isOpen_valuationSubring _⟩
+  let : IsTopologicalRing E := RestrictedProduct.isTopologicalRing (fun w : I ↦ w.val.adicCompletion F)
+  let : T2Space (Multiplicative E) :=
+    inferInstanceAs (T2Space (Πʳ w : I, [w.val.adicCompletion F, w.val.adicCompletionIntegers F]))
+  let : LocallyCompactSpace (Multiplicative E) := by
+    change LocallyCompactSpace (Πʳ w : I, [w.val.adicCompletion F, w.val.adicCompletionIntegers F])
+    infer_instance
+  exact sLocalThetaPrincipalValue_toGlobal_compactOpenIndicator H.toSubgroup ho hc
+
+open Classical in
+private theorem sLocalThetaPrincipalValue_toGlobal_tensor (S : Finset V) (f : ℬₛ(S))
+    (c : ℬ(FiniteAdeleTail F S))
+    (hc : ∀ x : FiniteAdeleTail F S, c (Multiplicative.ofAdd x) =
+      if ∀ w, x w ∈ w.val.adicCompletionIntegers F then 1 else 0) :
+    (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] c) =
+      sAdeleSchwartzToGlobal F S f := by
+  apply Subtype.ext
+  funext x
+  change (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] c)
+    (Multiplicative.ofAdd x.toAdd) = sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd x.toAdd)
+  have hi : (∀ w, finiteAdeleTailProjection F S x.toAdd.2 w ∈ w.val.adicCompletionIntegers F) ↔
+      ∀ w : V, w ∉ S → x.toAdd.2 w ∈ w.adicCompletionIntegers F :=
+    ⟨fun h w hw ↦ h ⟨w, hw⟩, fun h w ↦ h w.val w.property⟩
+  calc
+    _ = f (Multiplicative.ofAdd (adeleProjection F S x.toAdd)) *
+        c (Multiplicative.ofAdd (finiteAdeleTailProjection F S x.toAdd.2)) :=
+      (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose_spec f c x.toAdd
+    _ = f (Multiplicative.ofAdd (adeleProjection F S x.toAdd)) *
+        (if ∀ w : V, w ∉ S → x.toAdd.2 w ∈ w.adicCompletionIntegers F then 1 else 0) :=
+      congrArg (fun z : ℂ ↦ f (Multiplicative.ofAdd (adeleProjection F S x.toAdd)) * z)
+        ((hc _).trans (if_congr hi rfl rfl))
+    _ = if ∀ w : V, w ∉ S → x.toAdd.2 w ∈ w.adicCompletionIntegers F then
+        f (Multiplicative.ofAdd (adeleProjection F S x.toAdd)) else 0 := by
+      split <;> simp only [mul_one, mul_zero]
+    _ = _ := (sAdeleSchwartzToGlobal_apply F S f x.toAdd).symm
+
+open Classical in
+private theorem sLocalThetaPrincipalValue_toGlobal_tests {S₀ S : Finset V} (h₀ : S₀ ⊆ S)
+    (f : ℬₛ(S)) (c : ℬ(FiniteAdeleTail F S))
+    (hc : ∀ x : FiniteAdeleTail F S, c (Multiplicative.ofAdd x) =
+      if ∀ w, x w ∈ w.val.adicCompletionIntegers F then 1 else 0) :
+    sAdeleSchwartzToGlobal F S (sAdelePrincipalValue F h₀ f) =
+      adelePrincipalValue F S₀ (sAdeleSchwartzToGlobal F S f) := by
+  calc
+    _ = (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose
+        (sAdelePrincipalValue F h₀ f ⊗ₜ[ℂ] c) :=
+      (sLocalThetaPrincipalValue_toGlobal_tensor S (sAdelePrincipalValue F h₀ f) c hc).symm
+    _ = adelePrincipalValue F S₀
+        ((sAdeleTailSchwartz_inductiveTensor_equiv F S).choose (f ⊗ₜ[ℂ] c)) :=
+      (adelePrincipalValue_tmul h₀ f c).symm
+    _ = _ := congrArg (adelePrincipalValue F S₀)
+      (sLocalThetaPrincipalValue_toGlobal_tensor S f c hc)
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The local and global principal value operators commute with insertion of an S-local theta stage. -/
 theorem sLocalThetaPrincipalValue_toGlobal {S₀ S : Finset V}
     (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty) :
     (sLocalThetaToGlobal F S).comp (sLocalThetaPrincipalValue F h₀) =
-      (globalThetaPrincipalValue F S₀).comp (sLocalThetaToGlobal F S) := by sorry
+      (globalThetaPrincipalValue F S₀).comp (sLocalThetaToGlobal F S) := by
+  classical
+  let c := (sLocalThetaPrincipalValue_toGlobal_indicator (F := F) S).choose
+  have hc := (sLocalThetaPrincipalValue_toGlobal_indicator (F := F) S).choose_spec
+  apply LinearMap.ext
+  intro x
+  refine Submodule.Quotient.induction_on (Kₛ(S)) x ?_
+  intro f
+  calc
+    _ = sLocalThetaToGlobal F S (sLocalThetaPrincipalValue F h₀ (Submodule.Quotient.mk f)) := rfl
+    _ = sLocalThetaToGlobal F S (Submodule.Quotient.mk (sAdelePrincipalValue F h₀ f)) :=
+      congrArg (sLocalThetaToGlobal F S) (sLocalThetaPrincipalValue_mk h₀ f)
+    _ = (Submodule.Quotient.mk (sAdeleSchwartzToGlobal F S (sAdelePrincipalValue F h₀ f)) : Θ𝔽) :=
+      sLocalThetaToGlobal_mk (sAdelePrincipalValue F h₀ f)
+    _ = Submodule.Quotient.mk (adelePrincipalValue F S₀ (sAdeleSchwartzToGlobal F S f)) :=
+      congrArg (Submodule.Quotient.mk : ℬ(𝔸[F]) → Θ𝔽)
+        (sLocalThetaPrincipalValue_toGlobal_tests h₀ f c hc)
+    _ = globalThetaPrincipalValue F S₀ (Submodule.Quotient.mk (sAdeleSchwartzToGlobal F S f)) :=
+      (globalThetaPrincipalValue_mk S₀ (sAdeleSchwartzToGlobal F S f)).symm
+    _ = globalThetaPrincipalValue F S₀ (sLocalThetaToGlobal F S (Submodule.Quotient.mk f)) :=
+      congrArg (globalThetaPrincipalValue F S₀) (sLocalThetaToGlobal_mk f).symm
+    _ = _ := rfl
 
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The S-local principal value commutes with each S-idele translation on theta classes. -/
