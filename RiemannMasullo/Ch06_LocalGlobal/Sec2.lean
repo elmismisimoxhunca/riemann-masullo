@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch06_LocalGlobal.Sec1
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
+import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Topology.Algebra.IsOpenUnits
@@ -183,6 +184,31 @@ theorem globalThetaIsotypeSum_dense :
     let i := DirectSum.toModule ℂ _ Θ𝔽 (fun ω ↦ (E𝔽(ω)).subtype)
     Continuous i ∧ Injective i ∧ DenseRange i := by sorry
 
+/-- A locally convex direct sum of closed submodules of a complete Hausdorff polynormable
+space is complete for any compatible additive uniformity. -/
+private theorem sLocalThetaIsotypeSum_complete_of_isClosed {I E : Type*} [DecidableEq I] [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [PolynormableSpace ℂ E] [T2Space E] [CompleteSpace E]
+    (P : I → Submodule ℂ E) (hP : ∀ i, IsClosed (P i : Set E)) :
+    let X := fun i ↦ ↥(P i)
+    let D := ⨁ i, X i
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ I X)
+    T2Space D ∧ PolynormableSpace ℂ D ∧
+      ∀ (u : UniformSpace D), u.toTopologicalSpace = (inferInstance : TopologicalSpace D) →
+        @IsUniformAddGroup D u _ → @CompleteSpace D u := by
+  let X := fun i ↦ ↥(P i)
+  let D := ⨁ i, X i
+  let := locallyConvexFinalTopology (DirectSum.lof ℂ I X)
+  have hD := finalTopology_withSeminorms (DirectSum.lof ℂ I X)
+  have : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  have : ∀ i, IsUniformAddGroup (X i) := fun i ↦ (P i).toAddSubgroup.isUniformAddGroup
+  have : ∀ i, CompleteSpace (X i) := fun i ↦ (hP i).completeSpace_coe
+  refine ⟨?_, hD.toPolynormableSpace, ?_⟩
+  · exact T2Space.of_injective_continuous (f := fun x : D ↦ (fun i ↦ x i))
+      (fun _ _ h ↦ DFinsupp.ext (congrFun h)) (continuous_pi (continuous_lcDirectSum_component X))
+  · intro u ht hu
+    rw [hu.ext (isUniformAddGroup_of_addCommGroup (G := D)) (congrArg (fun t ↦ @nhds D t 0) ht)]
+    exact completeSpace_lcDirectSum X
+
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex direct sum of the S-local isotypes is Hausdorff and complete. -/
 theorem sLocalThetaIsotypeSum_complete :
@@ -192,7 +218,18 @@ theorem sLocalThetaIsotypeSum_complete :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
     T2Space D ∧ PolynormableSpace ℂ D ∧
       ∀ (u : UniformSpace D), u.toTopologicalSpace = (inferInstance : TopologicalSpace D) →
-        @IsUniformAddGroup D u _ → @CompleteSpace D u := by sorry
+        @IsUniformAddGroup D u _ → @CompleteSpace D u := by
+  classical
+  have : PolynormableSpace ℂ (Θₛ(S)) := sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  have : T2Space (Θₛ(S)) := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  have : IsTopologicalAddGroup (Θₛ(S)) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  have : ContinuousSMul ℂ (Θₛ(S)) := PolynormableSpace.continuousSMul ℂ _
+  let : UniformSpace (Θₛ(S)) := IsTopologicalAddGroup.rightUniformSpace (Θₛ(S))
+  have : IsUniformAddGroup (Θₛ(S)) := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace (Θₛ(S)) := sLocalAdelicThetaSpace_complete (F := F) (S := S)
+  exact sLocalThetaIsotypeSum_complete_of_isClosed (I := PontryaginDual J₁(S)) (E := Θₛ(S))
+    (actionIsotype (ρₛ₁(S))) (isClosed_actionIsotype (ρₛ₁(S)))
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex direct sum of the global isotypes is Hausdorff and complete. -/
